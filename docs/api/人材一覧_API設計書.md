@@ -26,7 +26,7 @@ GET /api/engineers
 ### ソート
 | パラメータ名 | 型 | 必須 | 説明 |
 |---|---|---|---|
-| sort | string | 任意 | ソート項目（例：更新日, 稼働可能日）|
+| sort | string | 任意 | ソート項目（DBカラム名 例：updated_at, available_date）|
 | order | string | 任意 | 並び順（asc / desc）|
 
 ### ページネーション
@@ -54,15 +54,6 @@ GET /api/engineers
 - 総件数（total）
 - 現在の表示範囲（例：1〜4件 / 50件）
 - 現在ページ
-
-### メタ情報詳細
-| 項目名 | 型 | 説明 |
-|---|---|---|
-| current_page | integer | 現在のページ番号 |
-| per_page | integer | 1ページあたりの件数 |
-| total | integer | 全件数 |
-| from | integer | 現在ページの開始位置 |
-| to | integer | 現在ページの終了位置 |
 
 ### 保存検索条件
 - 保存検索条件（ユーザーと紐づく）
@@ -141,38 +132,49 @@ JSON
 }
 ```
 
-## 関連データ取得
-### 検索条件マスタ
-検索条件の選択肢は以下のマスタから取得する
-- statuses（ステータス一覧）
-- skills（スキル一覧）
-- work_types / phases は固定定義、または設定ファイルから取得
+## レスポンスメタ
+| 項目名 | 型 | 説明 |
+|---|---|---|
+| current_page | integer | 現在のページ番号 |
+| per_page | integer | 1ページあたりの件数 |
+| total | integer | 全件数 |
+| from | integer | 現在ページの開始位置 |
+| to | integer | 現在ページの終了位置 |
 
-## 処理概要
-1. engineersテーブルを基点にクエリ生成
+## 検索仕様
+### 条件ロジック
+- 同一項目内：OR
+- 異なる項目間：AND
 
-1. 検索条件による絞り込み（複数選択対応）
-   - status_ids → whereIn
-   - skill_ids → whereHas（OR条件で検索）
-   - work_types → whereJsonContains('work_type_json', 値) をOR条件で適用（値は文字列キー）
-   - phases → 配列で渡されたキーごとにwhere('phase_json->キー', true) をOR条件で適用
+例：
+
+`
+(Java OR PHP) AND (稼働中) AND (フルリモート)
+`
+### クエリ詳細
+| 条件 | 実装 |
+|---|---|
+| status_ids | whereIn |
+| skill_ids | whereHas（OR）|
+| work_types | whereJsonContains |
+| phases | where('phases->key', true) |
 
 ### 削除データの扱い
 - status = 削除（無効）は除外する
 
+## 処理概要
+1. engineersテーブルを基点にクエリ生成
+1. 削除データ除外
+1. 検索条件適用
 1. ソート条件適用
-   - sort + order
-
 1. ページネーション適用
-   - page, per_page
-
 1. 関連テーブルを取得
    - skills
    - status
    - station
    - route
    - users
-
+1. レスポンス整形
 1. JSON形式で返却
 
 ## 使用テーブル
