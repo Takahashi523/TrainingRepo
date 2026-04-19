@@ -43,9 +43,7 @@ GET /api/engineers
 - 最寄駅
 - 路線
 - スキル（複数）
-- 担当営業
-  - 主担当
-  - サブ担当（nullable）
+- 担当営業（role付）
 - 工程経験（複数）
 - 勤務形態（複数）
 - ステータス
@@ -90,13 +88,18 @@ JSON
         { "id": 1, "name": "Java" },
         { "id": 2, "name": "AWS" }
       ],
-      "users": {
-        "main": {
+      "users": [
+        {
           "id": 1,
           "name": "佐藤"
+          "role": "main"
         },
-        "sub": null
-      },
+        {
+          "id": 2,
+          "name": "鈴木"
+          "role": "sub"
+        }
+      ],
       "phases": [
         { "key": "requirement_definition", "name": "要件定義", "has_experience": false },
         { "key": "basic_design", "name": "基本設計", "has_experience": true },
@@ -154,6 +157,8 @@ JSON
    - work_types → whereJsonContains('work_type_json', 値) をOR条件で適用（値は文字列キー）
    - phases → 配列で渡されたキーごとにwhere('phase_json->キー', true) をOR条件で適用
 
+### 削除データの扱い
+- status = 削除（無効）は除外する
 
 1. ソート条件適用
    - sort + order
@@ -193,3 +198,4 @@ JSON
 - 最寄駅のマスタ連携方式
 - 人材のステータスの管理方法（固定 or マスタ管理）
 - 年齢の計算タイミング（API側 or フロント側）
+- 管理者の削除データ表示可否
