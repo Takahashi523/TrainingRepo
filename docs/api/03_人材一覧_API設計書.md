@@ -18,8 +18,8 @@ GET /api/engineers
 |---|---|---|---|
 | status_ids | array | 任意 | ステータスID配列 |
 | skill_ids | array | 任意 | スキルID配列 |
-| work_type_ids | array | 任意 | 勤務形態ID配列 |
-| phase_ids | array | 任意 | 工程ID配列 |
+| work_types | array | 任意 | 勤務形態（キー配列） |
+| phases | array | 任意 | 工程（キー配列） |
 
 ### ソート
 | パラメータ名 | 型 | 必須 | 説明 |
@@ -87,11 +87,16 @@ JSON
         "sub": null
       },
       "phases": [
-        { "id": 1, "name": "基本設計" }
+        { "key": "requirement_definition", "name": "要件定義", "has_experience": false },
+        { "key": "basic_design", "name": "基本設計", "has_experience": true },
+        { "key": "detailed_design", "name": "詳細設計", "has_experience": true },
+        { "key": "development", "name": "開発", "has_experience": true },
+        { "key": "test", "name": "テスト", "has_experience": true },
+        { "key": "maintenance", "name": "保守運用", "has_experience": false }
       ],
       "work_types": [
-        { "id": 1, "name": "常駐" },
-        { "id": 2, "name": "リモート可" }
+        { "key": "onsite", "name": "常駐可"},
+        { "key": "partial_remote", "name": "一部リモート可"}
       ],
       "status": {
         "id": 1,
@@ -115,7 +120,7 @@ JSON
       "conditions": {
         "skill_ids": [1],
         "status_ids": [1],
-        "work_type_ids": [1]
+        "work_types": ["onsite"]
       }
     }
   ]
@@ -127,17 +132,17 @@ JSON
 検索条件の選択肢は以下のマスタから取得する
 - statuses（ステータス一覧）
 - skills（スキル一覧）
-- work_types（勤務形態一覧）
-- phases（工程一覧）
+- work_types / phases は固定定義、または設定ファイルから取得
 
 ## 処理概要
 1. engineersテーブルを基点にクエリ生成
 
 1. 検索条件による絞り込み（複数選択対応）
-   1. status_ids → whereIn
-   1. skill_ids → whereHas + whereIn
-   1. work_type_ids → whereHas + whereIn
-   1. phase_ids → whereHas + whereIn
+   - status_ids → whereIn
+   - skill_ids → whereHas（OR条件で検索）
+   - work_types → whereJsonContains('work_type_json', 値) をOR条件で適用（値は文字列キー）
+   - phases → 配列で渡されたキーごとにwhere('phase_json->キー', true) をOR条件で適用
+
 
 1. ソート条件適用
    ・sort + order
@@ -147,8 +152,6 @@ JSON
 
 1. 関連テーブルを取得
    ・skills
-   ・phases
-   ・work_types
    ・status
    ・station
    ・route
@@ -161,10 +164,6 @@ JSON
 | engineers | 人材 | 人材の基本情報 |
 | skills | スキルマスタ | スキル一覧 |
 | engineer_skill | 人材スキル | 人材とスキルの中間テーブル |
-| phases | 工程マスタ | 開発工程（要件定義、設計など） |
-| engineer_phase | 人材工程経験 | 人材と工程の中間テーブル |
-| work_types | 勤務形態マスタ | 常駐・リモートなど |
-| engineer_work_type | 人材勤務形態 | 人材と勤務形態の中間テーブル |
 | statuses | ステータスマスタ | 稼働中・待機中など |
 | users | ユーザー | 営業担当者など |
 | engineer_user | 人材担当営業 | 人材と営業の中間テーブル（主・サブ） |
