@@ -164,6 +164,7 @@ JSON
    - status
    - station
    - route
+   - users
 
 1. JSON形式で返却
 
