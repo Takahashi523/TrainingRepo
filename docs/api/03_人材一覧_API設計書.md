@@ -154,16 +154,16 @@ JSON
 
 
 1. ソート条件適用
-   ・sort + order
+   - sort + order
 
 1. ページネーション適用
-   ・page, per_page
+   - page, per_page
 
 1. 関連テーブルを取得
-   ・skills
-   ・status
-   ・station
-   ・route
+   - skills
+   - status
+   - station
+   - route
 
 1. JSON形式で返却
 
@@ -173,13 +173,13 @@ JSON
 | engineers | 人材 | 人材の基本情報 |
 | skills | スキルマスタ | スキル一覧 |
 | engineer_skill | 人材スキル | 人材とスキルの中間テーブル |
-| statuses | ステータスマスタ | 稼働中・待機中など |
-| users | ユーザー | 営業担当者など |
+| statuses | ステータスマスタ | 提案可 / 面談中 / 稼働中 / 退職等など |
+| users | ユーザー | 営業担当 |
 | engineer_user | 人材担当営業 | 人材と営業の中間テーブル（主・サブ） |
 | saved_filters | 保存検索条件 | ユーザーごとの検索条件保存 |
 
 ## 未確定事項（TBD）
-- ソート項目の最終定義（updated_at / available_date など）
+- ソート項目の最終定義（更新日, 稼働可能時期 など）
 - 1ページあたり件数の上限
 - 保存検索条件の上限件数
 - 検索条件の論理条件（AND検索 / OR検索 の仕様）
