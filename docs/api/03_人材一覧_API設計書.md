@@ -55,6 +55,15 @@ GET /api/engineers
 - 現在の表示範囲（例：1〜4件 / 50件）
 - 現在ページ
 
+### メタ情報詳細
+| 項目名 | 型 | 説明 |
+|---|---|---|
+| current_page | integer | 現在のページ番号 |
+| per_page | integer | 1ページあたりの件数 |
+| total | integer | 全件数 |
+| from | integer | 現在ページの開始位置 |
+| to | integer | 現在ページの終了位置 |
+
 ### 保存検索条件
 - 保存検索条件（ユーザーと紐づく）
 
@@ -108,10 +117,10 @@ JSON
   ],
   "meta": {
     "current_page": 1,
-    "per_page": 20,
-    "total": 100,
+    "per_page": 4,
+    "total": 50,
     "from": 1,
-    "to": 20
+    "to": 4
   },
   "saved_filters": [
     {
