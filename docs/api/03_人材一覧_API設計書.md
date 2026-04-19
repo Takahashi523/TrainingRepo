@@ -184,5 +184,9 @@ JSON
 - 1ページあたり件数の上限
 - 保存検索条件の上限件数
 - 検索条件の論理条件（AND検索 / OR検索 の仕様）
-  - 例：スキル[Java, PHP]で検索する場合、Java OR PHPか、Java AND PHPか。
+  - 同一項目内（skill_ids, work_types, phases）は OR 条件
+  - 異なる項目間は AND 条件
+  - 例：（Java OR PHP）AND（提案可）AND（フルリモート）
+  - 最終仕様は要確認（TBD）
 - 最寄駅のマスタ連携方式未定
+- 人材のステータス選択肢未定
