@@ -32,6 +32,8 @@ POST /api/engineers
 | work_types | array | 任意 | 勤務形態（キー配列） |
 | notes | string | 任意 | 特記事項 |
 | status_id | integer | 必須 | ステータスID |
+| main_user_id | integer | 必須 | 主営業担当ID |
+| sub_user_id | integer | 任意 | サブ営業担当ID |
 
 ### 人材スキル（engineer_skill）
 | パラメータ | 型 | 必須 | 説明 |
@@ -39,12 +41,6 @@ POST /api/engineers
 | skills | array   | 必須 | スキル配列 |
 | skills[].skill_id | integer | 必須 | スキルID |
 | skills[].experience_years | integer | 必須 | 経験年数  |
-
-### 人材担当営業（engineer_user）
-| パラメータ | 型 | 必須 | 説明 |
-|---|---|---|---|
-| main_user_id | integer | 必須 | 主営業担当ID |
-| sub_user_id | integer | 任意 | サブ営業担当ID |
 
 ### リクエスト例
 ```
@@ -142,8 +138,8 @@ JSON
 | work_types | array | 勤務形態 |
 | work_types.* | string / in:onsite,partial_remote,full_remote | 定義済みキーを使用 |
 | notes | string / max:1000 | 特記事項 |
-| main_user_id | required / exists | 主担当 |
-| sub_user_id | nullable / different:main_user_id | サブ担当 |
+| main_user_id | required / exists:users,id | 主担当 |
+| sub_user_id | nullable / exists:users,id / different:main_user_id | サブ担当 |
 
 ※work_typesの値は定数または設定ファイルで管理する
 
@@ -152,7 +148,6 @@ JSON
 1. トランザクション開始
 1. engineersテーブルに登録
 1. engineer_skillテーブルに登録
-1. engineer_userテーブルに登録
 1. ファイル保存（任意）
    - アップロード後、ストレージに保存しファイルパスをDBに保持する
 1. コミット
@@ -167,7 +162,6 @@ JSON
 | engineer_skill | 人材スキル | 人材とスキルの中間テーブル |
 | statuses | ステータスマスタ | 稼働中・待機中など |
 | users | ユーザー | 営業担当者など |
-| engineer_user | 人材担当営業 | 人材と営業の中間テーブル（主・サブ） |
 
 ## 未確定事項（TBD）
 - 最寄駅のマスタ連携方式

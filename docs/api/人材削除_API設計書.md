@@ -43,7 +43,6 @@ DELETE /api/engineers/{id}
 ### 管理者による物理削除時
 以下の関連データも削除対象とする
 - engineer_skill（人材スキル）
-- engineer_user（担当営業）
 - 職務経歴書ファイル（ストレージ）
 
 ## ファイル削除仕様
@@ -99,7 +98,6 @@ JSON
 - 管理者の場合（物理削除）
 4. 関連データ削除
    - engineer_skill
-   - engineer_user
 5. 職務経歴書ファイル削除（存在する場合）
 6. engineersテーブル削除（物理削除）
 
@@ -114,7 +112,6 @@ JSON
 |---|---|---|
 | engineers | 人材 | 人材の基本情報 |
 | engineer_skill | 人材スキル | スキル中間テーブル |
-| engineer_user | 人材担当営業 | 営業担当 |
 | statuses | ステータスマスタ | ステータス管理 |
 
 ## 未確定事項（TBD）

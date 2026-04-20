@@ -37,6 +37,8 @@ PATCH /api/engineers/{id}
 | work_types | array | 任意 | 勤務形態（キー配列）|
 | notes | string | 任意 | 特記事項（最大1000文字） |
 | status_id | integer | 任意 | ステータスID |
+| main_user_id | integer | 任意 | 主営業担当ID |
+| sub_user_id | integer | 任意 | サブ営業担当ID |
 
 ### 人材スキル（engineer_skill）
 | パラメータ | 型 | 必須 | 説明 |
@@ -44,12 +46,6 @@ PATCH /api/engineers/{id}
 | skills | array | 任意 | スキル配列 |
 | skills[].skill_id | integer | 必須（skills指定時） | スキルID |
 | skills[].experience_years | integer | 必須（skills指定時） | 経験年数 |
-
-### 人材担当営業（engineer_user）
-| パラメータ | 型 | 必須 | 説明 |
-|---|---|---|---|
-| main_user_id | integer | 任意 | 主営業担当ID |
-| sub_user_id | integer | 任意 | サブ営業担当ID |
 
 ### リクエスト例
 ```
@@ -89,7 +85,9 @@ JSON
 
 ### 担当営業更新ルール
 - main_user_id / sub_user_id が指定された場合
-  - 既存レコードを更新
+  - engineersテーブルの該当カラムを上書き更新する
+- 未指定の場合
+  - 変更なし
 
 ### ファイル更新ルール
 - resume_fileが指定された場合
@@ -163,8 +161,8 @@ JSON
 | work_types | sometimes / array | 勤務形態 |
 | work_types.* | sometimes / string / in:onsite,partial_remote,full_remote | 勤務形態の各要素（定義済みキーのみ許可） |
 | notes | sometimes / string / max:1000 | 特記事項 |
-| main_user_id | sometimes / exists | 主担当 |
-| sub_user_id | nullable / exists / different:main_user_id | サブ担当 |
+| main_user_id | sometimes / exists:users,id | 主担当 |
+| sub_user_id | sometimes / nullable / exists:users,id / different:main_user_id | サブ担当 |
 
 ### 処理概要
 1. 対象データ存在チェック（存在しなければ404）
@@ -172,7 +170,6 @@ JSON
 1. トランザクション開始
 1. engineersテーブル更新
 1. engineer_skill更新（必要な場合）
-1. engineer_user更新（必要な場合）
 1. ファイル更新（必要な場合）
 1. コミット
 1. レスポンス返却
@@ -184,7 +181,6 @@ JSON
 |---|---|---|
 | engineers | 人材 | 人材の基本情報 |
 | engineer_skill | 人材スキル | 人材とスキルの中間テーブル |
-| engineer_user | 人材担当営業 | 人材と営業の中間テーブル（主・サブ） |
 | skills | スキルマスタ | スキル一覧 |
 | statuses | ステータスマスタ | 稼働中・待機中など |
 | users | ユーザー | 営業担当 |

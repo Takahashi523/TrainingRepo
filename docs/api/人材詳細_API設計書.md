@@ -29,7 +29,7 @@ GET /api/engineers/{id}
 - 稼働可能日
 - 最寄駅
 - 路線
-- 担当営業（role付）
+- 担当営業（主・サブ）
 - スキル（複数）
   - スキル名
   - 経験年数
@@ -63,18 +63,16 @@ JSON
       "id": 3,
       "name": "山手線"
     },
-    "users": [
-      {
+    "users": {
+      "main": {
         "id": 1,
         "name": "佐藤"
-        "role": "main"
       },
-      {
+      "sub": {
         "id": 2,
         "name": "鈴木"
-        "role": "sub"
       }
-    ],
+    },
     "skills": [
       {
         "id": 1,
@@ -155,7 +153,7 @@ GET /api/engineers/{id}/resume
    - statuses
    - stations
    - routes
-   - users（主・サブ）
+   - users (main_user_id / sub_user_id から取得)
 1. JSON整形
 1. レスポンス返却
 
@@ -167,7 +165,6 @@ GET /api/engineers/{id}/resume
 | engineer_skill | 人材スキル | スキル＋経験年数 |
 | statuses | ステータスマスタ | ステータス |
 | users | ユーザー | 営業担当 |
-| engineer_user | 人材担当営業 | 主・サブ |
 | stations | 駅マスタ | 最寄駅 |
 | routes | 路線マスタ | 路線 |
 
