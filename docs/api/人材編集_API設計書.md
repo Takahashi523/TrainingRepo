@@ -161,7 +161,7 @@ JSON
 | resume_file | sometimes / file / mimes:pdf / max:5120 | PDFのみ（5MB以内） |
 | desired_monthly_rate | sometimes / integer / min:0 | 数値 |
 | work_types | sometimes / array | 勤務形態 |
-| work_types.* | sometimes / string / in:onsite,partial_remote,full_remote | |
+| work_types.* | sometimes / string / in:onsite,partial_remote,full_remote | 勤務形態の各要素（定義済みキーのみ許可） |
 | notes | sometimes / string / max:1000 | 特記事項 |
 | main_user_id | sometimes / exists | 主担当 |
 | sub_user_id | nullable / exists / different:main_user_id | サブ担当 |

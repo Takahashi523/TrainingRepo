@@ -134,7 +134,7 @@ JSON
 | skills.*.experience_years | required / integer / min:0 | 経験年数 |
 | phases | required / array | 工程経験 |
 | phases.* | boolean | true / false |
-| phases |  | ※少なくとも1つはtrueであること |
+| phases | カスタムバリデーション | 少なくとも1つはtrue |
 | client_communication_experience | required / boolean | 顧客折衝経験 |
 | self_promotion | string / max:1000 | PRポイント |
 | resume_file | file / mimes:pdf / max:5120 | PDFのみ（5MB以内） |
@@ -144,6 +144,7 @@ JSON
 | notes | string / max:1000 | 特記事項 |
 | main_user_id | required / exists | 主担当 |
 | sub_user_id | nullable / different:main_user_id | サブ担当 |
+
 ※work_typesの値は定数または設定ファイルで管理する
 
 ## 処理概要
@@ -171,4 +172,5 @@ JSON
 ## 未確定事項（TBD）
 - 最寄駅のマスタ連携方式
 - 職務経歴のファイル形式未定
+- 職務経歴のファイルサイズ上限（現状5MB）
 - 人材のステータスの管理方法（固定 or マスタ管理）
