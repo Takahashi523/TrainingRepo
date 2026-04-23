@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_10_進捗管理_パイプライン v16 | 国内SES 人材・案件マッチングシステム</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+  }
+
+  .app-shell {
+    display: flex;
+    width: 1440px;
+    height: 100vh;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: 220px; height: 100%;
+    border-right: 1.5px solid #555;
+    background: #fafafa;
+    flex-shrink: 0;
+    display: flex; flex-direction: column;
+    z-index: 1;
+  }
+
+  .sidebar-logo {
+    padding: 16px 14px 14px;
+    border-bottom: 1.5px solid #555;
+    font-size: 11px; font-weight: 700;
+    color: #333; line-height: 1.5;
+  }
+
+  .sidebar-logo .logo-mark {
+    display: inline-block;
+    width: 28px; height: 28px;
+    border: 2px solid #333;
+    margin-bottom: 6px; position: relative;
+  }
+  .sidebar-logo .logo-mark::before,
+  .sidebar-logo .logo-mark::after {
+    content: ''; position: absolute; background: #333;
+  }
+  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
+  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
+
+  .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+  .nav-section-label {
+    font-size: 10px; color: #888; font-weight: 700;
+    padding: 10px 14px 4px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px; color: #444;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+
+  .nav-item.active {
+    background: #e8e8e8; border-left-color: #333;
+    font-weight: 700; color: #111;
+  }
+
+  .nav-item:hover:not(.active) { background: #f2f2f2; }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    border: 1.5px solid #666; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  .nav-item.active .nav-icon { border-color: #111; background: #333; color: #fff; }
+
+  .nav-badge {
+    margin-left: auto;
+    background: #555; color: #fff;
+    font-size: 9px; padding: 1px 5px;
+    border-radius: 8px; font-weight: 700;
+  }
+
+  .sidebar-bottom { border-top: 1.5px solid #ccc; flex-shrink: 0; }
+  .sidebar-footer { padding: 12px 14px; font-size: 11px; color: #777; border-bottom: 1px solid #e8e8e8; }
+  .nav-item.logout { color: #888; }
+  .nav-item.logout .nav-icon { border-color: #aaa; color: #aaa; }
+
+  /* ===== MAIN ===== */
+  .main-content {
+    flex: 1; display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+  }
+
+  .page-header {
+    padding: 16px 24px 14px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0; background: #fff;
+  }
+
+  .page-title { font-size: 18px; font-weight: 700; color: #111; }
+  .page-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* ===== COMMON ===== */
+  .btn {
+    height: 32px; padding: 0 14px;
+    border: 1.5px solid #555; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #333; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .btn.btn-primary { background: #333; color: #fff; border-color: #333; }
+  .btn.btn-ghost   { border-color: #bbb; color: #666; font-weight: 400; }
+  .btn.btn-danger  { border-color: #c00; color: #c00; }
+  .btn.btn-sm { height: 26px; padding: 0 10px; font-size: 11px; }
+
+  .tbd-label {
+    display: inline-flex; align-items: center;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.04);
+    color: #c00; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  }
+
+  .should-badge {
+    display: inline-block;
+    border: 1px dashed #888; color: #888;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 4px; border-radius: 2px;
+    margin-left: 4px; vertical-align: middle;
+  }
+
+  .wf-select {
+    height: 32px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 24px 0 8px; font-size: 12px; font-family: inherit;
+    color: #444; border-radius: 3px;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    cursor: pointer;
+  }
+
+  .wf-input {
+    height: 32px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 10px; font-size: 12px; font-family: inherit;
+    color: #555; border-radius: 3px;
+  }
+
+  .wf-textarea {
+    border: 1.5px solid #999; background: #fff;
+    padding: 8px 10px; font-size: 12px; font-family: inherit;
+    color: #555; border-radius: 3px; width: 100%;
+    resize: vertical; line-height: 1.6;
+  }
+
+  .filter-label { font-size: 11px; color: #666; font-weight: 600; white-space: nowrap; }
+  .filter-sep { width: 1px; height: 24px; background: #ccc; flex-shrink: 0; }
+
+  /* フリーワード検索（WF_03と同一） */
+  .search-wrap { position: relative; }
+  .search-icon {
+    position: absolute; left: 8px; top: 50%;
+    transform: translateY(-50%); font-size: 13px; color: #999;
+  }
+  .wf-input.search-box { width: 220px; }
+  .wf-input.with-icon { padding-left: 28px; }
+
+  /* 絞り込み条件バッジ（WF_03と同一） */
+  .active-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px;
+    border: 1.5px solid #555; border-radius: 20px;
+    font-size: 11px; color: #333; background: #eee;
+    white-space: nowrap;
+  }
+
+  /* フィルタ折りたたみバー */
+  .filter-toggle-bar {
+    display: flex; align-items: center;
+    padding: 8px 24px;
+    background: #f7f7f7;
+    border-bottom: 1.5px solid #ddd;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+    gap: 10px;
+  }
+
+  .filter-toggle-bar:hover { background: #f0f0f0; }
+
+  .filter-toggle-icon {
+    font-size: 14px; color: #555; flex-shrink: 0;
+  }
+
+  .filter-toggle-label {
+    font-size: 12px; font-weight: 600; color: #444;
+    white-space: nowrap;
+  }
+
+  .filter-toggle-summary {
+    display: inline-flex; align-items: center;
+    padding: 2px 10px;
+    background: #eee; border: 1.5px solid #ccc;
+    border-radius: 20px;
+    font-size: 11px; color: #555;
+    white-space: nowrap; max-width: 400px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .filter-toggle-arrow {
+    margin-left: auto;
+    font-size: 11px; color: #888; flex-shrink: 0;
+  }
+
+  /* ===== TAB ===== */
+  .tab-bar {
+    display: flex; align-items: flex-end;
+    border-bottom: 2px solid #ddd;
+    padding: 0 24px;
+    background: #fff; flex-shrink: 0;
+  }
+
+  .tab-item {
+    padding: 10px 18px 8px;
+    font-size: 13px; font-weight: 600; color: #888;
+    cursor: pointer; border-bottom: 3px solid transparent;
+    margin-bottom: -2px; white-space: nowrap;
+  }
+
+  .tab-item.active { color: #111; border-bottom-color: #333; }
+
+  .tab-count {
+    display: inline-block;
+    background: #999; color: #fff;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 8px; margin-left: 5px;
+  }
+
+  .tab-item.active .tab-count { background: #333; }
+
+  /* ===== FILTER ===== */
+  .filter-area {
+    background: #f7f7f7;
+    border-bottom: 1.5px solid #ddd;
+    padding: 12px 24px; flex-shrink: 0;
+  }
+
+  .filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* ===== KANBAN ===== */
+  .kanban-wrapper {
+    flex: 1; overflow-x: auto; overflow-y: hidden;
+    background: #ebebeb;
+    display: flex; flex-direction: column;
+  }
+
+  .kanban-board {
+    display: flex; flex-direction: row;
+    height: 100%; min-width: max-content;
+  }
+
+  .phase-block {
+    display: flex; flex-direction: column;
+    border-right: 2px solid #c0c0c0; flex-shrink: 0;
+  }
+  .phase-block:last-child { border-right: none; }
+
+  .phase-header {
+    padding: 7px 14px 5px;
+    background: #d8d8d8;
+    border-bottom: 1.5px solid #c0c0c0;
+    font-size: 10px; font-weight: 700; color: #555;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    white-space: nowrap; flex-shrink: 0;
+  }
+
+  .phase-columns {
+    display: flex; flex-direction: row;
+    flex: 1; overflow: hidden;
+  }
+
+  .kanban-col {
+    width: 175px; min-width: 175px;
+    display: flex; flex-direction: column;
+    border-right: 1px solid #d0d0d0;
+    background: #f2f2f2; flex-shrink: 0;
+  }
+  .kanban-col:last-child { border-right: none; }
+
+  .col-header {
+    padding: 7px 10px;
+    background: #e4e4e4;
+    border-bottom: 1.5px solid #ccc;
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  }
+
+  .col-title {
+    font-size: 11px; font-weight: 700; color: #333;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .col-count {
+    margin-left: auto;
+    background: #bbb; color: #fff;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 8px; flex-shrink: 0;
+  }
+
+  .col-cards {
+    flex: 1; overflow-y: auto;
+    padding: 8px; display: flex;
+    flex-direction: column; gap: 8px;
+  }
+
+  .col-empty {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #ccc;
+  }
+
+  /* ===== カード ===== */
+  .pipeline-card {
+    background: #fff;
+    border: 1.5px solid #bbb;
+    border-radius: 4px;
+    padding: 10px;
+    cursor: pointer;
+  }
+
+  .pipeline-card:hover { border-color: #555; background: #fafafa; }
+  .pipeline-card.active-card { border-color: #333; box-shadow: 0 0 0 2px rgba(0,0,0,0.1); }
+
+  .card-engineer {
+    font-size: 12px; font-weight: 700; color: #111;
+    margin-bottom: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .card-project {
+    font-size: 10px; color: #777;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 6px;
+  }
+
+  .card-rank-row {
+    display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
+  }
+
+  .rank-badge {
+    font-size: 10px; font-weight: 700; color: #fff;
+    background: #333; padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  }
+  .rank-badge.rank-b { background: #777; }
+  .rank-badge.rank-c { background: #fff; color: #555; border: 1.5px dashed #aaa; }
+  .rank-badge.rank-none { background: #eee; color: #aaa; border: 1.5px dashed #ccc; font-weight: 400; }
+
+  .card-score { font-size: 11px; font-weight: 700; color: #555; }
+  .card-divider { height: 1px; background: #eee; margin: 6px 0; }
+
+  .card-meta { display: flex; flex-direction: column; gap: 3px; }
+
+  .card-meta-row {
+    display: flex; align-items: flex-start; gap: 4px;
+    font-size: 10px; line-height: 1.4;
+  }
+
+  .card-meta-label {
+    color: #aaa; font-size: 9px; font-weight: 700;
+    flex-shrink: 0; min-width: 32px; padding-top: 1px;
+  }
+
+  .card-meta-val {
+    color: #555; flex: 1; overflow: hidden;
+    white-space: nowrap; text-overflow: ellipsis;
+  }
+
+  .card-meta-val.alert { color: #c00; font-weight: 700; }
+  .card-meta-val.empty { color: #ccc; }
+
+  /* カード内ステータス変更（即時反映） */
+  .card-status-select {
+    margin-top: 8px; width: 100%; height: 26px;
+    border: 1.5px solid #ccc; background: #fafafa;
+    padding: 0 22px 0 6px; font-size: 10px; font-family: inherit;
+    color: #555; border-radius: 2px;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23888'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 6px center;
+    cursor: pointer;
+  }
+
+  /* ===== 完了済みタブ ===== */
+  .done-view {
+    display: none; flex: 1;
+    overflow: hidden; flex-direction: column;
+  }
+
+  .table-area {
+    flex: 1; overflow-y: auto;
+    padding: 20px 24px; background: #f5f5f5;
+  }
+
+  .data-table {
+    width: 100%; border-collapse: collapse;
+    background: #fff; border: 1.5px solid #ccc;
+    font-size: 12px;
+  }
+
+  .data-table th {
+    background: #e8e8e8; padding: 9px 12px;
+    text-align: left; font-size: 11px; font-weight: 700; color: #444;
+    border-bottom: 1.5px solid #ccc; white-space: nowrap;
+  }
+
+  .data-table td {
+    padding: 9px 12px; border-bottom: 1px solid #eee;
+    color: #333; vertical-align: middle;
+  }
+
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #fafafa; }
+
+  .status-chip {
+    display: inline-block; padding: 2px 8px;
+    border: 1.5px solid #999; border-radius: 20px;
+    font-size: 10px; font-weight: 700; color: #555; white-space: nowrap;
+  }
+
+  /* ===== DRAWER ===== */
+  .drawer-overlay {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.25);
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.25s; z-index: 20;
+  }
+
+  .drawer-overlay.open { opacity: 1; visibility: visible; }
+
+  .drawer {
+    position: absolute; top: 0; right: -500px;
+    width: 480px; height: 100%;
+    background: #fff;
+    border-left: 1.5px solid #ccc;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.12);
+    transition: right 0.25s ease;
+    z-index: 30;
+    display: flex; flex-direction: column;
+  }
+
+  .drawer.open { right: 0; }
+
+  /* ドロワーヘッダー：人材名・案件名・ステータス変更を集約 */
+  .drawer-header {
+    padding: 14px 16px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-shrink: 0; background: #fff;
+  }
+
+  .drawer-header-left { flex: 1; min-width: 0; }
+
+  .drawer-engineer {
+    font-size: 15px; font-weight: 700; color: #111;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .drawer-project {
+    font-size: 12px; color: #777; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 8px;
+  }
+
+  /* ステータス変更エリア（ヘッダー内） */
+  .drawer-status-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+
+  .current-status-label { font-size: 11px; color: #888; font-weight: 600; white-space: nowrap; }
+
+  .current-status-badge {
+    display: inline-block; padding: 3px 10px;
+    border: 1.5px solid #333; border-radius: 20px;
+    font-size: 11px; font-weight: 700; color: #333; white-space: nowrap;
+  }
+
+  /* ヘッダー内ステータス変更プルダウン */
+  .drawer-status-select {
+    height: 28px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 24px 0 8px; font-size: 11px; font-family: inherit;
+    color: #444; border-radius: 3px;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    cursor: pointer; flex: 1; min-width: 0;
+  }
+
+  .drawer-links { display: flex; gap: 10px; margin-top: 8px; }
+
+  .drawer-link {
+    font-size: 11px; color: #555;
+    text-decoration: underline; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+
+  .drawer-close {
+    width: 28px; height: 28px;
+    border: 1.5px solid #ccc; background: #fff;
+    font-size: 14px; color: #888;
+    cursor: pointer; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-left: 10px;
+  }
+
+  /* ドロワーボディ */
+  .drawer-body {
+    flex: 1; overflow-y: auto;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  .drawer-section-title {
+    font-size: 10px; font-weight: 700; color: #999;
+    letter-spacing: 0.07em; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  /* スコアサマリー */
+  .score-summary {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 14px; background: #f5f5f5;
+    border: 1.5px solid #ddd; border-radius: 4px;
+  }
+
+  .score-rank-col {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0;
+  }
+
+  .score-big { font-size: 30px; font-weight: 700; color: #111; line-height: 1; }
+  .score-big-unit { font-size: 12px; color: #888; font-weight: 400; }
+  .score-bar-area { flex: 1; }
+  .score-bar-bg { height: 10px; background: #e0e0e0; border-radius: 5px; overflow: hidden; }
+  .score-bar-fill { height: 100%; background: #555; border-radius: 5px; }
+
+  /* スコア内訳（折りたたみ） */
+  .accordion {
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .accordion-toggle {
+    width: 100%; padding: 7px 12px;
+    background: #f5f5f5;
+    border: none; cursor: pointer;
+    font-size: 11px; font-weight: 600; font-family: inherit;
+    color: #666; text-align: left;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .accordion-toggle:hover { background: #eeeeee; }
+
+  .accordion-arrow { font-size: 10px; color: #999; transition: transform 0.2s; }
+  .accordion.open .accordion-arrow { transform: rotate(180deg); }
+
+  .accordion-body {
+    display: none;
+    padding: 10px;
+    background: #fff;
+  }
+
+  .accordion.open .accordion-body { display: block; }
+
+  .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+
+  .breakdown-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 8px; background: #fafafa;
+    border: 1px solid #eee; border-radius: 3px; font-size: 11px;
+  }
+
+  .breakdown-name { color: #666; }
+  .breakdown-score { font-weight: 700; }
+  .breakdown-score.full { color: #333; }
+  .breakdown-score.partial { color: #777; }
+  .breakdown-score.zero { color: #ccc; }
+
+  /* AI */
+  .ai-block {
+    background: #f7f7f7; border: 1.5px solid #ddd;
+    border-radius: 4px; padding: 12px 14px;
+  }
+
+  .ai-block-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+
+  .ai-badge {
+    background: #555; color: #fff;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 6px; border-radius: 2px;
+  }
+
+  .ai-section-title { font-size: 12px; font-weight: 700; color: #333; }
+  .ai-text { font-size: 12px; color: #333; line-height: 1.7; }
+  .ai-divider { height: 1px; background: #e0e0e0; margin: 8px 0; }
+  .ai-shortage-title { font-size: 11px; font-weight: 700; color: #c00; margin-bottom: 5px; }
+  .ai-shortage-text { font-size: 12px; color: #555; line-height: 1.7; }
+
+  /* 管理情報フォーム */
+  .info-form-block {
+    background: #fff; border: 1.5px solid #ddd;
+    border-radius: 4px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  .form-row { display: flex; flex-direction: column; gap: 4px; }
+  .form-row-label { font-size: 10px; font-weight: 700; color: #888; }
+
+  /* ドロワーフッター */
+  .drawer-footer {
+    padding: 12px 16px;
+    border-top: 1.5px solid #ddd;
+    background: #fafafa;
+    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark"></div>
+      <div>SES マッチング<br>システム</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">メイン</div>
+      <div class="nav-item">
+        <span class="nav-icon">◫</span><span>ダッシュボード</span>
+      </div>
+
+      <div class="nav-section-label">人材</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span><span>人材一覧</span>
+      </div>
+
+      <div class="nav-section-label">案件</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span><span>案件一覧</span>
+      </div>
+
+      <div class="nav-section-label">進捗管理</div>
+      <div class="nav-item active">
+        <span class="nav-icon">⊞</span><span>パイプライン</span>
+        <!-- 進行中カード3枚に修正 -->
+        <span class="nav-badge">2</span>
+      </div>
+
+      <div class="nav-section-label">管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">↓</span><span>CSV入出力</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">⚙</span><span>マスタ管理</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">田中 営業（ログイン中）</div>
+      <div class="nav-item logout">
+        <span class="nav-icon">→</span><span>ログアウト</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <div class="page-header">
+      <div>
+        <div class="page-title">進捗管理</div>
+        <div style="font-size:10px;color:#888;margin-top:1px;">※ページヘッダー・タブ・フィルタはstickyで常時固定表示</div>
+        <div class="page-subtitle">人材 × 案件の提案〜参画までのステータスを管理します</div>
+      </div>
+    </div>
+
+    <!-- タブ -->
+    <div class="tab-bar">
+      <div class="tab-item active" id="tab-active" onclick="switchTab('active')">
+        進行中<span class="tab-count">2</span>
+      </div>
+      <div class="tab-item" id="tab-done" onclick="switchTab('done')">
+        完了済み<span class="tab-count">14</span>
+      </div>
+    </div>
+
+    <!-- 折りたたみバー（進行中タブのみ・常時表示） -->
+    <div class="filter-toggle-bar" id="filter-toggle-bar" onclick="toggleFilterArea()">
+      <span class="filter-toggle-icon">⊟</span>
+      <span class="filter-toggle-label">表示条件を指定</span>
+      <span class="filter-toggle-summary" id="filter-summary">すべて表示中</span>
+      <span class="filter-toggle-arrow" id="filter-toggle-arrow">▲</span>
+    </div>
+
+    <!-- フィルタ＋ソートエリア（折りたたみ対象） -->
+    <div id="filter-area-active" class="filter-area">
+      <div class="filter-row" id="filter-active">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="wf-input search-box with-icon" type="text" placeholder="人材名・案件名で検索" id="filter-keyword" oninput="updateSummary()">
+        </div>
+        <div class="filter-sep"></div>
+        <select class="wf-select" style="width:130px;" id="filter-sales" onchange="updateSummary()">
+          <option value="">担当営業（全員）</option>
+          <option value="田中">田中 営業</option>
+          <option value="鈴木">鈴木 営業</option>
+          <option value="佐藤">佐藤 営業</option>
+        </select>
+        <select class="wf-select" style="width:120px;" id="filter-rank" onchange="updateSummary()">
+          <option value="">ランク（全て）</option>
+          <option value="A">A（80点以上）</option>
+          <option value="B">B（65〜79点）</option>
+          <option value="C">C（50〜64点）</option>
+          <option value="D">D（49点以下）</option>
+        </select>
+      </div>
+      <!-- 絞り込み条件バッジ行 -->
+      <div class="filter-row" style="margin-top:8px;display:none;" id="filter-active-tags">
+      </div>
+      <!-- 件数表示＋ソート（フィルタエリア内・折りたたみ対象） -->
+      <div style="display:flex;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #e0e0e0;">
+        <span style="font-size:12px;color:#555;"><strong style="color:#111;font-size:13px;">2</strong> 件</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <span class="filter-label">ソート</span>
+          <select class="wf-select" style="width:200px;height:28px;">
+            <option>次回アクション日（近い順）</option>
+            <option>スコア（高い順）</option>
+            <option>最終更新日（新しい順）</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 完了済みフィルタ（常時表示・折りたたみなし） -->
+    <div id="filter-area-done" class="filter-area" style="display:none;">
+      <div class="filter-row" id="filter-done">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="wf-input search-box with-icon" type="text" placeholder="人材名・案件名で検索">
+        </div>
+        <div class="filter-sep"></div>
+        <select class="wf-select" style="width:150px;">
+          <option>ステータス（全て）</option>
+          <option>不成立</option>
+          <option>募集終了</option>
+          <option>アサイン辞退</option>
+          <option>辞退</option>
+        </select>
+        <span class="tbd-label" style="font-size:9px;">TBD 終了4種の使い分け未確定（QA #63）</span>
+        <select class="wf-select" style="width:130px;">
+          <option>担当営業（全員）</option>
+          <option>田中 営業</option>
+          <option>鈴木 営業</option>
+        </select>
+        <input class="wf-input" type="text" placeholder="2026/01/01" style="width:100px;">
+        <span style="font-size:11px;color:#aaa;">〜</span>
+        <input class="wf-input" type="text" placeholder="2026/04/16" style="width:100px;">
+      </div>
+      <!-- 完了済みバッジ行 -->
+      <div class="filter-row" style="margin-top:8px;" id="filter-done-tags">
+        <span class="active-tag">不成立 <span style="cursor:pointer;">✕</span></span>
+        <button class="btn btn-ghost" style="margin-left:4px;">✕ すべてクリア</button>
+      </div>
+    </div>
+
+    <!-- ===== 進行中タブ：カンバン ===== -->
+    <div id="view-active" class="kanban-wrapper">
+      <div class="kanban-board">
+
+        <!-- フェーズ1：提案 -->
+        <div class="phase-block">
+          <div class="phase-header">提案</div>
+          <div class="phase-columns">
+
+            <!-- 上位提案（サンプル3枚） -->
+            <div class="kanban-col">
+              <div class="col-header">
+                <span class="col-title">上位提案</span>
+                <span class="col-count">2</span>
+              </div>
+              <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;">
+                <span class="tbd-label" style="font-size:9px;">TBD 定義未確定（QA #62）</span>
+              </div>
+              <div class="col-cards">
+
+                <!-- カード1：Aランク -->
+                <div class="pipeline-card active-card" onclick="openDrawer()">
+                  <div class="card-engineer">山田 太郎</div>
+                  <div class="card-project">株式会社ABC / PHPシステム運用</div>
+                  <div class="card-rank-row">
+                    <span class="rank-badge">A</span>
+                    <span class="card-score">85点</span>
+                  </div>
+                  <select class="card-status-select" onclick="event.stopPropagation()">
+                    <optgroup label="進行中">
+                      <option selected>上位提案</option>
+                      <option>求職者応募済み</option>
+                      <option>応募中</option>
+                      <option>一次調整中</option>
+                      <option>一次待ち</option>
+                      <option>一次結果待ち</option>
+                      <option>最終調整中</option>
+                      <option>最終待ち</option>
+                      <option>最終結果待ち</option>
+                      <option>オファー</option>
+                      <option>アサイン承諾待ち</option>
+                      <option>成約</option>
+                    </optgroup>
+                    <optgroup label="── 終了">
+                      <option>不成立</option>
+                      <option>募集終了</option>
+                      <option>アサイン辞退</option>
+                      <option>辞退</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                <!-- カード2：Bランク・期限超過 -->
+                <div class="pipeline-card" onclick="openDrawer()">
+                  <div class="card-engineer">佐藤 花子</div>
+                  <div class="card-project">株式会社DEF / Java開発</div>
+                  <div class="card-rank-row">
+                    <span class="rank-badge rank-b">B</span>
+                    <span class="card-score">72点</span>
+                  </div>
+                  <select class="card-status-select" onclick="event.stopPropagation()">
+                    <optgroup label="進行中">
+                      <option selected>上位提案</option>
+                      <option>求職者応募済み</option>
+                      <option>応募中</option>
+                      <option>一次調整中</option>
+                      <option>一次待ち</option>
+                      <option>一次結果待ち</option>
+                      <option>最終調整中</option>
+                      <option>最終待ち</option>
+                      <option>最終結果待ち</option>
+                      <option>オファー</option>
+                      <option>アサイン承諾待ち</option>
+                      <option>成約</option>
+                    </optgroup>
+                    <optgroup label="── 終了">
+                      <option>不成立</option>
+                      <option>募集終了</option>
+                      <option>アサイン辞退</option>
+                      <option>辞退</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+              </div>
+            </div><!-- /上位提案 -->
+
+            <!-- 求職者応募済み（空） -->
+            <div class="kanban-col">
+              <div class="col-header">
+                <span class="col-title">求職者応募済み</span>
+                <span class="col-count">0</span>
+              </div>
+              <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;">
+                <span class="tbd-label" style="font-size:9px;">TBD 定義未確定（QA #62）</span>
+              </div>
+              <div class="col-empty">カードなし</div>
+            </div>
+
+            <!-- 応募中（空） -->
+            <div class="kanban-col">
+              <div class="col-header">
+                <span class="col-title">応募中</span>
+                <span class="col-count">0</span>
+              </div>
+              <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;">
+                <span class="tbd-label" style="font-size:9px;">TBD 定義未確定（QA #62）</span>
+              </div>
+              <div class="col-empty">カードなし</div>
+            </div>
+
+          </div>
+        </div><!-- /フェーズ1 -->
+
+        <!-- フェーズ2：一次選考（全列空） -->
+        <div class="phase-block">
+          <div class="phase-header">一次選考</div>
+          <div class="phase-columns">
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">一次調整中</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">一次待ち</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">一次結果待ち</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- フェーズ3：最終選考（全列空） -->
+        <div class="phase-block">
+          <div class="phase-header">最終選考</div>
+          <div class="phase-columns">
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">最終調整中</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">最終待ち</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">最終結果待ち</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- フェーズ4：クロージング（全列空） -->
+        <div class="phase-block">
+          <div class="phase-header">クロージング</div>
+          <div class="phase-columns">
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">オファー</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">アサイン承諾待ち</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header"><span class="col-title">成約</span><span class="col-count">0</span></div>
+              <div class="col-empty">カードなし</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /kanban-board -->
+    </div><!-- /view-active -->
+
+    <!-- ===== 完了済みタブ ===== -->
+    <div id="view-done" class="done-view">
+      <div class="table-area">
+        <!-- テーブル上部：件数表示＋ソート（WF_03準拠） -->
+        <div style="display:flex;align-items:center;margin-bottom:12px;">
+          <span style="font-size:12px;color:#555;"><strong style="color:#111;font-size:13px;">3</strong> 件</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+            <span class="filter-label">ソート</span>
+            <select class="wf-select" style="width:180px;height:28px;">
+              <option>終了日（新しい順）</option>
+              <option>終了日（古い順）</option>
+              <option>スコア（高い順）</option>
+            </select>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>人材名</th>
+              <th>案件名</th>
+              <th>ステータス</th>
+              <th>担当営業</th>
+              <th>終了日</th>
+              <th>NG理由 / 備考</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>鈴木 一郎</strong></td>
+              <td>QRS社 / PHP開発</td>
+              <td><span class="status-chip">不成立</span></td>
+              <td>田中</td>
+              <td>2026/04/08</td>
+              <td style="color:#777;font-size:11px;">スキル不足（AWS未経験）</td>
+              <td>
+                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+                  <button class="btn btn-sm">進行中に戻す<span class="should-badge">Should</span></button>
+                  <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
+                  <span class="tbd-label" style="font-size:9px;">TBD 削除権限未確定（QA #66）</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>山田 佳子</strong></td>
+              <td>TUV社 / インフラ移行</td>
+              <td><span class="status-chip">募集終了</span></td>
+              <td>鈴木</td>
+              <td>2026/04/05</td>
+              <td style="color:#777;font-size:11px;">案件側の予算凍結</td>
+              <td>
+                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+                  <button class="btn btn-sm">進行中に戻す<span class="should-badge">Should</span></button>
+                  <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
+                  <span class="tbd-label" style="font-size:9px;">TBD 削除権限未確定（QA #66）</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>岡 太郎</strong></td>
+              <td>WXY社 / Salesforce開発</td>
+              <td><span class="status-chip">辞退</span></td>
+              <td>佐藤</td>
+              <td>2026/04/02</td>
+              <td style="color:#777;font-size:11px;">他社案件に決定</td>
+              <td>
+                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+                  <button class="btn btn-sm">進行中に戻す<span class="should-badge">Should</span></button>
+                  <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
+                  <span class="tbd-label" style="font-size:9px;">TBD 削除権限未確定（QA #66）</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== DRAWER ===== -->
+    <div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
+
+    <div class="drawer" id="drawer">
+
+      <!-- ドロワーヘッダー：人材名・案件名・ステータス変更を集約 -->
+      <div class="drawer-header">
+        <div class="drawer-header-left">
+          <div class="drawer-engineer">山田 太郎</div>
+          <div class="drawer-project">株式会社ABC / PHPシステム運用</div>
+
+          <!-- ステータス変更（ヘッダー内・案C） -->
+          <div class="drawer-status-row">
+            <span class="current-status-label">ステータス：</span>
+            <span class="current-status-badge">上位提案</span>
+            <select class="drawer-status-select">
+              <optgroup label="進行中">
+                <option selected>上位提案</option>
+                <option>求職者応募済み</option>
+                <option>応募中</option>
+                <option>一次調整中</option>
+                <option>一次待ち</option>
+                <option>一次結果待ち</option>
+                <option>最終調整中</option>
+                <option>最終待ち</option>
+                <option>最終結果待ち</option>
+                <option>オファー</option>
+                <option>アサイン承諾待ち</option>
+                <option>成約</option>
+              </optgroup>
+              <optgroup label="── 終了（完了済みタブへ移動）">
+                <option>不成立</option>
+                <option>募集終了</option>
+                <option>アサイン辞退</option>
+                <option>辞退</option>
+              </optgroup>
+            </select>
+          </div>
+          <div style="margin-top:4px;">
+            <span class="tbd-label" style="font-size:9px;">TBD 各ステータス定義未確定（QA #62 / #63）</span>
+          </div>
+
+          <!-- 詳細リンク（Should） -->
+          <div class="drawer-links">
+            <span class="drawer-link">人材詳細 →<span class="should-badge">Should</span></span>
+            <span class="drawer-link">案件詳細 →<span class="should-badge">Should</span></span>
+          </div>
+        </div>
+        <button class="drawer-close" onclick="closeDrawer()">✕</button>
+      </div>
+
+      <!-- ドロワーボディ -->
+      <div class="drawer-body">
+
+        <!-- ① スコアサマリー＋内訳（折りたたみ） -->
+        <div>
+          <div class="drawer-section-title">マッチングスコア</div>
+          <div class="score-summary">
+            <div class="score-rank-col">
+              <span class="rank-badge" style="font-size:12px;padding:2px 10px;">A</span>
+              <div class="score-big">85<span class="score-big-unit"> pt</span></div>
+            </div>
+            <div class="score-bar-area">
+              <div class="score-bar-bg">
+                <div class="score-bar-fill" style="width:85%;"></div>
+              </div>
+              <div style="font-size:10px;color:#aaa;margin-top:4px;text-align:right;">85 / 100点</div>
+            </div>
+          </div>
+
+          <!-- スコア内訳：折りたたみ（初期：閉じた状態） -->
+          <div class="accordion" id="accordion-score">
+            <button class="accordion-toggle" onclick="toggleAccordion('accordion-score')">
+              スコア内訳を見る
+              <span class="accordion-arrow">▼</span>
+            </button>
+            <div class="accordion-body">
+              <div class="breakdown-grid">
+                <div class="breakdown-item">
+                  <span class="breakdown-name">必須スキル一致</span>
+                  <span class="breakdown-score full">30 / 30</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-name">工程経験一致</span>
+                  <span class="breakdown-score partial">15 / 20</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-name">尚可スキル一致</span>
+                  <span class="breakdown-score partial">8 / 10</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-name">単価一致</span>
+                  <span class="breakdown-score full">10 / 10</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-name">勤務地/通勤条件</span>
+                  <span class="breakdown-score partial">7 / 10</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-name">勤務形態一致</span>
+                  <span class="breakdown-score full">10 / 10</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-name">稼働開始時期</span>
+                  <span class="breakdown-score full">5 / 5</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-name">顧客折衝/人物要件</span>
+                  <span class="breakdown-score zero">0 / 5</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ② AI推薦理由（折りたたみ・初期：閉じた状態） -->
+        <div>
+          <div class="accordion" id="accordion-ai">
+            <button class="accordion-toggle" onclick="toggleAccordion('accordion-ai')">
+              <span style="display:flex;align-items:center;gap:6px;">
+                <span class="ai-badge">AI</span>
+                推薦理由・不足条件
+                <span class="tbd-label" style="font-size:9px;">TBD AI生成タイミング未確定</span>
+              </span>
+              <span class="accordion-arrow">▼</span>
+            </button>
+            <div class="accordion-body">
+              <div class="ai-text">
+                Java・Spring Bootの豊富な実務経験が必須スキルと完全一致しています。単価レンジ（60〜80万円）も人材の希望単価（65万円）と合致しており、勤務形態も一部リモート可で条件が揃っています。
+              </div>
+              <div class="ai-divider"></div>
+              <div class="ai-shortage-title">⚠ 不足条件</div>
+              <div class="ai-shortage-text">
+                顧客折衝経験が「無」のため、案件が要求する人物要件（5点）が未取得です。事前確認を推奨します。
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ③ 管理情報フォーム -->
+        <div class="info-form-block">
+          <div class="drawer-section-title">パイプライン管理情報</div>
+          <span class="tbd-label" style="font-size:9px;">TBD 表示項目確定待ち（QA #54）</span>
+
+          <div class="form-row">
+            <div class="form-row-label">担当営業（メイン）</div>
+            <select class="wf-select" style="width:100%;">
+              <option>田中 営業</option>
+              <option>鈴木 営業</option>
+              <option>佐藤 営業</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-row-label">担当営業（サブ）</div>
+            <select class="wf-select" style="width:100%;">
+              <option>（なし）</option>
+              <option selected>鈴木 営業</option>
+              <option>佐藤 営業</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-row-label">次回アクション予定日</div>
+            <input class="wf-input" type="text" value="2026/04/14" style="width:150px;">
+          </div>
+          <div class="form-row">
+            <div class="form-row-label">顧客コメント</div>
+            <textarea class="wf-textarea" rows="2">スキルは問題なし。単価面の確認待ち。</textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-row-label">NG理由</div>
+            <textarea class="wf-textarea" rows="2" placeholder="見送り・不成立の場合に記入"></textarea>
+          </div>
+        </div>
+
+      </div><!-- /drawer-body -->
+
+      <!-- ドロワーフッター -->
+      <div class="drawer-footer">
+        <button class="btn btn-primary" style="flex:1;height:36px;font-size:13px;">保存する</button>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+          <button class="btn btn-danger btn-sm">削除（管理者のみ）</button>
+          <span class="tbd-label" style="font-size:9px;">TBD 削除権限未確定（QA #66）</span>
+        </div>
+      </div>
+
+    </div><!-- /drawer -->
+
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+
+<!-- ===== ANNOTATION ===== -->
+<div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
+  <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_10_進捗管理_パイプライン v16</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 32px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:6px;">🔴 TBDラベル付与箇所・対応QA</div>
+        <ul style="font-size:11px;color:#555;line-height:2;padding-left:16px;">
+          <li>各ステータスの業務定義：<span style="color:#c00;">TBD（QA #62）</span></li>
+          <li>終了ステータス4種の使い分け：<span style="color:#c00;">TBD（QA #63）</span></li>
+          <li>パイプライン初期ステータス：<span style="color:#c00;">TBD（QA #49）</span></li>
+          <li>カード・ドロワーの表示項目確定：<span style="color:#c00;">TBD（QA #54）</span></li>
+          <li>完了済みカードの復活操作：<span style="color:#c00;">TBD（QA #64）</span></li>
+          <li>パイプラインカード削除権限：<span style="color:#c00;">TBD（QA #66）</span></li>
+          <li>スコアなしカードの表示：<span style="color:#c00;">TBD（QA #45：オンデマンド計算確定）</span></li>
+          <li>AI推薦理由の生成タイミング：<span style="color:#c00;">TBD</span></li>
+          <li>次回アクション期限超過アラート：<span style="color:#c00;">TBD（QA #6）</span></li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:6px;">⚠ 設計決定事項・v16変更点</div>
+        <ul style="font-size:11px;color:#555;line-height:2;padding-left:16px;">
+          <li>折りたたみバーを新デザインに変更：⊟ 表示条件を指定 [ サマリー ] ▲▼</li>
+          <li>条件なし：[ すべて表示中 ] / 条件あり：[ 担当: 田中 · ランク: A ] / 3件以上：[ 担当: 田中 · ほか2件 ]</li>
+          <li>フィルタ選択・ソート選択に連動して条件サマリーをリアルタイム更新</li>
+          <li>バッジ行も条件と連動して表示・非表示・内容を動的に更新</li>
+          <li>展開時：▲ / 折りたたみ時：▼</li>
+          <li>折りたたみ時：フィルタ・バッジ・ソートがすべて非表示。カンバン縦スペース最大化</li>
+          <li>完了済みタブは折りたたみバーなし・フィルタ常時表示</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#888;margin-top:12px;margin-bottom:6px;">⬜ Shouldバッジ付与箇所</div>
+        <ul style="font-size:11px;color:#555;line-height:2;padding-left:16px;">
+          <li>人材詳細・案件詳細リンク（ドロワーヘッダー）：別タブ遷移想定</li>
+          <li>次回アクション期限超過アラート（QA #6未着手）</li>
+          <li>完了済みカードの「進行中に戻す」（QA #64未着手）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  var tabActive     = document.getElementById('tab-active');
+  var tabDone       = document.getElementById('tab-done');
+  var viewActive    = document.getElementById('view-active');
+  var viewDone      = document.getElementById('view-done');
+  var fAreaActive   = document.getElementById('filter-area-active');
+  var fAreaDone     = document.getElementById('filter-area-done');
+  var toggleBar     = document.getElementById('filter-toggle-bar');
+
+  if (tab === 'active') {
+    tabActive.classList.add('active');
+    tabDone.classList.remove('active');
+    viewActive.style.display  = 'flex';
+    viewDone.style.display    = 'none';
+    fAreaActive.style.display = 'block';
+    fAreaDone.style.display   = 'none';
+    toggleBar.style.display   = 'flex';
+    closeDrawer();
+  } else {
+    tabDone.classList.add('active');
+    tabActive.classList.remove('active');
+    viewActive.style.display  = 'none';
+    viewDone.style.display    = 'flex';
+    viewDone.style.flexDirection = 'column';
+    fAreaActive.style.display = 'none';
+    fAreaDone.style.display   = 'block';
+    toggleBar.style.display   = 'none';
+    closeDrawer();
+  }
+}
+
+/* 条件サマリー更新 */
+function updateSummary() {
+  var keyword = document.getElementById('filter-keyword').value.trim();
+  var sales   = document.getElementById('filter-sales').value;
+  var rank    = document.getElementById('filter-rank').value;
+
+  var conditions = [];
+  if (keyword) conditions.push('キーワード: ' + keyword);
+  if (sales)   conditions.push('担当: ' + sales);
+  if (rank)    conditions.push('ランク: ' + rank);
+
+  var summary = document.getElementById('filter-summary');
+  if (conditions.length === 0) {
+    summary.textContent = 'すべて表示中';
+  } else if (conditions.length <= 2) {
+    summary.textContent = conditions.join(' · ');
+  } else {
+    summary.textContent = conditions[0] + ' · ほか' + (conditions.length - 1) + '件';
+  }
+
+  /* バッジ行も更新 */
+  var tagsRow = document.getElementById('filter-active-tags');
+  if (conditions.length === 0) {
+    tagsRow.style.display = 'none';
+  } else {
+    tagsRow.style.display = 'flex';
+    var html = conditions.map(function(c) {
+      return '<span class="active-tag">' + c + ' <span style="cursor:pointer;" onclick="clearCondition(\'' + c.split(':')[0].trim() + '\')">✕</span></span>';
+    }).join('');
+    html += '<button class="btn btn-ghost" style="margin-left:4px;" onclick="clearAll()">✕ すべてクリア</button>';
+    tagsRow.innerHTML = html;
+  }
+}
+
+/* 条件クリア */
+function clearAll() {
+  document.getElementById('filter-keyword').value = '';
+  document.getElementById('filter-sales').value = '';
+  document.getElementById('filter-rank').value = '';
+  updateSummary();
+}
+
+/* フィルタエリア折りたたみ */
+function toggleFilterArea() {
+  var area  = document.getElementById('filter-area-active');
+  var arrow = document.getElementById('filter-toggle-arrow');
+  var isOpen = area.style.display !== 'none';
+  area.style.display = isOpen ? 'none' : 'block';
+  arrow.textContent  = isOpen ? '▼' : '▲';
+}
+
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+function toggleAccordion(id) {
+  var el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+</script>
+</body>
+</html>

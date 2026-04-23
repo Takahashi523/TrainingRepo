@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_01_ログイン v1.0 | 国内SES 人材・案件マッチングシステム</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ===== LAYOUT ===== */
+  .login-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  /* ===== LOGIN CARD ===== */
+  .login-card {
+    width: 400px;
+    background: #fff;
+    border: 1.5px solid #555;
+    padding: 40px 36px;
+  }
+
+  /* ===== LOGO AREA ===== */
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1.5px solid #e8e8e8;
+  }
+
+  .logo-mark {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    border: 2px solid #333;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .logo-mark::before,
+  .logo-mark::after {
+    content: '';
+    position: absolute;
+    background: #333;
+  }
+  .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
+  .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
+
+  .logo-text {
+    font-size: 13px;
+    font-weight: 700;
+    color: #333;
+    line-height: 1.4;
+  }
+
+  /* ===== FORM ===== */
+  .form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #444;
+  }
+
+  .wf-input {
+    height: 36px;
+    border: 1.5px solid #999;
+    background: #fff;
+    padding: 0 10px;
+    font-size: 12px;
+    font-family: inherit;
+    color: #555;
+    border-radius: 3px;
+    width: 100%;
+  }
+  .wf-input::placeholder { color: #bbb; }
+
+  /* ===== CHECKBOX ===== */
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #444;
+    cursor: pointer;
+  }
+
+  .wf-checkbox {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #888;
+    background: #fff;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  /* ===== BUTTON ===== */
+  .btn {
+    height: 40px;
+    padding: 0 14px;
+    border: 1.5px solid #555;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    color: #333;
+    cursor: pointer;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: 100%;
+  }
+  .btn.btn-primary {
+    background: #333;
+    color: #fff;
+    border-color: #333;
+  }
+
+  /* ===== ANNOTATION ===== */
+  .annotation-box {
+    width: 260px;
+    border: 1px dashed #bbb;
+    padding: 14px;
+    font-size: 11px;
+    color: #555;
+    line-height: 1.7;
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+
+  .annotation-box .ann-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .annotation-box ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .annotation-box ul li {
+    padding-left: 10px;
+    position: relative;
+  }
+
+  .annotation-box ul li::before {
+    content: '–';
+    position: absolute;
+    left: 0;
+    color: #aaa;
+  }
+
+  .annotation-box .ann-qa {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #e8e8e8;
+    font-size: 10px;
+    color: #888;
+  }
+
+  .qa-ref {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #555;
+    background: #f2f2f2;
+    border: 1px solid #ccc;
+    padding: 1px 5px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  /* ===== SCREEN META ===== */
+  .screen-meta {
+    position: fixed;
+    bottom: 16px;
+    right: 20px;
+    font-size: 10px;
+    color: #aaa;
+    text-align: right;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-wrapper">
+
+  <!-- ログインカード -->
+  <div class="login-card">
+
+    <!-- ロゴ・システム名 -->
+    <div class="logo-area">
+      <span class="logo-mark"></span>
+      <span class="logo-text">国内SES<br>人材・案件マッチングシステム</span>
+    </div>
+
+    <!-- フォーム -->
+    <div class="form-section">
+
+      <!-- メールアドレス -->
+      <div class="form-group">
+        <label class="form-label">メールアドレス</label>
+        <input class="wf-input" type="email" placeholder="you@company.co.jp" disabled>
+      </div>
+
+      <!-- パスワード -->
+      <div class="form-group">
+        <label class="form-label">パスワード</label>
+        <input class="wf-input" type="password" placeholder="••••••••" disabled>
+      </div>
+
+      <!-- Remember me -->
+      <div class="form-group">
+        <label class="checkbox-item">
+          <span class="wf-checkbox"></span>
+          ログイン情報を保存する
+        </label>
+      </div>
+
+      <!-- ログインボタン -->
+      <div class="form-group">
+        <button class="btn btn-primary">ログイン</button>
+      </div>
+
+    </div>
+  </div>
+
+
+
+</div>
+
+<!-- 画面メタ情報 -->
+<div class="screen-meta">
+  WF_01_ログイン.html &nbsp;|&nbsp; v1.0 &nbsp;|&nbsp; 2025-04-23<br>
+  国内SES 人材・案件マッチングシステム
+</div>
+
+<!--
+  WF_01_ログイン.html
+  バージョン: v1.0
+  作成日: 2025-04-23
+  備考: Laravel Breeze デフォルトログイン流用前提。
+        パスワードリセットはマスタ管理画面から管理者が手動対応（QA #20）。
+        ログインIDは社内メールアドレスのみ（QA #19）。
+        TBD項目なし。
+-->
+</body>
+</html>

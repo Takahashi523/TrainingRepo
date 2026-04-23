@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_12_マスタ管理 | 国内SES 人材・案件マッチングシステム</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+  }
+
+  .app-shell {
+    display: flex;
+    width: 1440px;
+    height: 100vh;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: hidden;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: 220px;
+    height: 100%;
+    border-right: 1.5px solid #555;
+    background: #fafafa;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-logo {
+    padding: 16px 14px 14px;
+    border-bottom: 1.5px solid #555;
+    font-size: 11px; font-weight: 700;
+    color: #333; line-height: 1.5;
+  }
+
+  .sidebar-logo .logo-mark {
+    display: inline-block;
+    width: 28px; height: 28px;
+    border: 2px solid #333;
+    margin-bottom: 6px; position: relative;
+  }
+  .sidebar-logo .logo-mark::before,
+  .sidebar-logo .logo-mark::after {
+    content: ''; position: absolute; background: #333;
+  }
+  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
+  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
+
+  .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+  .nav-section-label {
+    font-size: 10px; color: #888; font-weight: 700;
+    padding: 10px 14px 4px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px; color: #444;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+
+  .nav-item.active {
+    background: #e8e8e8; border-left-color: #333;
+    font-weight: 700; color: #111;
+  }
+
+  .nav-item:hover:not(.active) { background: #f2f2f2; }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    border: 1.5px solid #666; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  .nav-item.active .nav-icon { border-color: #111; background: #333; color: #fff; }
+
+  .sidebar-bottom { border-top: 1.5px solid #ccc; flex-shrink: 0; }
+  .sidebar-footer { padding: 12px 14px; font-size: 11px; color: #777; border-bottom: 1px solid #e8e8e8; }
+  .nav-item.logout { color: #888; }
+  .nav-item.logout .nav-icon { border-color: #aaa; color: #aaa; }
+
+  /* ===== MAIN ===== */
+  .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .page-header {
+    padding: 16px 24px 14px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .page-title { font-size: 18px; font-weight: 700; color: #111; }
+  .page-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* ===== 上部タブバー（WF_10準拠：アンダーライン型） ===== */
+  .tab-bar {
+    display: flex; align-items: flex-end;
+    border-bottom: 2px solid #ddd;
+    padding: 0 24px;
+    background: #fff; flex-shrink: 0;
+  }
+
+  .tab-item {
+    padding: 10px 18px 8px;
+    font-size: 13px; font-weight: 600; color: #888;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+
+  .tab-item.active { color: #111; border-bottom-color: #333; }
+  .tab-item:hover:not(.active) { color: #555; }
+
+  .tab-bar-note {
+    margin-left: 16px; margin-bottom: 10px;
+    font-size: 10px; color: #bbb; align-self: center;
+  }
+
+  /* ===== TBDラベル（既存WFと統一） ===== */
+  .tbd-label {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.04);
+    color: #c00; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  }
+
+  /* ===== コンテンツエリア ===== */
+  .tab-content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .tab-content { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .tab-content.active { display: flex; }
+
+  .content-header {
+    padding: 14px 24px; border-bottom: 1.5px solid #e8e8e8;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .content-title { font-size: 14px; font-weight: 700; color: #111; }
+
+  /* QA未確定バナー */
+  .qa-banner {
+    margin: 14px 24px 0; padding: 10px 14px;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.03);
+    border-radius: 3px; font-size: 11px; color: #c00; line-height: 1.7;
+    flex-shrink: 0;
+  }
+
+  /* ===== ボタン ===== */
+  .btn {
+    height: 30px; padding: 0 14px;
+    border: 1.5px solid #555; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #333; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .btn.btn-primary        { background: #333; color: #fff; border-color: #333; }
+  .btn.btn-sm             { height: 26px; padding: 0 10px; font-size: 11px; }
+  .btn.btn-edit           { border-color: #aaa; color: #666; font-weight: 400; }
+  .btn.btn-delete         { border-color: #ddd; color: #ccc; font-weight: 400; cursor: not-allowed; }
+  .btn.btn-delete-active  { border-color: #c00; color: #c00; font-weight: 400; }
+
+  .ops-group { display: flex; gap: 6px; align-items: center; }
+
+  /* ===== テーブル ===== */
+  .table-wrap { flex: 1; overflow-y: auto; padding: 16px 24px 24px; }
+
+  .master-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  .master-table th {
+    padding: 8px 12px; text-align: left;
+    font-size: 11px; font-weight: 700; color: #666;
+    background: #f5f5f5;
+    border-top: 1.5px solid #ddd; border-bottom: 1.5px solid #ddd;
+    white-space: nowrap;
+  }
+
+  .master-table td {
+    padding: 10px 12px; border-bottom: 1px solid #eee;
+    color: #333; vertical-align: middle;
+  }
+
+  .master-table tr:hover td { background: #fafafa; }
+
+  .master-table td.col-name  { font-weight: 600; }
+  .master-table td.col-cat   { width: 110px; }
+  .master-table td.col-ops   { width: 140px; white-space: nowrap; }
+  .master-table td.col-email { font-size: 11px; color: #555; }
+  .master-table td.col-role  { width: 80px; }
+  .master-table td.col-login { width: 110px; font-size: 11px; color: #888; }
+
+  /* カテゴリバッジ */
+  .cat-badge {
+    display: inline-block; padding: 2px 8px;
+    border: 1.5px solid #aaa; border-radius: 2px;
+    font-size: 10px; color: #555; white-space: nowrap;
+  }
+
+  /* ロール */
+  .role-badge {
+    display: inline-block; padding: 2px 8px;
+    border: 1.5px solid #555; border-radius: 2px;
+    font-size: 10px; font-weight: 700; color: #333;
+  }
+  .role-badge.general { border-color: #bbb; color: #888; font-weight: 400; }
+
+  /* ===== 注釈ブロック ===== */
+  .annotation-block {
+    margin-top: 16px; padding: 10px 14px;
+    background: #fafafa; border: 1px solid #eee; border-radius: 3px;
+  }
+  .annotation-title {
+    font-size: 10px; font-weight: 700; color: #bbb;
+    letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .annotation-list { display: flex; flex-direction: column; gap: 3px; }
+  .annotation-item { font-size: 10px; color: #aaa; line-height: 1.5; }
+
+  /* ===== モーダル ===== */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: #fff; border: 1.5px solid #555; border-radius: 4px;
+    width: 460px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 14px 18px; border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    background: #f7f7f7;
+  }
+  .modal-title { font-size: 14px; font-weight: 700; color: #111; }
+  .modal-close {
+    width: 24px; height: 24px; border: 1.5px solid #bbb; background: #fff;
+    font-size: 14px; font-family: inherit; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 2px; color: #666;
+  }
+
+  .modal-body { padding: 20px 18px; display: flex; flex-direction: column; gap: 16px; }
+  .form-row { display: flex; flex-direction: column; gap: 5px; }
+  .form-label {
+    font-size: 11px; font-weight: 700; color: #555;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .required-mark { font-size: 10px; color: #c00; font-weight: 700; }
+
+  .wf-input {
+    width: 100%; height: 34px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 10px; font-size: 12px; font-family: inherit;
+    color: #333; border-radius: 3px;
+  }
+  .wf-input.short { width: 100px; }
+
+  .wf-select-modal {
+    width: 100%; height: 34px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 28px 0 10px; font-size: 12px; font-family: inherit;
+    color: #333; border-radius: 3px;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    cursor: pointer;
+  }
+
+  .hint-text { font-size: 10px; color: #aaa; }
+
+  .modal-footer {
+    padding: 12px 18px; border-top: 1.5px solid #eee;
+    display: flex; justify-content: flex-end; gap: 8px;
+    background: #fafafa;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark"></div>
+      <div>SES マッチング<br>システム</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">メイン</div>
+      <div class="nav-item">
+        <span class="nav-icon">◫</span><span>ダッシュボード</span>
+      </div>
+      <div class="nav-section-label">人材</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span><span>人材一覧</span>
+      </div>
+      <div class="nav-section-label">案件</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span><span>案件一覧</span>
+      </div>
+      <div class="nav-section-label">進捗管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">⊞</span><span>パイプライン</span>
+      </div>
+      <div class="nav-section-label">管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">↓</span><span>CSV入出力</span>
+      </div>
+      <div class="nav-item active">
+        <span class="nav-icon">⚙</span><span>マスタ管理</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">田中 営業（ログイン中）</div>
+      <div class="nav-item logout">
+        <span class="nav-icon">→</span><span>ログアウト</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <!-- ページヘッダー -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">マスタ管理</div>
+        <div class="page-subtitle">システム全体で使用するマスタデータを管理します</div>
+      </div>
+    </div>
+
+    <!-- ===== タブバー（WF_10準拠：アンダーライン型） ===== -->
+    <div class="tab-bar">
+      <div class="tab-item active" id="tab-skill-btn" onclick="switchTab('skill')">
+        スキルタグ
+      </div>
+      <div class="tab-item" id="tab-user-btn" onclick="switchTab('user')">
+        ユーザー管理
+        <span class="tbd-label" style="font-size:9px;">QA未確定</span>
+      </div>
+      <div class="tab-bar-note">
+        [WF注] 工程・勤務形態・ステータスはJSONカラム管理のため対象外
+      </div>
+    </div>
+
+    <!-- ===== コンテンツエリア ===== -->
+    <div class="tab-content-area">
+
+      <!-- ========== タブ1：スキルタグ ========== -->
+      <div class="tab-content active" id="tab-skill">
+
+        <div class="content-header">
+          <div class="content-title">スキルタグ</div>
+          <button class="btn btn-primary" onclick="openModal()">＋ 新規追加</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="master-table">
+            <thead>
+              <tr>
+                <th class="col-name">名称</th>
+                <th class="col-cat">
+                  カテゴリ
+                  <span style="font-size:9px;color:#bbb;font-weight:400;margin-left:4px;">
+                    [WF注] スキル絞り込みドロップダウンのグループ表示に使用（WF_03と対応）
+                  </span>
+                </th>
+                <th class="col-ops">
+                  操作
+                  <span style="font-size:9px;color:#bbb;font-weight:400;margin-left:4px;">
+                    [WF注] 使用中タグは削除不可
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-name">Java</td>
+                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">Python</td>
+                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">PHP</td>
+                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">TypeScript</td>
+                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">JavaScript</td>
+                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">React</td>
+                <td class="col-cat"><span class="cat-badge fw">FW</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">Laravel</td>
+                <td class="col-cat"><span class="cat-badge fw">FW</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">Spring Boot</td>
+                <td class="col-cat"><span class="cat-badge fw">FW</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">PostgreSQL</td>
+                <td class="col-cat"><span class="cat-badge db">DB</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">MySQL</td>
+                <td class="col-cat"><span class="cat-badge db">DB</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">SQL Server</td>
+                <td class="col-cat"><span class="cat-badge db">DB</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">AWS</td>
+                <td class="col-cat"><span class="cat-badge cloud">クラウド</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">Azure</td>
+                <td class="col-cat"><span class="cat-badge cloud">クラウド</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">GCP</td>
+                <td class="col-cat"><span class="cat-badge cloud">クラウド</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">Docker</td>
+                <td class="col-cat"><span class="cat-badge tool">ツール</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">Kubernetes</td>
+                <td class="col-cat"><span class="cat-badge tool">ツール</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">Git</td>
+                <td class="col-cat"><span class="cat-badge tool">ツール</span></td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
+                </div></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="annotation-block">
+            <div class="annotation-title">WF注釈</div>
+            <div class="annotation-list">
+              <div class="annotation-item">・ カテゴリ5分類（言語 / FW / DB / クラウド / ツール）は暫定採用。QA表の案件サンプル環境欄を根拠とするが、クライアント確認推奨</div>
+              <div class="annotation-item">・ カテゴリはWF_03スキル絞り込みの ms-group-label（言語 / FW / インフラ・DB）と整合が必要。DB・クラウド・ツール分離に合わせてWF_03も要更新</div>
+              <div class="annotation-item">・ 削除ボタン（グレー）：使用中タグ。ホバー時ツールチップ「使用中のため削除不可」を表示</div>
+              <div class="annotation-item">・ 削除ボタン（赤枠）：未使用タグ。物理削除を許可</div>
+              <div class="annotation-item">・ 表示順はカテゴリ内で名称の昇順（あいうえお / ABC順）に自動ソート。並び順フィールドは不要</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== タブ2：ユーザー管理 ========== -->
+      <div class="tab-content" id="tab-user">
+
+        <div class="content-header">
+          <div class="content-title">
+            ユーザー管理
+            <span class="tbd-label" style="margin-left:10px;">QA未確定</span>
+          </div>
+          <button class="btn btn-primary">＋ 新規追加</button>
+        </div>
+
+        <div class="qa-banner">
+          <strong>⚠ 仕様QA未確定（確認待ち）</strong><br>
+          QA #16（CRUD運用方針）／ QA #17（ロール種別）／ QA #18（登録項目）／ QA #19（ログインID形式）／ QA #68（氏名登録要否）
+        </div>
+
+        <div class="table-wrap" style="padding-top:16px;">
+          <table class="master-table">
+            <thead>
+              <tr>
+                <th class="col-name">
+                  氏名
+                  <span class="tbd-label" style="margin-left:6px;font-size:9px;">QA #68</span>
+                </th>
+                <th class="col-email">
+                  メールアドレス
+                  <span class="tbd-label" style="margin-left:6px;font-size:9px;">QA #19</span>
+                </th>
+                <th class="col-role">
+                  ロール
+                  <span class="tbd-label" style="margin-left:4px;font-size:9px;">QA #17</span>
+                </th>
+                <th class="col-login">最終ログイン</th>
+                <th class="col-ops">
+                  操作
+                  <span style="font-size:9px;color:#bbb;font-weight:400;margin-left:4px;">[WF注] 管理者のみ操作可</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-name">田中 一郎</td>
+                <td class="col-email">tanaka@example.com</td>
+                <td class="col-role"><span class="role-badge">管理者</span></td>
+                <td class="col-login">2025-04-15</td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="自分自身は削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">鈴木 花子</td>
+                <td class="col-email">suzuki@example.com</td>
+                <td class="col-role"><span class="role-badge general">一般</span></td>
+                <td class="col-login">2025-04-14</td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">佐藤 次郎</td>
+                <td class="col-email">sato@example.com</td>
+                <td class="col-role"><span class="role-badge general">一般</span></td>
+                <td class="col-login">2025-03-20</td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="annotation-block">
+            <div class="annotation-title">WF注釈</div>
+            <div class="annotation-list">
+              <div class="annotation-item">・ ユーザー追加・編集・削除は管理者ロールのみ実行可能（QA #16 回答済）</div>
+              <div class="annotation-item">・ ログインIDは社内メールアドレスのみ許可（QA #19 回答済）</div>
+              <div class="annotation-item">・ ロールは「管理者」「一般」の2階層（QA #17 回答済）</div>
+              <div class="annotation-item">・ ステータス列は削除。ユーザーの無効化は削除で運用（退職者の紐付けデータ保持が必要な場合はQA追加要）</div>
+              <div class="annotation-item">・ 氏名フィールドの登録要否は QA #68 回答待ち <span class="tbd-label" style="margin-left:4px;">QA未確定</span></div>
+              <div class="annotation-item">・ パスワードリセットは管理者が手動リセット・本人へ通知する運用（QA #20 回答済）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-content-area -->
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+
+
+<!-- ===== モーダル：スキルタグ新規追加 ===== -->
+<div class="modal-overlay" id="modal-skill">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">スキルタグを追加</div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">名称 <span class="required-mark">※必須</span></label>
+        <input class="wf-input" type="text" placeholder="例：Go、Vue.js、Oracle">
+      </div>
+      <div class="form-row">
+        <label class="form-label">カテゴリ <span class="required-mark">※必須</span></label>
+        <select class="wf-select-modal">
+          <option value="">選択してください</option>
+          <option value="lang">言語</option>
+          <option value="fw">FW</option>
+          <option value="db">DB</option>
+          <option value="cloud">クラウド</option>
+          <option value="tool">ツール</option>
+        </select>
+        <span class="hint-text">人材一覧・案件一覧のスキル絞り込みでグループ表示に使用します</span>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+
+    // モーダルオーバーレイクリックで閉じる
+    document.getElementById('modal-skill').addEventListener('click', function (e) {
+      if (e.target === this) closeModal();
+    });
+  });
+
+  // タブ切り替え（WF_10と同じ方式）
+  function switchTab(tab) {
+    var btnSkill   = document.getElementById('tab-skill-btn');
+    var btnUser    = document.getElementById('tab-user-btn');
+    var contSkill  = document.getElementById('tab-skill');
+    var contUser   = document.getElementById('tab-user');
+
+    btnSkill.classList.remove('active');
+    btnUser.classList.remove('active');
+    contSkill.classList.remove('active');
+    contUser.classList.remove('active');
+
+    if (tab === 'skill') {
+      btnSkill.classList.add('active');
+      contSkill.classList.add('active');
+    } else {
+      btnUser.classList.add('active');
+      contUser.classList.add('active');
+    }
+  }
+
+  function openModal()  { document.getElementById('modal-skill').classList.add('open'); }
+  function closeModal() { document.getElementById('modal-skill').classList.remove('open'); }
+</script>
+
+</body>
+</html>

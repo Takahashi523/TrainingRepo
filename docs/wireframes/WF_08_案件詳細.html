@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_08_案件詳細 | 国内SES 人材・案件マッチングシステム</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+
+  }
+
+  .app-shell {
+    display: flex;
+    width: 1440px;
+    height: 100vh;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: hidden;
+  }
+
+  /* ===== SIDEBAR（共通） ===== */
+  .sidebar {
+    width: 220px;
+    height: 100%;
+    border-right: 1.5px solid #555;
+    background: #fafafa;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-logo {
+    padding: 16px 14px 14px;
+    border-bottom: 1.5px solid #555;
+    font-size: 11px; font-weight: 700;
+    color: #333; line-height: 1.5;
+  }
+
+  .sidebar-logo .logo-mark {
+    display: inline-block;
+    width: 28px; height: 28px;
+    border: 2px solid #333;
+    margin-bottom: 6px; position: relative;
+  }
+  .sidebar-logo .logo-mark::before,
+  .sidebar-logo .logo-mark::after {
+    content: ''; position: absolute; background: #333;
+  }
+  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
+  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
+
+  .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+  .nav-section-label {
+    font-size: 10px; color: #888; font-weight: 700;
+    padding: 10px 14px 4px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px; color: #444;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+
+  .nav-item.active {
+    background: #e8e8e8; border-left-color: #333;
+    font-weight: 700; color: #111;
+  }
+
+  .nav-item:hover:not(.active) { background: #f2f2f2; }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    border: 1.5px solid #666; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  .nav-item.active .nav-icon { border-color: #111; background: #333; color: #fff; }
+
+  .sidebar-bottom { border-top: 1.5px solid #ccc; flex-shrink: 0; }
+
+  .sidebar-footer {
+    padding: 12px 14px;
+    font-size: 11px; color: #777;
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  .nav-item.logout { color: #888; }
+  .nav-item.logout .nav-icon { border-color: #aaa; color: #aaa; }
+
+  /* ===== MAIN ===== */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    background: #fff;
+  }
+
+  .page-header {
+    padding: 16px 40px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0;
+    background: #fff; z-index: 10;
+  }
+
+  .page-title { font-size: 18px; font-weight: 700; color: #111; }
+  .page-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  /* ===== BUTTONS ===== */
+  .btn {
+    height: 34px; padding: 0 16px;
+    border: 1.5px solid #555; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #333; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .btn.btn-primary { background: #333; color: #fff; border-color: #333; }
+  .btn.btn-ghost   { border-color: #bbb; color: #777; font-weight: 400; }
+  .btn.btn-danger  { border-color: #c00; color: #c00; }
+
+  /* ===== TBD ===== */
+  .tbd-label {
+    display: inline-flex; align-items: center;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.04);
+    color: #c00; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  }
+
+  /* ===== DETAIL AREA ===== */
+  .detail-area {
+    padding: 32px 40px 48px;
+    max-width: 860px;
+  }
+
+  /* ===== 案件サマリー ===== */
+  .project-summary {
+    padding-bottom: 24px;
+    border-bottom: 1.5px solid #eee;
+    margin-bottom: 24px;
+  }
+
+  .project-name {
+    font-size: 20px; font-weight: 700; color: #111;
+    margin-bottom: 6px;
+  }
+
+  .project-client {
+    font-size: 12px; color: #777;
+    margin-bottom: 12px;
+  }
+
+  .project-badges {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    align-items: flex-start; margin-bottom: 10px;
+  }
+
+  .status-badge {
+    padding: 3px 10px;
+    border: 1.5px solid #555; border-radius: 20px;
+    font-size: 11px; font-weight: 700; color: #333;
+  }
+
+  .recruit-badge {
+    padding: 3px 10px;
+    border: 1.5px solid #888; border-radius: 4px;
+    font-size: 11px; color: #555; background: #fff;
+  }
+
+  .timing-badge {
+    padding: 3px 10px;
+    border: 1.5px dashed #888; border-radius: 20px;
+    font-size: 11px; color: #555; background: #f9f9f9;
+  }
+
+  .project-meta {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .meta-item { font-size: 12px; color: #444; }
+  .meta-label { font-size: 10px; color: #aaa; font-weight: 600; margin-right: 4px; }
+  .meta-sep { width: 1px; height: 14px; background: #ddd; }
+
+  /* ===== セクションカード（WF_05と共通） ===== */
+  .section-card {
+    border: 1.5px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .section-card-header {
+    background: #f5f5f5;
+    border-bottom: 1.5px solid #ddd;
+    padding: 9px 16px;
+    font-size: 12px; font-weight: 700; color: #333;
+  }
+
+  /* ===== 詳細行（WF_05と共通） ===== */
+  .detail-row {
+    display: flex; align-items: flex-start;
+    padding: 11px 16px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .detail-row:last-child { border-bottom: none; }
+
+  .detail-label {
+    width: 190px; flex-shrink: 0;
+    font-size: 11px; font-weight: 600; color: #888;
+    padding-right: 16px; padding-top: 2px;
+  }
+
+  .detail-value {
+    flex: 1; font-size: 12px; color: #222;
+    line-height: 1.7; min-width: 0;
+  }
+
+  /* ===== タグ ===== */
+  .tag-list { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .wf-tag {
+    padding: 2px 8px;
+    border: 1.5px solid #888; border-radius: 2px;
+    font-size: 11px; color: #333; background: #fff; white-space: nowrap;
+  }
+
+  /* 尚可スキルは点線 */
+  .wf-tag.optional { border-style: dashed; color: #777; }
+
+  /* ===== チェックリスト（工程） ===== */
+  .process-list { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .process-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #555; }
+
+  .process-check {
+    width: 14px; height: 14px;
+    border: 1.5px solid #bbb;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 9px; font-weight: 700;
+  }
+  .process-check.checked   { border-color: #333; color: #333; }
+  .process-check.unchecked { background: #f5f5f5; }
+
+  /* ===== 単価 ===== */
+  .rate-value { font-size: 14px; font-weight: 700; color: #333; }
+  .rate-unit  { font-size: 12px; color: #888; }
+
+  /* ===== フッターアクション ===== */
+  .detail-footer {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding-top: 32px;
+    border-top: 1.5px solid #eee;
+    margin-top: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark"></div>
+      <div>SES マッチング<br>システム</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">メイン</div>
+      <div class="nav-item"><span class="nav-icon">◫</span><span>ダッシュボード</span></div>
+      <div class="nav-section-label">人材</div>
+      <div class="nav-item"><span class="nav-icon">≡</span><span>人材一覧</span></div>
+      <div class="nav-section-label">案件</div>
+      <div class="nav-item active"><span class="nav-icon">≡</span><span>案件一覧</span></div>
+      <div class="nav-section-label">進捗管理</div>
+      <div class="nav-item"><span class="nav-icon">⊞</span><span>パイプライン</span></div>
+      <div class="nav-section-label">管理</div>
+      <div class="nav-item"><span class="nav-icon">↓</span><span>CSV入出力</span></div>
+      <div class="nav-item"><span class="nav-icon">⚙</span><span>マスタ管理</span></div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">田中 営業（ログイン中）</div>
+      <div class="nav-item logout"><span class="nav-icon">→</span><span>ログアウト</span></div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <!-- ページヘッダー（sticky） -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">案件詳細</div>
+        <div style="font-size:10px;color:#888;margin-top:1px;">※ページヘッダーはstickyで常時固定表示（スクロール時もボタンが見える）</div>
+        <div class="page-subtitle">登録された案件情報の確認</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn">✎ 編集する（→画面7）</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+          <button class="btn btn-danger">🗑 削除（管理者のみ）</button>
+          <span style="font-size:10px;color:#aaa;">※物理削除・一般営業には非表示</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== DETAIL AREA ===== -->
+    <div class="detail-area">
+
+      <!-- ==================== 案件サマリー ==================== -->
+      <div class="project-summary">
+        <div class="project-name">大手金融系 勘定系システム リプレース開発</div>
+        <div class="project-client">クライアント：○○銀行　｜　商流：1次請け</div>
+        <div class="project-badges">
+          <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
+            <span class="status-badge">募集中</span>
+            <span class="tbd-label">TBD 案件ステータス定義未確定</span>
+          </div>
+          <span class="recruit-badge">👤 2名募集中</span>
+          <span class="timing-badge">⏱ 即日〜</span>
+        </div>
+        <div class="project-meta">
+          <div class="meta-item">
+            <span class="meta-label">担当</span>田中 営業
+            　<span class="meta-label">サブ</span>鈴木 営業
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 基本情報 ==================== -->
+      <div class="section-card">
+        <div class="section-card-header">基本情報</div>
+        <div class="detail-row">
+          <div class="detail-label">案件名</div>
+          <div class="detail-value">大手金融系 勘定系システム リプレース開発</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">顧客名</div>
+          <div class="detail-value">○○銀行</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">募集人数</div>
+          <div class="detail-value">2名</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">参画開始時期</div>
+          <div class="detail-value">即日〜（2025年2月1日以降）</div>
+        </div>
+      </div>
+
+      <!-- ==================== 契約条件 ==================== -->
+      <div class="section-card">
+        <div class="section-card-header">契約条件</div>
+        <div class="detail-row">
+          <div class="detail-label">単価（月額）</div>
+          <div class="detail-value">
+            <span class="rate-value">60</span><span class="rate-unit"> 万円</span>
+            　〜　
+            <span class="rate-value">80</span><span class="rate-unit"> 万円</span>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">商流</div>
+          <div class="detail-value">1次請け</div>
+        </div>
+      </div>
+
+      <!-- ==================== 勤務条件 ==================== -->
+      <div class="section-card">
+        <div class="section-card-header">勤務条件</div>
+        <div class="detail-row">
+          <div class="detail-label">勤務地（最寄駅）</div>
+          <div class="detail-value">大手町駅（東京メトロ丸ノ内線）</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">稼働形態</div>
+          <div class="detail-value">一部リモート可</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">面談回数</div>
+          <div class="detail-value">1回</div>
+        </div>
+      </div>
+
+      <!-- ==================== スキル要件 ==================== -->
+      <div class="section-card">
+        <div class="section-card-header">スキル要件</div>
+        <div class="detail-row">
+          <div class="detail-label">必須スキル</div>
+          <div class="detail-value">
+            <div class="tag-list">
+              <span class="wf-tag">Java（3年以上）</span>
+              <span class="wf-tag">Spring Boot（2年以上）</span>
+              <span class="wf-tag">Oracle DB（1年以上）</span>
+              <span class="wf-tag">SQL（2年以上）</span>
+            </div>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">尚可スキル</div>
+          <div class="detail-value">
+            <div class="tag-list">
+              <span class="wf-tag optional">AWS</span>
+              <span class="wf-tag optional">Docker</span>
+              <span class="wf-tag optional">Jenkins</span>
+            </div>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">対象工程</div>
+          <div class="detail-value">
+            <div class="process-list">
+              <div class="process-item"><span class="process-check unchecked"></span>要件定義</div>
+              <div class="process-item"><span class="process-check checked">✓</span>基本設計</div>
+              <div class="process-item"><span class="process-check checked">✓</span>詳細設計</div>
+              <div class="process-item"><span class="process-check checked">✓</span>開発</div>
+              <div class="process-item"><span class="process-check checked">✓</span>テスト</div>
+              <div class="process-item"><span class="process-check unchecked"></span>保守運用</div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">顧客折衝経験</div>
+          <div class="detail-value">要</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">業務内容詳細</div>
+          <div class="detail-value" style="line-height:1.8;">
+            大手金融機関の勘定系システムをJava/Spring Bootでリプレースするプロジェクトです。要件定義フェーズから参画いただき、基本設計〜開発・テストまで一貫して担当していただきます。チームは5名構成、スクラム開発を採用しています。
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 管理情報 ==================== -->
+      <div class="section-card">
+        <div class="section-card-header">管理情報</div>
+        <div class="detail-row">
+          <div class="detail-label">ステータス</div>
+          <div class="detail-value" style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
+            <span>募集中</span>
+            <span class="tbd-label">TBD 案件ステータス定義未確定</span>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">担当営業</div>
+          <div class="detail-value">
+            担当：田中 営業　／　サブ：鈴木 営業
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 就業条件 ==================== -->
+      <div class="section-card">
+        <div class="section-card-header">就業条件</div>
+        <div class="detail-row">
+          <div class="detail-label">特記事項</div>
+          <div class="detail-value" style="color:#555;line-height:1.8;">
+            基本勤務時間：10:00〜19:00　精算幅：140〜180h　シフト制なし　出張なし
+          </div>
+        </div>
+      </div>
+
+      <!-- フッターアクション -->
+
+
+    </div><!-- /detail-area -->
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+
+<!-- ===== ANNOTATION ===== -->
+<div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
+  <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_08_案件詳細</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li style="color:#c00;font-weight:700;">TBD ヘッダーのstickyが正しく実装された場合、フッターの編集ボタンは不要になる可能性あり。実装時に判断すること</li>
+          <li>案件ステータスの定義：<span style="color:#c00;">[TBD 案件ステータス定義未確定]</span></li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">⚠️ WF_05（人材詳細）との主な差分</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>プロフィールサマリー → 案件サマリー（顔写真なし・案件名を大テキストで表示）</li>
+          <li>AI職務要約エリアなし</li>
+          <li>必須スキル（実線＋年数）と尚可スキル（点線・年数なし）を区別して表示</li>
+          <li>対象工程をチェックリスト表示</li>
+          <li>単価は下限〜上限の範囲表示</li>
+          <li>就業条件セクションを追加</li>
+          <li>削除ボタン：管理者のみ・物理削除（確定済み）</li>
+          <li>担当営業：担当＋サブの2名体制（確定済み）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

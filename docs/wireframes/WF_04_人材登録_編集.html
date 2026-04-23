@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_04_人材登録_編集 | 国内SES 人材・案件マッチングシステム</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+
+  }
+
+  .app-shell {
+    display: flex;
+    width: 1440px;
+    height: 100vh;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: hidden;
+  }
+
+  /* ===== SIDEBAR（共通） ===== */
+  .sidebar {
+    width: 220px;
+    height: 100%;
+    border-right: 1.5px solid #555;
+    background: #fafafa;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-logo {
+    padding: 16px 14px 14px;
+    border-bottom: 1.5px solid #555;
+    font-size: 11px; font-weight: 700;
+    color: #333; line-height: 1.5;
+  }
+
+  .sidebar-logo .logo-mark {
+    display: inline-block;
+    width: 28px; height: 28px;
+    border: 2px solid #333;
+    margin-bottom: 6px; position: relative;
+  }
+  .sidebar-logo .logo-mark::before,
+  .sidebar-logo .logo-mark::after {
+    content: ''; position: absolute; background: #333;
+  }
+  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
+  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
+
+  .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+  .nav-section-label {
+    font-size: 10px; color: #888; font-weight: 700;
+    padding: 10px 14px 4px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px; color: #444;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+
+  .nav-item:hover { background: #f2f2f2; }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    border: 1.5px solid #666; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  .sidebar-bottom { border-top: 1.5px solid #ccc; flex-shrink: 0; }
+
+  .sidebar-footer {
+    padding: 12px 14px;
+    font-size: 11px; color: #777;
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  .nav-item.logout { color: #888; }
+  .nav-item.logout .nav-icon { border-color: #aaa; color: #aaa; }
+
+  /* ===== MAIN ===== */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    background: #fff;
+  }
+
+  /* ページヘッダー（sticky） */
+  .page-header {
+    padding: 16px 40px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0;
+    background: #fff; z-index: 10;
+  }
+
+  .page-title { font-size: 18px; font-weight: 700; color: #111; }
+  .page-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+
+  .header-actions { display: flex; gap: 8px; }
+
+  /* ===== BUTTONS ===== */
+  .btn {
+    height: 34px; padding: 0 16px;
+    border: 1.5px solid #555; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #333; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .btn.btn-primary { background: #333; color: #fff; border-color: #333; }
+  .btn.btn-ghost   { border-color: #bbb; color: #777; font-weight: 400; }
+
+  .btn-icon {
+    width: 28px; height: 28px;
+    border: 1.5px solid #ccc; background: #fff;
+    font-size: 13px; color: #999;
+    cursor: pointer; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .btn-add-row {
+    height: 28px; padding: 0 10px;
+    border: 1.5px dashed #aaa; background: #fafafa;
+    font-size: 11px; font-family: inherit; color: #888;
+    cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  /* ===== TBD / バッジ ===== */
+  .tbd-label {
+    display: inline-flex; align-items: center;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.04);
+    color: #c00; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  }
+
+  .badge-required {
+    display: inline-block;
+    background: #333; color: #fff;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 2px; flex-shrink: 0;
+  }
+
+  .badge-optional {
+    display: inline-block;
+    border: 1px solid #ccc; color: #aaa;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 2px; flex-shrink: 0;
+  }
+
+  /* ===== FORM AREA ===== */
+  .form-area {
+    padding: 32px 40px 48px;
+    max-width: 860px;
+  }
+
+  /* ---- セクション見出し（A案：シンプル） ---- */
+  .section-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    margin-top: 36px;
+  }
+  .section-heading:first-child { margin-top: 0; }
+
+  .section-heading-text {
+    font-size: 13px;
+    font-weight: 700;
+    color: #333;
+    white-space: nowrap;
+  }
+
+  .section-divider {
+    flex: 1;
+    height: 1px;
+    background: #ddd;
+  }
+
+  /* ---- フォーム行 ---- */
+  .form-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .form-row:last-child { border-bottom: none; }
+
+  .form-label {
+    width: 190px;
+    flex-shrink: 0;
+    padding-top: 6px;
+    padding-right: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #444;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    line-height: 1.5;
+  }
+
+  .form-field {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .form-field.col { flex-direction: column; gap: 6px; }
+
+  /* ===== INPUT / SELECT / TEXTAREA ===== */
+  .wf-input {
+    height: 32px;
+    border: 1.5px solid #ccc;
+    background: #fff;
+    padding: 0 10px;
+    font-size: 12px; font-family: inherit;
+    color: #333; border-radius: 3px;
+  }
+  .wf-input::placeholder { color: #bbb; }
+  .wf-input.error { border-color: #c00; background: #fff8f8; }
+  .wf-input.w-full  { width: 100%; }
+  .wf-input.w-half  { width: calc(50% - 4px); }
+  .wf-input.w-200   { width: 200px; }
+  .wf-input.w-140   { width: 140px; }
+  .wf-input.w-80    { width: 80px; }
+  .wf-input.w-60    { width: 60px; }
+
+  .wf-select {
+    height: 32px;
+    border: 1.5px solid #ccc; background: #fff;
+    padding: 0 24px 0 8px;
+    font-size: 12px; font-family: inherit;
+    color: #444; border-radius: 3px;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    cursor: pointer;
+  }
+
+  .wf-textarea {
+    width: 100%;
+    min-height: 84px;
+    border: 1.5px solid #ccc; background: #fff;
+    padding: 8px 10px;
+    font-size: 12px; font-family: inherit;
+    color: #333; border-radius: 3px;
+    resize: vertical; line-height: 1.6;
+  }
+  .wf-textarea::placeholder { color: #bbb; }
+
+  /* ===== チェックボックス ===== */
+  .checkbox-group { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+
+  .checkbox-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #333; cursor: pointer;
+  }
+
+  .wf-checkbox {
+    width: 14px; height: 14px;
+    border: 1.5px solid #aaa; background: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 9px; font-weight: 700;
+  }
+  .wf-checkbox.checked { border-color: #333; background: #fff; color: #333; }
+
+  /* ===== スキルペア ===== */
+  .skill-pair-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+
+  .skill-pair {
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ===== 日付 + 自動計算 ===== */
+  .auto-calc {
+    height: 32px;
+    padding: 0 10px;
+    background: #f5f5f5;
+    border: 1.5px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px; color: #555;
+    display: flex; align-items: center;
+  }
+
+  /* ===== ファイルアップロード ===== */
+  .file-upload-area {
+    width: 100%;
+    border: 1.5px dashed #ccc;
+    background: #fafafa;
+    padding: 20px;
+    text-align: center;
+    border-radius: 4px;
+    font-size: 12px; color: #999;
+    cursor: pointer;
+    line-height: 1.8;
+  }
+
+  /* ===== ヒント / エラー ===== */
+  .hint-text {
+    font-size: 11px; color: #aaa;
+    line-height: 1.6; width: 100%;
+  }
+
+  .error-msg {
+    font-size: 11px; color: #c00; width: 100%;
+  }
+
+  /* ===== フォーム下部アクション ===== */
+  .form-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 32px;
+    border-top: 1.5px solid #eee;
+    margin-top: 36px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark"></div>
+      <div>SES マッチング<br>システム</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">メイン</div>
+      <div class="nav-item"><span class="nav-icon">◫</span><span>ダッシュボード</span></div>
+      <div class="nav-section-label">人材</div>
+      <div class="nav-item"><span class="nav-icon">≡</span><span>人材一覧</span></div>
+      <div class="nav-section-label">案件</div>
+      <div class="nav-item"><span class="nav-icon">≡</span><span>案件一覧</span></div>
+      <div class="nav-section-label">進捗管理</div>
+      <div class="nav-item"><span class="nav-icon">⊞</span><span>パイプライン</span></div>
+      <div class="nav-section-label">管理</div>
+      <div class="nav-item"><span class="nav-icon">↓</span><span>CSV入出力</span></div>
+      <div class="nav-item"><span class="nav-icon">⚙</span><span>マスタ管理</span></div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">
+        田中 営業（ログイン中）<br>
+        
+      </div>
+      <div class="nav-item logout"><span class="nav-icon">→</span><span>ログアウト</span></div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <!-- ページヘッダー（sticky） -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">人材登録</div>
+        <div style="font-size:10px;color:#888;margin-top:1px;">※ページヘッダーはstickyで常時固定表示（スクロール時もボタンが見える）</div>
+        <div class="page-subtitle">新規人材情報を登録します　※編集時は「人材編集」モードに切替</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost">✕ キャンセル（→画面3）</button>
+        <button class="btn btn-primary">✓ 保存する（→画面5）</button>
+      </div>
+    </div>
+
+    <!-- ===== フォーム本体 ===== -->
+    <div class="form-area">
+
+      <!-- ==================== 基本情報 ==================== -->
+      <div class="section-heading">
+        <span class="section-heading-text">基本情報</span>
+        <div class="section-divider"></div>
+      </div>
+
+      <!-- 氏名 / カナ -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>氏名 / カナ
+        </div>
+        <div class="form-field col">
+          <div style="display:flex;gap:8px;width:100%;">
+            <input class="wf-input w-half error" type="text" placeholder="例：山田 太郎">
+            <input class="wf-input w-half" type="text" placeholder="例：ヤマダ タロウ">
+          </div>
+          <span class="error-msg">⚠ 氏名は必須項目です</span>
+        </div>
+      </div>
+
+      <!-- 年齢（生年月日） -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>年齢（生年月日）
+        </div>
+        <div class="form-field col">
+          <div style="display:flex;gap:10px;align-items:center;">
+            <input class="wf-input w-140" type="text" placeholder="1990/04/15">
+            <div class="auto-calc">→ 34歳（自動計算）</div>
+          </div>
+          <span class="hint-text">年齢条件がある案件への自動マッチングに使用します</span>
+        </div>
+      </div>
+
+      <!-- 最寄駅 / 路線 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>最寄駅 / 路線
+        </div>
+        <div class="form-field col">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select class="wf-select" style="width:180px;">
+              <option>路線を選択</option>
+              <option>JR中央線</option>
+              <option>東急東横線</option>
+              <option>東京メトロ丸ノ内線</option>
+            </select>
+            <input class="wf-input w-200" type="text" placeholder="駅名（例：新宿）">
+            <span class="tbd-label">TBD マスタ連携方式未確定</span>
+          </div>
+          <span class="hint-text">出社が必要な案件との通勤条件の判定に使用します</span>
+        </div>
+      </div>
+
+      <!-- 稼働可能時期 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>稼働可能時期
+        </div>
+        <div class="form-field" style="align-items:center;">
+          <input class="wf-input w-140" type="text" placeholder="2025/02/01">
+          <span style="font-size:12px;color:#888;">〜（以降）</span>
+        </div>
+      </div>
+
+      <!-- ==================== スキル情報 ==================== -->
+      <div class="section-heading">
+        <span class="section-heading-text">スキル情報</span>
+        <div class="section-divider"></div>
+      </div>
+
+      <!-- 経験スキル -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>経験スキル
+        </div>
+        <div class="form-field col">
+          <div class="skill-pair-list">
+            <div class="skill-pair">
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <select class="wf-select" style="width:190px;"><option>Java</option></select>
+                <span class="tbd-label" style="font-size:9px;">TBD マスタ選択 or 自由入力</span>
+              </div>
+              <input class="wf-input w-60" type="text" value="3">
+              <span style="font-size:12px;color:#888;">年</span>
+              <button class="btn-icon">✕</button>
+            </div>
+            <div class="skill-pair">
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <select class="wf-select" style="width:190px;"><option>Spring Boot</option></select>
+                <span style="height:18px;"></span>
+              </div>
+              <input class="wf-input w-60" type="text" value="2">
+              <span style="font-size:12px;color:#888;">年</span>
+              <button class="btn-icon">✕</button>
+            </div>
+            <div class="skill-pair">
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <select class="wf-select" style="width:190px;"><option>AWS</option></select>
+                <span style="height:18px;"></span>
+              </div>
+              <input class="wf-input w-60" type="text" value="1">
+              <span style="font-size:12px;color:#888;">年</span>
+              <button class="btn-icon">✕</button>
+            </div>
+          </div>
+          <button class="btn-add-row">＋ スキルを追加</button>
+          <span class="hint-text">スキルと経験年数をセットで登録します（例：Java 3年）</span>
+        </div>
+      </div>
+
+      <!-- 経験工程 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>経験工程
+        </div>
+        <div class="form-field">
+          <div class="checkbox-group">
+            <label class="checkbox-item"><span class="wf-checkbox"></span> 要件定義</label>
+            <label class="checkbox-item"><span class="wf-checkbox checked">✓</span> 基本設計</label>
+            <label class="checkbox-item"><span class="wf-checkbox checked">✓</span> 詳細設計</label>
+            <label class="checkbox-item"><span class="wf-checkbox checked">✓</span> 開発</label>
+            <label class="checkbox-item"><span class="wf-checkbox checked">✓</span> テスト</label>
+            <label class="checkbox-item"><span class="wf-checkbox"></span> 保守運用</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 顧客折衝経験 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>顧客折衝経験
+        </div>
+        <div class="form-field col">
+          <select class="wf-select" style="width:160px;">
+            <option>選択してください</option>
+            <option>有</option>
+            <option>無</option>
+          </select>
+          <span class="hint-text">顧客との折衝・コミュニケーション経験。案件マッチングの判断基準として使用します</span>
+        </div>
+      </div>
+
+      <!-- ==================== 経歴・PR ==================== -->
+      <div class="section-heading">
+        <span class="section-heading-text">経歴・PR</span>
+        <div class="section-divider"></div>
+      </div>
+
+      <!-- アピールポイント -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>アピールポイント
+        </div>
+        <div class="form-field col">
+          <textarea class="wf-textarea" placeholder="例：Java・Spring Bootを用いた金融系システムの開発経験が豊富です。チームリードの経験もあり、コミュニケーション能力にも自信があります。"></textarea>
+          <span class="hint-text">案件提案時にAIが推薦コメントを生成する際の参考情報として使用します</span>
+        </div>
+      </div>
+
+      <!-- 職務経歴ファイル -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>職務経歴ファイル
+        </div>
+        <div class="form-field col">
+          <div class="file-upload-area">
+            □ PDF / Word ファイルをドラッグ＆ドロップ<br>
+            <span style="font-size:11px;">または クリックしてファイルを選択</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <span class="hint-text">職務経歴書を添付します（PDF / Word）</span>
+            <span class="tbd-label">TBD 職務経歴書以外のスキルシートも許容するか未確定</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 希望条件 ==================== -->
+      <div class="section-heading">
+        <span class="section-heading-text">希望条件</span>
+        <div class="section-divider"></div>
+      </div>
+
+      <!-- 希望単価 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>希望単価（月額）
+        </div>
+        <div class="form-field" style="align-items:center;">
+          <input class="wf-input w-80" type="text" placeholder="60">
+          <span style="font-size:12px;color:#888;">万円</span>
+        </div>
+      </div>
+
+      <!-- 勤務形態 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>勤務形態
+        </div>
+        <div class="form-field">
+          <div class="checkbox-group">
+            <label class="checkbox-item"><span class="wf-checkbox checked">✓</span> 常駐可</label>
+            <label class="checkbox-item"><span class="wf-checkbox checked">✓</span> 一部リモート可</label>
+            <label class="checkbox-item"><span class="wf-checkbox"></span> フルリモート希望</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 特記事項 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>特記事項
+        </div>
+        <div class="form-field col">
+          <textarea class="wf-textarea" placeholder="例：土日祝休み希望、出張NG、残業月20h以内希望 など"></textarea>
+          <span class="hint-text">スコア計算には使用しません。担当営業が把握しておきたい条件を自由記述してください</span>
+        </div>
+      </div>
+
+      <!-- ==================== 管理情報 ==================== -->
+      <div class="section-heading">
+        <span class="section-heading-text">管理情報</span>
+        <div class="section-divider"></div>
+      </div>
+
+      <!-- ステータス -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>ステータス
+        </div>
+        <div class="form-field col">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select class="wf-select" style="width:180px;">
+              <option>提案可</option>
+              <option>面談中</option>
+              <option>稼働中</option>
+              <option>退職等</option>
+            </select>
+            <span class="tbd-label">TBD 人材ステータス定義未確定</span>
+          </div>
+          <span class="hint-text">人材の現在の状況です。一覧の検索・絞り込みに使用します</span>
+        </div>
+      </div>
+
+      <!-- 担当営業 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-required">必須</span>担当営業
+        </div>
+        <div class="form-field col">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:11px;color:#888;white-space:nowrap;">担当</span>
+            <select class="wf-select" style="width:160px;">
+              <option>田中 営業</option>
+              <option>鈴木 営業</option>
+              <option>佐藤 営業</option>
+            </select>
+            <span style="font-size:11px;color:#888;white-space:nowrap;">サブ</span>
+            <select class="wf-select" style="width:160px;">
+              <option>（なし）</option>
+              <option>田中 営業</option>
+              <option>鈴木 営業</option>
+              <option>佐藤 営業</option>
+            </select>
+          </div>
+          <span class="hint-text">担当・サブともにユーザーマスタより選択します</span>
+        </div>
+      </div>
+
+
+
+    </div><!-- /form-area -->
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+
+<!-- ===== ANNOTATION ===== -->
+<div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
+  <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_04_人材登録_編集</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li style="color:#c00;font-weight:700;">TBD ヘッダーのstickyが正しく実装された場合、フォーム下部の保存・キャンセルボタンは不要になる可能性あり。実装時に判断すること</li>
+          <li>最寄駅：マスタ連携方式<br><span style="color:#c00;">[TBD マスタ連携方式未確定]</span></li>
+          <li>経験スキル：入力方式<br><span style="color:#c00;">[TBD マスタ選択 or 自由入力]</span></li>
+          <li>ステータス：選択肢定義<br><span style="color:#c00;">[TBD 人材ステータス定義未確定]</span></li>
+          <li>担当営業：担当＋サブの2名体制（確定済み）</li>
+                  </ul>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">🔧 レイアウト変更点（v2）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>カード型セクション枠を廃止 → 見出し＋水平線のみに変更（A案）</li>
+          <li>入力欄の背景をシンプルな白＋薄いグレー枠線に統一</li>
+          <li>ラベルと入力欄の左右配置はそのまま維持</li>
+          <li>保存ボタンはヘッダー固定＋フォーム下部の2か所に配置</li>
+          <li>バリデーションエラーは氏名欄に赤枠サンプルで表現</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
