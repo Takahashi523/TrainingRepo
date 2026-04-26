@@ -1,6 +1,6 @@
 {
-  "name": "SES Matching",
-  "dockerComposeFile": "../docker-compose.yml",
+  "name": "SES Matching - Laravel",
+  "dockerComposeFile": "../../docker-compose.yml",
   "service": "laravel",
   "workspaceFolder": "/var/www",
   "customizations": {
@@ -10,7 +10,6 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "bradlc.vscode-tailwindcss",
-        "ms-python.python",
         "ms-azuretools.vscode-docker",
         "christian-kohler.path-intellisense"
       ],
