@@ -391,13 +391,20 @@
           <span class="badge-required">必須</span>単価（月額）
         </div>
         <div class="form-field col">
-          <div style="display:flex;align-items:center;gap:8px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#444;cursor:pointer;">
+            <input type="checkbox" id="skill-merit-chk" onchange="toggleSkillMerit(this)" style="width:14px;height:14px;">
+            スキル見合い
+          </label>
+          <div id="rate-num-area" style="display:flex;align-items:center;gap:8px;">
             <input class="wf-input w-80" type="text" placeholder="60">
             <span class="unit-text">万円　〜</span>
             <input class="wf-input w-80" type="text" placeholder="80">
             <span class="unit-text">万円</span>
           </div>
-          <span class="hint-text">人材の希望単価が案件の単価レンジ内に収まるかの判定に使用します</span>
+          <div id="rate-text-area" style="display:none;">
+            <input class="wf-input w-200" type="text" placeholder="例：スキル見合い、応相談">
+          </div>
+          <span class="hint-text">人材の希望単価が案件の単価レンジ内に収まるかの判定に使用します。スキル見合いの場合はチェックを入れてください</span>
         </div>
       </div>
 
@@ -426,39 +433,33 @@
         <div class="section-divider"></div>
       </div>
 
-      <!-- 勤務地（最寄駅） -->
-      <div class="form-row">
-        <div class="form-label">
-          <span class="badge-required">必須</span>勤務地（最寄駅）
-        </div>
-        <div class="form-field col">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <select class="wf-select" style="width:180px;">
-              <option>路線を選択</option>
-              <option>JR山手線</option>
-              <option>東京メトロ丸ノ内線</option>
-              <option>東急東横線</option>
-            </select>
-            <input class="wf-input w-200" type="text" placeholder="駅名（例：新宿）">
-            <span class="tbd-label">TBD マスタ連携方式未確定</span>
-          </div>
-          <span class="hint-text">フルリモートの場合は駅名欄に「リモート」と入力してください</span>
-        </div>
-      </div>
-
       <!-- 稼働形態 -->
       <div class="form-row">
         <div class="form-label">
           <span class="badge-required">必須</span>稼働形態
         </div>
         <div class="form-field col">
-          <select class="wf-select" style="width:200px;">
-            <option>選択してください</option>
-            <option>常駐</option>
-            <option>一部リモート可</option>
-            <option>フルリモート</option>
+          <select class="wf-select" style="width:200px;" id="work-style-sel" onchange="onWorkStyleChange(this)">
+            <option value="">選択してください</option>
+            <option value="onsite">常駐</option>
+            <option value="hybrid">一部リモート可</option>
+            <option value="remote">フルリモート</option>
           </select>
           <span class="hint-text">人材の勤務形態希望とのマッチングスコアリングに使用します</span>
+        </div>
+      </div>
+
+      <!-- 勤務地（最寄駅）：フルリモート以外の場合のみ表示・必須 -->
+      <div class="form-row" id="location-row" style="display:none;">
+        <div class="form-label">
+          <span class="badge-required" id="location-badge">必須</span>勤務地（最寄駅）
+        </div>
+        <div class="form-field col">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input class="wf-input w-200" type="text" id="location-line" placeholder="路線名（例：東京メトロ丸ノ内線）">
+            <input class="wf-input w-200" type="text" id="location-sta"  placeholder="駅名（例：大手町）">
+          </div>
+          <span class="hint-text">フリーテキスト入力。稼働形態が「常駐」または「一部リモート可」の場合は必須です</span>
         </div>
       </div>
 
@@ -492,33 +493,33 @@
                 <select class="wf-select" style="width:190px;"><option>Java</option></select>
                 <span class="tbd-label" style="font-size:9px;">TBD マスタ選択 or 自由入力</span>
               </div>
-              <input class="wf-input w-60" type="text" value="3">
-              <span class="unit-text">年以上</span>
+              <input class="wf-input w-60" type="text" value="3" placeholder="－">
+              <span class="unit-text">年以上（任意）</span>
               <button class="btn-icon">✕</button>
             </div>
-            <!-- 行2 -->
+            <!-- 行2：年数なしサンプル -->
             <div class="skill-pair">
               <div style="display:flex;flex-direction:column;gap:3px;">
-                <select class="wf-select" style="width:190px;"><option>Spring Boot</option></select>
+                <select class="wf-select" style="width:190px;"><option>SQL</option></select>
                 <span style="height:18px;"></span>
               </div>
-              <input class="wf-input w-60" type="text" value="2">
-              <span class="unit-text">年以上</span>
+              <input class="wf-input w-60" type="text" placeholder="－">
+              <span class="unit-text">年以上（任意）</span>
               <button class="btn-icon">✕</button>
             </div>
-            <!-- 行3 -->
+            <!-- 行3：年数なしサンプル -->
             <div class="skill-pair">
               <div style="display:flex;flex-direction:column;gap:3px;">
-                <select class="wf-select" style="width:190px;"><option>AWS</option></select>
+                <select class="wf-select" style="width:190px;"><option>Linux</option></select>
                 <span style="height:18px;"></span>
               </div>
-              <input class="wf-input w-60" type="text" value="1">
-              <span class="unit-text">年以上</span>
+              <input class="wf-input w-60" type="text" placeholder="－">
+              <span class="unit-text">年以上（任意）</span>
               <button class="btn-icon">✕</button>
             </div>
           </div>
           <button class="btn-add-row">＋ 必須スキルを追加</button>
-          <span class="hint-text">この条件を満たさない人材は自動的にマッチング対象から除外されます</span>
+          <span class="hint-text">この条件を満たさない人材は自動的にマッチング対象から除外されます。年数は任意です（未入力の場合は年数不問として扱います）</span>
         </div>
       </div>
 
@@ -593,6 +594,17 @@
         </div>
       </div>
 
+      <!-- 稼働環境 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>稼働環境
+        </div>
+        <div class="form-field col">
+          <textarea class="wf-textarea" placeholder="例：OS: CentOS / Windows Server　DBMS: PostgreSQL / SQL Server　開発言語: PHP / JavaScript　クラウド: AWS　その他: Docker / Git"></textarea>
+          <span class="hint-text">OS・ツール・ミドルウェア等の技術環境をフリーテキストで記述してください</span>
+        </div>
+      </div>
+
       <!-- ==================== 管理情報 ==================== -->
       <div class="section-heading">
         <span class="section-heading-text">管理情報</span>
@@ -647,13 +659,24 @@
         <div class="section-divider"></div>
       </div>
 
+      <!-- 精算幅 -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>精算幅
+        </div>
+        <div class="form-field col">
+          <input class="wf-input w-200" type="text" placeholder="例：140〜180h">
+          <span class="hint-text">月の精算時間帯をフリーテキストで入力してください</span>
+        </div>
+      </div>
+
       <!-- 特記事項 -->
       <div class="form-row">
         <div class="form-label">
           <span class="badge-optional">任意</span>特記事項
         </div>
         <div class="form-field col">
-          <textarea class="wf-textarea" placeholder="例：基本勤務時間 10:00〜19:00、精算幅 140〜180h、シフト制あり、出張なし など"></textarea>
+          <textarea class="wf-textarea" placeholder="例：基本勤務時間 10:00〜19:00、シフト制なし、出張なし など"></textarea>
           <span class="hint-text">スコア計算には使用しません。営業担当者が把握しておきたい就業条件を自由記述してください</span>
         </div>
       </div>
@@ -674,10 +697,12 @@
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li style="color:#c00;font-weight:700;">TBD ヘッダーのstickyが正しく実装された場合、フォーム下部の保存・キャンセルボタンは不要になる可能性あり。実装時に判断すること</li>
           <li>商流の選択肢定義：<span style="color:#c00;">[TBD 商流の選択肢未確定]</span></li>
-          <li>勤務地のマスタ連携方式：<span style="color:#c00;">[TBD マスタ連携方式未確定]</span></li>
-          <li>必須スキルの入力方式：<span style="color:#c00;">[TBD マスタ選択 or 自由入力]</span></li>
-          <li>尚可スキルの入力方式：<span style="color:#c00;">[TBD マスタ選択 or 自由入力]</span></li>
+          <li>必須・尚可スキルの入力方式：<span style="color:#c00;">[TBD マスタ選択 or 自由入力 ※チーム内確認中]</span></li>
           <li>案件ステータスの定義：<span style="color:#c00;">[TBD 案件ステータス定義未確定]</span></li>
+          <li>勤務地：フリーテキスト採用確定。TBD解除（QA #59）。稼働形態と連動し、フルリモート選択時は行を非表示・入力値クリア。フルリモート以外は必須扱い</li>
+          <li>単価：スキル見合いチェックボックス追加。ON時に数値欄グレーアウト・テキスト入力へ切替（QA #14）</li>
+          <li>稼働環境：フリーテキストでスキル要件セクション末尾に追加（QA #67）</li>
+          <li>精算幅：フリーテキストで就業条件セクションに独立追加（QA #66）</li>
                   </ul>
       </div>
       <div>
@@ -696,5 +721,38 @@
   </div>
 </div>
 
+<script>
+function toggleSkillMerit(chk) {
+  var numArea  = document.getElementById('rate-num-area');
+  var textArea = document.getElementById('rate-text-area');
+  if (chk.checked) {
+    numArea.style.display  = 'none';
+    textArea.style.display = 'flex';
+  } else {
+    numArea.style.display  = 'flex';
+    textArea.style.display = 'none';
+  }
+}
+
+function onWorkStyleChange(sel) {
+  var row   = document.getElementById('location-row');
+  var line  = document.getElementById('location-line');
+  var sta   = document.getElementById('location-sta');
+  var val   = sel.value;
+
+  if (val === 'remote') {
+    // フルリモート：入力値クリア → 行を非表示
+    line.value = '';
+    sta.value  = '';
+    row.style.display = 'none';
+  } else if (val === '' ) {
+    // 未選択：非表示のまま
+    row.style.display = 'none';
+  } else {
+    // 常駐 or 一部リモート可：行を表示
+    row.style.display = 'flex';
+  }
+}
+</script>
 </body>
 </html>

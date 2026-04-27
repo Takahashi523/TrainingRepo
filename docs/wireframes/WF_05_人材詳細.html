@@ -356,10 +356,7 @@
           <div class="profile-name">山田 太郎</div>
           <div class="profile-kana">ヤマダ タロウ　｜　35歳</div>
           <div class="profile-badges">
-            <div style="display:flex;flex-direction:column;gap:3px;">
-              <span class="status-badge">提案可</span>
-              <span class="tbd-label" style="font-size:9px;">TBD ステータス定義未確定</span>
-            </div>
+            <span class="status-badge status-teian">提案可</span>
             <span class="timing-badge">⏱ 即日〜</span>
           </div>
           <div class="profile-meta">
@@ -377,8 +374,7 @@
         <div class="ai-block-header">
           <span class="ai-badge">AI</span>
           <span class="ai-section-title">職務要約</span>
-          <span class="tbd-label" style="margin-left:auto;">TBD 生成タイミング・更新条件未確定</span>
-          <span class="ai-date">最終生成：2025-01-15</span>
+          <span class="ai-date" style="margin-left:auto;">最終生成：2025-01-15</span>
         </div>
         <div class="ai-body">
           <strong>強み：</strong>Java・Spring Bootを中心とした金融系システムの開発経験が豊富。基本設計〜テストまで一貫して担当。チームリードの経験もあり、顧客折衝にも対応可能。
@@ -499,10 +495,7 @@
         <div class="detail-row">
           <div class="detail-label">ステータス</div>
           <div class="detail-value">
-          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
-            <span class="status-badge" style="border-radius:4px;">提案可</span>
-            <span class="tbd-label" style="font-size:9px;">TBD 人材ステータス定義未確定</span>
-          </div>
+          <span class="status-badge status-teian">提案可</span>
         </div>
         </div>
         <div class="detail-row">
@@ -527,11 +520,11 @@
         <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li style="color:#c00;font-weight:700;">TBD ヘッダーのstickyが正しく実装された場合、フッターの編集ボタンは不要になる可能性あり。実装時に判断すること</li>
-          <li>ステータスバッジの定義：<span style="color:#c00;">[TBD ステータス定義未確定]</span></li>
+          <li>ステータスバッジ：<strong>提案可 / 面談中 / 提案不可</strong> の3択に確定。TBD解除（QA #69）</li>
           <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
           <li>削除ルール：管理者のみ物理削除（確定済み）</li>
           <li>職務経歴ダウンロード権限：<span style="color:#c00;">[TBD ダウンロード権限未確定]</span></li>
-          <li>AI職務要約の生成タイミング・更新条件：<span style="color:#c00;">[TBD]</span></li>
+          <li>AI職務要約：登録・編集の保存時に同期処理で自動生成。TBD解除（QA #47）</li>
                   </ul>
       </div>
       <div>

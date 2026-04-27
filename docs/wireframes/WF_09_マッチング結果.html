@@ -599,21 +599,9 @@
       </div>
     </div>
 
-    <!-- フィルタ行 -->
-    <div class="filter-bar">
-      <div class="rank-tabs">
-        <button class="rank-tab active">すべて</button>
-        <button class="rank-tab">Aランク</button>
-        <button class="rank-tab">Bランク</button>
-        <button class="rank-tab">Cランク</button>
-        <button class="rank-tab">Dランク</button>
-      </div>
-      <select class="wf-select" style="width:160px;">
-        <option>スコア順（高い順）</option>
-        <option>スコア順（低い順）</option>
-        <option>更新日順</option>
-      </select>
-      <div class="result-count"><strong>12</strong> 件の案件がマッチしました</div>
+    <!-- 件数表示 -->
+    <div style="padding:8px 24px;font-size:12px;color:#777;border-bottom:1.5px solid #eee;background:#fff;flex-shrink:0;">
+      スコア上位 <strong style="color:#333;">5</strong> 件を表示　※Pythonエンジンが上位5件を返却
     </div>
 
     <!-- 一覧エリア -->
@@ -798,17 +786,7 @@
         </div>
       </div>
 
-      <!-- ページネーション -->
-      <div class="pagination">
-        <button class="page-btn">‹</button>
-        <button class="page-btn active">1</button>
-        <button class="page-btn">2</button>
-        <button class="page-btn">3</button>
-        <button class="page-btn ellipsis">…</button>
-        <button class="page-btn">5</button>
-        <button class="page-btn">›</button>
-        <span style="font-size:11px;color:#888;margin-left:8px;">1〜5件 / 全12件</span>
-      </div>
+
 
     </div><!-- /list-area -->
 
@@ -888,7 +866,6 @@
           <div class="ai-block-header">
             <span class="ai-badge">AI</span>
             <span class="ai-section-title">推薦理由</span>
-            <span class="tbd-label" style="margin-left:auto;">TBD AI生成タイミング未確定</span>
           </div>
           <div class="ai-text">
             Java・Spring Bootの豊富な実務経験が必須スキルと完全一致しています。単価レンジ（60〜80万円）も人材の希望単価（65万円）と合致しており、勤務形態も一部リモート可で条件が揃っています。稼働開始時期も即日対応可能なため、即提案レベルの候補です。
@@ -904,12 +881,11 @@
 
       <!-- ドロワーフッター -->
       <div class="drawer-footer">
-        <button class="btn-pipeline" onclick="alert('パイプラインに追加しました（ステータス：候補）')">
-          ＋ パイプラインに追加（→画面10）
+        <button class="btn-pipeline" onclick="alert('パイプラインに追加しました（ステータス：上位提案）')">
+          ＋ パイプラインに追加
         </button>
         <div class="btn-pipeline-note">
-          追加後のステータス：候補
-          <span class="tbd-label" style="margin-left:4px;">TBD 初期ステータス未確定</span>
+          追加後の初期ステータス：上位提案（QA #49 確定）
         </div>
       </div>
 
@@ -928,22 +904,24 @@
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ TBD解除済み</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>AI推薦理由の生成タイミング：<span style="color:#c00;">[TBD AI生成タイミング未確定]</span></li>
-          <li>パイプライン追加時の初期ステータス：<span style="color:#c00;">[TBD 初期ステータス未確定]</span></li>
+          <li>AI推薦理由の生成タイミング：同期処理確定。TBD解除（QA #47）</li>
+          <li>パイプライン追加の初期ステータス：<strong>上位提案</strong>に確定。TBD解除（QA #49）</li>
+          <li>マッチング結果の表示件数：<strong>上位5件</strong>に確定。ページネーション削除（QA #33 / #50）</li>
         </ul>
       </div>
       <div>
         <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">⚠️ レイアウト・設計メモ</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>一覧＋右ドロワー方式を採用（カード1枚クリックでドロワーが開く）</li>
-          <li>一覧カードはシンプルに絞り（案件名・スコア・バー・基本情報のみ）</li>
+          <li>表示件数は上位5件固定。Pythonエンジンがスコア計算後に上位5件のみ返却する。5件以下のためランク絞り込みフィルタは不要と判断し削除</li>
           <li>スコア内訳・AI推薦理由・不足条件はドロワー内に集約</li>
           <li>マッチングは人材から起動（案件からのマッチングは不要・確定済み）</li>
           <li>Dランクカードはopacity低めで見送り推奨を視覚的に表現</li>
           <li>パイプライン追加ボタンはドロワーフッターに固定配置</li>
           <li>カード右の「詳細 →」ボタンはドロワーと別に案件詳細（画面8）へ遷移</li>
+          <li>除外ロジック：Pythonがマッチング実行時にDBのパイプラインテーブルを参照し、対象エンジニアのパイプラインに存在する案件IDをすべて除外（ステータス問わず）。残りの募集中案件で上位5件を返す</li>
         </ul>
       </div>
     </div>

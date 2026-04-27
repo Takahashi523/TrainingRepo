@@ -270,7 +270,7 @@
 
   .kanban-board {
     display: flex; flex-direction: row;
-    height: 100%; min-width: max-content;
+    height: 100%; width: 100%;
   }
 
   .phase-block {
@@ -294,10 +294,10 @@
   }
 
   .kanban-col {
-    width: 175px; min-width: 175px;
+    flex: 1; min-width: 240px;
     display: flex; flex-direction: column;
     border-right: 1px solid #d0d0d0;
-    background: #f2f2f2; flex-shrink: 0;
+    background: #f2f2f2;
   }
   .kanban-col:last-child { border-right: none; }
 
@@ -742,6 +742,29 @@
           <option value="C">C（50〜64点）</option>
           <option value="D">D（49点以下）</option>
         </select>
+        <select class="wf-select" style="width:160px;" id="filter-status" onchange="updateSummary()">
+          <option value="">ステータス（全て）</option>
+          <optgroup label="応募前">
+            <option>上位提案</option>
+            <option>求職者応募済み</option>
+            <option>応募中</option>
+          </optgroup>
+          <optgroup label="一次選考">
+            <option>一次調整中</option>
+            <option>一次待ち</option>
+            <option>一次結果待ち</option>
+          </optgroup>
+          <optgroup label="最終選考">
+            <option>最終調整中</option>
+            <option>最終待ち</option>
+            <option>最終結果待ち</option>
+          </optgroup>
+          <optgroup label="オファー">
+            <option>オファー</option>
+            <option>アサイン承諾待ち</option>
+            <option>成約</option>
+          </optgroup>
+        </select>
       </div>
       <!-- 絞り込み条件バッジ行 -->
       <div class="filter-row" style="margin-top:8px;display:none;" id="filter-active-tags">
@@ -775,7 +798,7 @@
           <option>アサイン辞退</option>
           <option>辞退</option>
         </select>
-        <span class="tbd-label" style="font-size:9px;">TBD 終了4種の使い分け未確定（QA #63）</span>
+<span style="font-size:10px;color:#555;">不成立＝選考落選 / 募集終了＝案件クローズ / アサイン辞退＝成約後辞退 / 辞退＝選考途中辞退（QA #63確定）</span>
         <select class="wf-select" style="width:130px;">
           <option>担当営業（全員）</option>
           <option>田中 営業</option>
@@ -796,172 +819,126 @@
     <div id="view-active" class="kanban-wrapper">
       <div class="kanban-board">
 
-        <!-- フェーズ1：提案 -->
-        <div class="phase-block">
-          <div class="phase-header">提案</div>
-          <div class="phase-columns">
+        <!-- カラム1：応募前 -->
+        <div class="kanban-col">
+          <div class="col-header">
+            <span class="col-title">応募前</span>
+            <span class="col-count">2</span>
+          </div>
+          <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;font-size:9px;color:#666;">
+            上位提案 / 求職者応募済み / 応募中
+            <span class="tbd-label" style="font-size:9px;margin-left:4px;">TBD 各ステータス定義（QA #62）</span>
+          </div>
+          <div class="col-cards">
 
-            <!-- 上位提案（サンプル3枚） -->
-            <div class="kanban-col">
-              <div class="col-header">
-                <span class="col-title">上位提案</span>
-                <span class="col-count">2</span>
+            <!-- カード1：Aランク -->
+            <div class="pipeline-card active-card" onclick="openDrawer()">
+              <div class="card-engineer">山田 太郎</div>
+              <div class="card-project">株式会社ABC / PHPシステム運用</div>
+              <div class="card-rank-row">
+                <span class="rank-badge">A</span>
+                <span class="card-score">85点</span>
               </div>
-              <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;">
-                <span class="tbd-label" style="font-size:9px;">TBD 定義未確定（QA #62）</span>
-              </div>
-              <div class="col-cards">
-
-                <!-- カード1：Aランク -->
-                <div class="pipeline-card active-card" onclick="openDrawer()">
-                  <div class="card-engineer">山田 太郎</div>
-                  <div class="card-project">株式会社ABC / PHPシステム運用</div>
-                  <div class="card-rank-row">
-                    <span class="rank-badge">A</span>
-                    <span class="card-score">85点</span>
-                  </div>
-                  <select class="card-status-select" onclick="event.stopPropagation()">
-                    <optgroup label="進行中">
-                      <option selected>上位提案</option>
-                      <option>求職者応募済み</option>
-                      <option>応募中</option>
-                      <option>一次調整中</option>
-                      <option>一次待ち</option>
-                      <option>一次結果待ち</option>
-                      <option>最終調整中</option>
-                      <option>最終待ち</option>
-                      <option>最終結果待ち</option>
-                      <option>オファー</option>
-                      <option>アサイン承諾待ち</option>
-                      <option>成約</option>
-                    </optgroup>
-                    <optgroup label="── 終了">
-                      <option>不成立</option>
-                      <option>募集終了</option>
-                      <option>アサイン辞退</option>
-                      <option>辞退</option>
-                    </optgroup>
-                  </select>
-                </div>
-
-                <!-- カード2：Bランク・期限超過 -->
-                <div class="pipeline-card" onclick="openDrawer()">
-                  <div class="card-engineer">佐藤 花子</div>
-                  <div class="card-project">株式会社DEF / Java開発</div>
-                  <div class="card-rank-row">
-                    <span class="rank-badge rank-b">B</span>
-                    <span class="card-score">72点</span>
-                  </div>
-                  <select class="card-status-select" onclick="event.stopPropagation()">
-                    <optgroup label="進行中">
-                      <option selected>上位提案</option>
-                      <option>求職者応募済み</option>
-                      <option>応募中</option>
-                      <option>一次調整中</option>
-                      <option>一次待ち</option>
-                      <option>一次結果待ち</option>
-                      <option>最終調整中</option>
-                      <option>最終待ち</option>
-                      <option>最終結果待ち</option>
-                      <option>オファー</option>
-                      <option>アサイン承諾待ち</option>
-                      <option>成約</option>
-                    </optgroup>
-                    <optgroup label="── 終了">
-                      <option>不成立</option>
-                      <option>募集終了</option>
-                      <option>アサイン辞退</option>
-                      <option>辞退</option>
-                    </optgroup>
-                  </select>
-                </div>
-
-              </div>
-            </div><!-- /上位提案 -->
-
-            <!-- 求職者応募済み（空） -->
-            <div class="kanban-col">
-              <div class="col-header">
-                <span class="col-title">求職者応募済み</span>
-                <span class="col-count">0</span>
-              </div>
-              <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;">
-                <span class="tbd-label" style="font-size:9px;">TBD 定義未確定（QA #62）</span>
-              </div>
-              <div class="col-empty">カードなし</div>
+              <div style="font-size:10px;color:#888;margin-bottom:2px;">担当：田中 / 更新：2026/04/10</div>
+              <select class="card-status-select" onclick="event.stopPropagation()">
+                <optgroup label="進行中">
+                  <option selected>上位提案</option>
+                  <option>求職者応募済み</option>
+                  <option>応募中</option>
+                  <option>一次調整中</option>
+                  <option>一次待ち</option>
+                  <option>一次結果待ち</option>
+                  <option>最終調整中</option>
+                  <option>最終待ち</option>
+                  <option>最終結果待ち</option>
+                  <option>オファー</option>
+                  <option>アサイン承諾待ち</option>
+                  <option>成約</option>
+                </optgroup>
+                <optgroup label="── 終了（完了済みタブへ）">
+                  <option>不成立</option>
+                  <option>募集終了</option>
+                  <option>アサイン辞退</option>
+                  <option>辞退</option>
+                </optgroup>
+              </select>
             </div>
 
-            <!-- 応募中（空） -->
-            <div class="kanban-col">
-              <div class="col-header">
-                <span class="col-title">応募中</span>
-                <span class="col-count">0</span>
+            <!-- カード2：Bランク -->
+            <div class="pipeline-card" onclick="openDrawer()">
+              <div class="card-engineer">佐藤 花子</div>
+              <div class="card-project">株式会社DEF / Java開発</div>
+              <div class="card-rank-row">
+                <span class="rank-badge rank-b">B</span>
+                <span class="card-score">72点</span>
               </div>
-              <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;">
-                <span class="tbd-label" style="font-size:9px;">TBD 定義未確定（QA #62）</span>
-              </div>
-              <div class="col-empty">カードなし</div>
+              <div style="font-size:10px;color:#888;margin-bottom:2px;">担当：鈴木 / 更新：2026/04/09</div>
+              <select class="card-status-select" onclick="event.stopPropagation()">
+                <optgroup label="進行中">
+                  <option>上位提案</option>
+                  <option selected>求職者応募済み</option>
+                  <option>応募中</option>
+                  <option>一次調整中</option>
+                  <option>一次待ち</option>
+                  <option>一次結果待ち</option>
+                  <option>最終調整中</option>
+                  <option>最終待ち</option>
+                  <option>最終結果待ち</option>
+                  <option>オファー</option>
+                  <option>アサイン承諾待ち</option>
+                  <option>成約</option>
+                </optgroup>
+                <optgroup label="── 終了（完了済みタブへ）">
+                  <option>不成立</option>
+                  <option>募集終了</option>
+                  <option>アサイン辞退</option>
+                  <option>辞退</option>
+                </optgroup>
+              </select>
             </div>
 
           </div>
-        </div><!-- /フェーズ1 -->
+        </div><!-- /応募前 -->
 
-        <!-- フェーズ2：一次選考（全列空） -->
-        <div class="phase-block">
-          <div class="phase-header">一次選考</div>
-          <div class="phase-columns">
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">一次調整中</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">一次待ち</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">一次結果待ち</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
+        <!-- カラム2：一次選考 -->
+        <div class="kanban-col">
+          <div class="col-header">
+            <span class="col-title">一次選考</span>
+            <span class="col-count">0</span>
           </div>
-        </div>
+          <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;font-size:9px;color:#666;">
+            一次調整中 / 一次待ち / 一次結果待ち
+            <span class="tbd-label" style="font-size:9px;margin-left:4px;">TBD 各ステータス定義（QA #62）</span>
+          </div>
+          <div class="col-empty">カードなし</div>
+        </div><!-- /一次選考 -->
 
-        <!-- フェーズ3：最終選考（全列空） -->
-        <div class="phase-block">
-          <div class="phase-header">最終選考</div>
-          <div class="phase-columns">
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">最終調整中</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">最終待ち</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">最終結果待ち</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
+        <!-- カラム3：最終選考 -->
+        <div class="kanban-col">
+          <div class="col-header">
+            <span class="col-title">最終選考</span>
+            <span class="col-count">0</span>
           </div>
-        </div>
+          <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;font-size:9px;color:#666;">
+            最終調整中 / 最終待ち / 最終結果待ち
+            <span class="tbd-label" style="font-size:9px;margin-left:4px;">TBD 各ステータス定義（QA #62）</span>
+          </div>
+          <div class="col-empty">カードなし</div>
+        </div><!-- /最終選考 -->
 
-        <!-- フェーズ4：クロージング（全列空） -->
-        <div class="phase-block">
-          <div class="phase-header">クロージング</div>
-          <div class="phase-columns">
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">オファー</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">アサイン承諾待ち</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
-            <div class="kanban-col">
-              <div class="col-header"><span class="col-title">成約</span><span class="col-count">0</span></div>
-              <div class="col-empty">カードなし</div>
-            </div>
+        <!-- カラム4：オファー -->
+        <div class="kanban-col">
+          <div class="col-header">
+            <span class="col-title">オファー</span>
+            <span class="col-count">0</span>
           </div>
-        </div>
+          <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;font-size:9px;color:#666;">
+            オファー / アサイン承諾待ち / 成約
+            <span class="tbd-label" style="font-size:9px;margin-left:4px;">TBD 各ステータス定義（QA #62）</span>
+          </div>
+          <div class="col-empty">カードなし</div>
+        </div><!-- /オファー -->
+
 
       </div><!-- /kanban-board -->
     </div><!-- /view-active -->
@@ -1002,11 +979,7 @@
               <td>2026/04/08</td>
               <td style="color:#777;font-size:11px;">スキル不足（AWS未経験）</td>
               <td>
-                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
-                  <button class="btn btn-sm">進行中に戻す<span class="should-badge">Should</span></button>
-                  <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
-                  <span class="tbd-label" style="font-size:9px;">TBD 削除権限未確定（QA #66）</span>
-                </div>
+                <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
               </td>
             </tr>
             <tr>
@@ -1017,11 +990,7 @@
               <td>2026/04/05</td>
               <td style="color:#777;font-size:11px;">案件側の予算凍結</td>
               <td>
-                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
-                  <button class="btn btn-sm">進行中に戻す<span class="should-badge">Should</span></button>
-                  <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
-                  <span class="tbd-label" style="font-size:9px;">TBD 削除権限未確定（QA #66）</span>
-                </div>
+                <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
               </td>
             </tr>
             <tr>
@@ -1032,11 +1001,7 @@
               <td>2026/04/02</td>
               <td style="color:#777;font-size:11px;">他社案件に決定</td>
               <td>
-                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
-                  <button class="btn btn-sm">進行中に戻す<span class="should-badge">Should</span></button>
-                  <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
-                  <span class="tbd-label" style="font-size:9px;">TBD 削除権限未確定（QA #66）</span>
-                </div>
+                <button class="btn btn-sm btn-danger">削除（管理者のみ）</button>
               </td>
             </tr>
           </tbody>
@@ -1083,7 +1048,7 @@
             </select>
           </div>
           <div style="margin-top:4px;">
-            <span class="tbd-label" style="font-size:9px;">TBD 各ステータス定義未確定（QA #62 / #63）</span>
+            <span class="tbd-label" style="font-size:9px;">TBD 各ステータス業務定義（QA #62 確認中）</span>
           </div>
 
           <!-- 詳細リンク（Should） -->
@@ -1166,7 +1131,7 @@
               <span style="display:flex;align-items:center;gap:6px;">
                 <span class="ai-badge">AI</span>
                 推薦理由・不足条件
-                <span class="tbd-label" style="font-size:9px;">TBD AI生成タイミング未確定</span>
+
               </span>
               <span class="accordion-arrow">▼</span>
             </button>
@@ -1186,12 +1151,15 @@
         <!-- ③ 管理情報フォーム -->
         <div class="info-form-block">
           <div class="drawer-section-title">パイプライン管理情報</div>
-          <span class="tbd-label" style="font-size:9px;">TBD 表示項目確定待ち（QA #54）</span>
 
+          <div class="form-row">
+            <div class="form-row-label">最終更新日時</div>
+            <div style="font-size:12px;color:#555;padding:4px 0;">2026/04/10 14:32　<span style="font-size:10px;color:#aaa;">※システム自動記録</span></div>
+          </div>
           <div class="form-row">
             <div class="form-row-label">担当営業（メイン）</div>
             <select class="wf-select" style="width:100%;">
-              <option>田中 営業</option>
+              <option selected>田中 営業</option>
               <option>鈴木 営業</option>
               <option>佐藤 営業</option>
             </select>
@@ -1225,7 +1193,7 @@
         <button class="btn btn-primary" style="flex:1;height:36px;font-size:13px;">保存する</button>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
           <button class="btn btn-danger btn-sm">削除（管理者のみ）</button>
-          <span class="tbd-label" style="font-size:9px;">TBD 削除権限未確定（QA #66）</span>
+          <div style="font-size:10px;color:#aaa;">管理者のみ物理削除可（QA #71確定）</div>
         </div>
       </div>
 
@@ -1240,35 +1208,35 @@
     <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_10_進捗管理_パイプライン v16</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 32px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:6px;">🔴 TBDラベル付与箇所・対応QA</div>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:6px;">🔴 残TBD</div>
         <ul style="font-size:11px;color:#555;line-height:2;padding-left:16px;">
-          <li>各ステータスの業務定義：<span style="color:#c00;">TBD（QA #62）</span></li>
-          <li>終了ステータス4種の使い分け：<span style="color:#c00;">TBD（QA #63）</span></li>
-          <li>パイプライン初期ステータス：<span style="color:#c00;">TBD（QA #49）</span></li>
-          <li>カード・ドロワーの表示項目確定：<span style="color:#c00;">TBD（QA #54）</span></li>
-          <li>完了済みカードの復活操作：<span style="color:#c00;">TBD（QA #64）</span></li>
-          <li>パイプラインカード削除権限：<span style="color:#c00;">TBD（QA #66）</span></li>
-          <li>スコアなしカードの表示：<span style="color:#c00;">TBD（QA #45：オンデマンド計算確定）</span></li>
-          <li>AI推薦理由の生成タイミング：<span style="color:#c00;">TBD</span></li>
-          <li>次回アクション期限超過アラート：<span style="color:#c00;">TBD（QA #6）</span></li>
+          <li>各ステータスの業務定義：<span style="color:#c00;">TBD（QA #62 未着手）</span></li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:10px;margin-bottom:6px;">✅ TBD解除済み</div>
+        <ul style="font-size:11px;color:#555;line-height:2;padding-left:16px;">
+          <li>終了ステータス4種の使い分け確定（QA #63）：不成立=選考落選 / 募集終了=案件側クローズ / アサイン辞退=成約後辞退 / 辞退=選考途中で人材辞退</li>
+          <li>パイプライン初期ステータス：<strong>上位提案</strong>（QA #49）</li>
+          <li>カード・ドロワー表示項目確定：担当営業 / 最終更新日 / 顧客コメント / NG理由 / 次回アクション予定日（QA #54）</li>
+          <li>完了済みカードの復活操作：<strong>不可</strong>（QA #64）→「進行中に戻す」ボタン削除</li>
+          <li>パイプラインカード削除権限：<strong>管理者のみ物理削除可・一般は削除不可</strong>（QA #71）</li>
+          <li>AI推薦理由の生成タイミング：同期処理（QA #47）</li>
+          <li>次回アクション期限超過アラート：<strong>不要</strong>（QA #6）→ Shouldバッジ削除</li>
+          <li>スコア保持：オンデマンド計算確定（QA #45）</li>
         </ul>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:6px;">⚠ 設計決定事項・v16変更点</div>
+        <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:6px;">⚠ 設計決定事項・v17変更点</div>
         <ul style="font-size:11px;color:#555;line-height:2;padding-left:16px;">
-          <li>折りたたみバーを新デザインに変更：⊟ 表示条件を指定 [ サマリー ] ▲▼</li>
-          <li>条件なし：[ すべて表示中 ] / 条件あり：[ 担当: 田中 · ランク: A ] / 3件以上：[ 担当: 田中 · ほか2件 ]</li>
-          <li>フィルタ選択・ソート選択に連動して条件サマリーをリアルタイム更新</li>
-          <li>バッジ行も条件と連動して表示・非表示・内容を動的に更新</li>
-          <li>展開時：▲ / 折りたたみ時：▼</li>
-          <li>折りたたみ時：フィルタ・バッジ・ソートがすべて非表示。カンバン縦スペース最大化</li>
+          <li>カンバン構造変更：フェーズ×サブカラム（12列）→ 4単一カラム（応募前 / 選考中 / オファー / 完了済み）</li>
+          <li>各カードに現在の詳細ステータスバッジを表示。ステータス変更はドロワーのプルダウンのみで行う</li>
+          <li>終了ステータス選択時は完了済みタブへ自動移動</li>
+          <li>初期表示：自分がメイン担当またはサブ担当のカードを表示。管理者も自分担当のみ（QA #70）</li>
+          <li>折りたたみバー：⊟ 表示条件を指定 [ サマリー ] ▲▼</li>
           <li>完了済みタブは折りたたみバーなし・フィルタ常時表示</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#888;margin-top:12px;margin-bottom:6px;">⬜ Shouldバッジ付与箇所</div>
         <ul style="font-size:11px;color:#555;line-height:2;padding-left:16px;">
           <li>人材詳細・案件詳細リンク（ドロワーヘッダー）：別タブ遷移想定</li>
-          <li>次回アクション期限超過アラート（QA #6未着手）</li>
-          <li>完了済みカードの「進行中に戻す」（QA #64未着手）</li>
         </ul>
       </div>
     </div>

@@ -128,6 +128,25 @@
     font-size: 10px; color: #bbb; align-self: center;
   }
 
+  /* ===== トグルスイッチ ===== */
+  .toggle-wrap { display:flex; align-items:center; gap:8px; }
+  .toggle {
+    position:relative; width:36px; height:20px; flex-shrink:0;
+  }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle-slider {
+    position:absolute; cursor:pointer; inset:0;
+    background:#ccc; border-radius:20px; transition:.2s;
+  }
+  .toggle-slider::before {
+    content:""; position:absolute;
+    width:14px; height:14px; left:3px; bottom:3px;
+    background:#fff; border-radius:50%; transition:.2s;
+  }
+  .toggle input:checked + .toggle-slider { background:#333; }
+  .toggle input:checked + .toggle-slider::before { transform:translateX(16px); }
+  .toggle-label { font-size:11px; font-weight:700; color:#333; min-width:24px; }
+
   /* ===== TBDラベル（既存WFと統一） ===== */
   .tbd-label {
     display: inline-flex; align-items: center; gap: 4px;
@@ -351,7 +370,9 @@
       </div>
       <div class="tab-item" id="tab-user-btn" onclick="switchTab('user')">
         ユーザー管理
-        <span class="tbd-label" style="font-size:9px;">QA未確定</span>
+      </div>
+      <div class="tab-item" id="tab-form-btn" onclick="switchTab('form')">
+        フォーム設定
       </div>
       <div class="tab-bar-note">
         [WF注] 工程・勤務形態・ステータスはJSONカラム管理のため対象外
@@ -545,34 +566,17 @@
       <div class="tab-content" id="tab-user">
 
         <div class="content-header">
-          <div class="content-title">
-            ユーザー管理
-            <span class="tbd-label" style="margin-left:10px;">QA未確定</span>
-          </div>
-          <button class="btn btn-primary">＋ 新規追加</button>
-        </div>
-
-        <div class="qa-banner">
-          <strong>⚠ 仕様QA未確定（確認待ち）</strong><br>
-          QA #16（CRUD運用方針）／ QA #17（ロール種別）／ QA #18（登録項目）／ QA #19（ログインID形式）／ QA #68（氏名登録要否）
+          <div class="content-title">ユーザー管理</div>
+          <button class="btn btn-primary" onclick="openUserModal()">＋ 新規追加</button>
         </div>
 
         <div class="table-wrap" style="padding-top:16px;">
           <table class="master-table">
             <thead>
               <tr>
-                <th class="col-name">
-                  氏名
-                  <span class="tbd-label" style="margin-left:6px;font-size:9px;">QA #68</span>
-                </th>
-                <th class="col-email">
-                  メールアドレス
-                  <span class="tbd-label" style="margin-left:6px;font-size:9px;">QA #19</span>
-                </th>
-                <th class="col-role">
-                  ロール
-                  <span class="tbd-label" style="margin-left:4px;font-size:9px;">QA #17</span>
-                </th>
+                <th class="col-name">氏名</th>
+                <th class="col-email">メールアドレス（ログインID）</th>
+                <th class="col-role">ロール</th>
                 <th class="col-login">最終ログイン</th>
                 <th class="col-ops">
                   操作
@@ -621,8 +625,92 @@
               <div class="annotation-item">・ ログインIDは社内メールアドレスのみ許可（QA #19 回答済）</div>
               <div class="annotation-item">・ ロールは「管理者」「一般」の2階層（QA #17 回答済）</div>
               <div class="annotation-item">・ ステータス列は削除。ユーザーの無効化は削除で運用（退職者の紐付けデータ保持が必要な場合はQA追加要）</div>
-              <div class="annotation-item">・ 氏名フィールドの登録要否は QA #68 回答待ち <span class="tbd-label" style="margin-left:4px;">QA未確定</span></div>
+              <div class="annotation-item">・ 氏名は必須登録項目（QA #68 確定）。担当営業名の画面表示に使用</div>
               <div class="annotation-item">・ パスワードリセットは管理者が手動リセット・本人へ通知する運用（QA #20 回答済）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== タブ3：フォーム設定 ========== -->
+      <div class="tab-content" id="tab-form">
+
+        <div class="content-header">
+          <div class="content-title">フォーム設定</div>
+          <div style="font-size:11px;color:#888;">変更は即時反映されます。全ユーザーの登録フォームに適用されます</div>
+        </div>
+
+        <div class="table-wrap">
+
+          <!-- 人材登録フォーム設定 -->
+          <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:10px;">人材登録フォーム</div>
+          <table class="master-table" style="margin-bottom:28px;">
+            <thead>
+              <tr>
+                <th class="col-name">項目名</th>
+                <th style="width:140px;">必須 / 任意</th>
+                <th style="font-size:9px;color:#bbb;font-weight:400;">[WF注] 管理者のみ変更可能（QA #65確定）。トグルON=必須 / OFF=任意</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-name">氏名 / カナ</td>
+                <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
+              </tr>
+              <tr>
+                <td class="col-name">年齢（生年月日）</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">最寄駅 / 路線</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">稼働可能時期</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">経験スキル</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">経験工程</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">顧客折衝経験</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">アピールポイント</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">職務経歴ファイル</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">希望単価</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">勤務形態タグ</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">特記事項</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="annotation-block">
+            <div class="annotation-title">WF注釈</div>
+            <div class="annotation-list">
+              <div class="annotation-item">・ 必須/任意の変更は管理者ロールのみ実行可能（QA #65確定）</div>
+              <div class="annotation-item">・ 変更はシステム全体に即時反映。全営業担当者の登録画面に適用される</div>
+              <div class="annotation-item">・ 「氏名/カナ」はシステム上の必須項目のため管理者も変更不可</div>
+              <div class="annotation-item">・ 案件登録フォームも同様の設定が必要だが、今回は人材フォームのみ表示（案件フォームの設定は詳細設計フェーズで追加）</div>
             </div>
           </div>
         </div>
@@ -632,6 +720,46 @@
   </div><!-- /main-content -->
 </div><!-- /app-shell -->
 
+
+<!-- ===== モーダル：ユーザー追加 ===== -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">ユーザーを追加</div>
+      <button class="modal-close" onclick="closeUserModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">氏名 <span class="required-mark">※必須</span></label>
+        <input class="wf-input" type="text" placeholder="例：田中 一郎">
+        <span class="hint-text">担当営業名として各画面に表示されます（QA #68確定）</span>
+      </div>
+      <div class="form-row">
+        <label class="form-label">メールアドレス <span class="required-mark">※必須</span></label>
+        <input class="wf-input" type="text" placeholder="例：tanaka@company.co.jp">
+        <span class="hint-text">社内メールアドレスのみ使用可。ログインIDとして使用（QA #19確定）</span>
+      </div>
+      <div class="form-row">
+        <label class="form-label">初期パスワード <span class="required-mark">※必須</span></label>
+        <input class="wf-input" type="password" placeholder="8文字以上">
+        <span class="hint-text">パスワードリセットは管理者が手動で再設定（QA #20確定）</span>
+      </div>
+      <div class="form-row">
+        <label class="form-label">ロール <span class="required-mark">※必須</span></label>
+        <select class="wf-select-modal">
+          <option value="">選択してください</option>
+          <option value="admin">管理者</option>
+          <option value="general">一般</option>
+        </select>
+        <span class="hint-text">管理者：全機能＋マスタ管理。一般：通常営業機能のみ（QA #17確定）</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeUserModal()">キャンセル</button>
+      <button class="btn btn-primary">保存</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== モーダル：スキルタグ新規追加 ===== -->
 <div class="modal-overlay" id="modal-skill">
@@ -668,36 +796,45 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-
-    // モーダルオーバーレイクリックで閉じる
     document.getElementById('modal-skill').addEventListener('click', function (e) {
       if (e.target === this) closeModal();
     });
+    document.getElementById('modal-user').addEventListener('click', function (e) {
+      if (e.target === this) closeUserModal();
+    });
   });
 
-  // タブ切り替え（WF_10と同じ方式）
+  // タブ切り替え
   function switchTab(tab) {
-    var btnSkill   = document.getElementById('tab-skill-btn');
-    var btnUser    = document.getElementById('tab-user-btn');
-    var contSkill  = document.getElementById('tab-skill');
-    var contUser   = document.getElementById('tab-user');
-
-    btnSkill.classList.remove('active');
-    btnUser.classList.remove('active');
-    contSkill.classList.remove('active');
-    contUser.classList.remove('active');
-
-    if (tab === 'skill') {
-      btnSkill.classList.add('active');
-      contSkill.classList.add('active');
-    } else {
-      btnUser.classList.add('active');
-      contUser.classList.add('active');
-    }
+    ['skill','user','form'].forEach(function(t) {
+      document.getElementById('tab-' + t + '-btn').classList.remove('active');
+      document.getElementById('tab-' + t).classList.remove('active');
+    });
+    document.getElementById('tab-' + tab + '-btn').classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
   }
 
+  // フォーム設定：トグル切替で必須/任意ラベルを動的更新
+  document.querySelectorAll('#tab-form .toggle input:not([disabled])').forEach(function(chk) {
+    chk.addEventListener('change', function() {
+      var label = this.closest('.toggle-wrap').querySelector('.toggle-label');
+      if (this.checked) {
+        label.textContent = '必須';
+        label.style.color = '#333';
+      } else {
+        label.textContent = '任意';
+        label.style.color = '#888';
+      }
+    });
+  });
+
+  // スキルタグモーダル
   function openModal()  { document.getElementById('modal-skill').classList.add('open'); }
   function closeModal() { document.getElementById('modal-skill').classList.remove('open'); }
+
+  // ユーザーモーダル
+  function openUserModal()  { document.getElementById('modal-user').classList.add('open'); }
+  function closeUserModal() { document.getElementById('modal-user').classList.remove('open'); }
 </script>
 
 </body>

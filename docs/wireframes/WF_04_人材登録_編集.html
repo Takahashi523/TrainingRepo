@@ -430,16 +430,10 @@
         </div>
         <div class="form-field col">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <select class="wf-select" style="width:180px;">
-              <option>路線を選択</option>
-              <option>JR中央線</option>
-              <option>東急東横線</option>
-              <option>東京メトロ丸ノ内線</option>
-            </select>
+            <input class="wf-input w-200" type="text" placeholder="路線名（例：JR中央線）">
             <input class="wf-input w-200" type="text" placeholder="駅名（例：新宿）">
-            <span class="tbd-label">TBD マスタ連携方式未確定</span>
           </div>
-          <span class="hint-text">出社が必要な案件との通勤条件の判定に使用します</span>
+          <span class="hint-text">出社が必要な案件との通勤条件の判定に使用します。入力形式：路線名・駅名をそれぞれ自由入力（例：JR中央線 / 新宿）</span>
         </div>
       </div>
 
@@ -559,10 +553,7 @@
             □ PDF / Word ファイルをドラッグ＆ドロップ<br>
             <span style="font-size:11px;">または クリックしてファイルを選択</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:4px;">
-            <span class="hint-text">職務経歴書を添付します（PDF / Word）</span>
-            <span class="tbd-label">TBD 職務経歴書以外のスキルシートも許容するか未確定</span>
-          </div>
+          <span class="hint-text">職務経歴書を添付します（PDF / Word）。スキルシート等の添付も可</span>
         </div>
       </div>
 
@@ -624,10 +615,8 @@
             <select class="wf-select" style="width:180px;">
               <option>提案可</option>
               <option>面談中</option>
-              <option>稼働中</option>
-              <option>退職等</option>
+              <option>提案不可</option>
             </select>
-            <span class="tbd-label">TBD 人材ステータス定義未確定</span>
           </div>
           <span class="hint-text">人材の現在の状況です。一覧の検索・絞り込みに使用します</span>
         </div>
@@ -673,10 +662,12 @@
         <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li style="color:#c00;font-weight:700;">TBD ヘッダーのstickyが正しく実装された場合、フォーム下部の保存・キャンセルボタンは不要になる可能性あり。実装時に判断すること</li>
-          <li>最寄駅：マスタ連携方式<br><span style="color:#c00;">[TBD マスタ連携方式未確定]</span></li>
-          <li>経験スキル：入力方式<br><span style="color:#c00;">[TBD マスタ選択 or 自由入力]</span></li>
-          <li>ステータス：選択肢定義<br><span style="color:#c00;">[TBD 人材ステータス定義未確定]</span></li>
+          <li>最寄駅：フリーテキスト採用確定。TBD解除（QA #59）</li>
+          <li>経験スキル：入力方式<br><span style="color:#c00;">[TBD マスタ選択 or 自由入力 ※チーム内確認中]</span></li>
+          <li>ステータス：<strong>提案可 / 面談中 / 提案不可</strong> の3択に確定。TBD解除（QA #69）</li>
+          <li>職務経歴ファイル：PDF / Word 確定。スキルシート等も許容。TBD解除（QA #13）</li>
           <li>担当営業：担当＋サブの2名体制（確定済み）</li>
+          <li>必須/任意の動的切替：マスタ管理画面「フォーム設定」タブで管理者が変更可能。全項目対象（QA #65）</li>
                   </ul>
       </div>
       <div>

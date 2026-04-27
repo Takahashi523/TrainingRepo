@@ -330,6 +330,9 @@
     font-size: 11px; font-weight: 700; color: #333;
     white-space: nowrap;
   }
+  .status-teian  { border-color: #2a7a2a; color: #2a7a2a; }
+  .status-mendan { border-color: #b07000; color: #b07000; }
+  .status-futeian { border-color: #888; color: #888; }
 
   .timing-badge {
     padding: 3px 8px;
@@ -506,13 +509,11 @@
         <div class="ms-wrap" id="ms-status">
           <button class="ms-btn" onclick="toggleMs('ms-status')">
             ステータス <span class="ms-badge" id="badge-status"></span> ▾
-            <span class="tbd-inline">[TBD]</span>
           </button>
           <div class="ms-panel">
             <label class="ms-item"><span class="wf-checkbox"></span> 提案可</label>
             <label class="ms-item"><span class="wf-checkbox"></span> 面談中</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> 参画中</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> 待機中</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 提案不可</label>
           </div>
         </div>
 
@@ -629,8 +630,7 @@
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-                  <span class="status-badge">提案可</span>
-                  <span class="tbd-label">TBD 人材ステータス定義未確定</span>
+                  <span class="status-badge status-teian">提案可</span>
                 </div>
                 <span class="timing-badge">⏱ 即日〜</span>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
@@ -687,8 +687,7 @@
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-                  <span class="status-badge">面談中</span>
-                  <span class="tbd-label">TBD 人材ステータス定義未確定</span>
+                  <span class="status-badge status-mendan">面談中</span>
                 </div>
                 <span class="timing-badge">⏱ 来月〜</span>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
@@ -742,8 +741,7 @@
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-                  <span class="status-badge">参画中</span>
-                  <span class="tbd-label">TBD 人材ステータス定義未確定</span>
+                  <span class="status-badge status-futeian">提案不可</span>
                 </div>
                 <span class="timing-badge">⏱ 3ヶ月後〜</span>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
@@ -788,10 +786,10 @@
         </div>
       </div>
 
-      <!-- CARD 4（保留） -->
-      <div class="engineer-card" style="opacity:0.7;">
+      <!-- CARD 4 -->
+      <div class="engineer-card">
         <div class="card-inner">
-          <div class="card-accent" style="background:#aaa;"></div>
+          <div class="card-accent"></div>
           
           <div class="card-body">
             <div class="card-top-row">
@@ -801,8 +799,7 @@
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-                  <span class="status-badge" style="border-style:dashed;color:#888;">保留</span>
-                  <span class="tbd-label">TBD 人材ステータス定義未確定</span>
+                  <span class="status-badge status-futeian">提案不可</span>
                 </div>
                 <span class="timing-badge">⏱ 未定</span>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
@@ -867,19 +864,22 @@
       <div>
         <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>人材ステータスバッジ（各カード）：<span style="color:#c00;">[TBD 人材ステータス定義未確定]</span></li>
-          <li>ステータスフィルタ：<span style="color:#c00;">[TBD 人材ステータス定義未確定]</span></li>
+          <li>人材ステータス：<strong>提案可 / 面談中 / 提案不可</strong> の3択に確定（QA #69）</li>
+          <li>ステータスフィルタ：同上3択で確定。TBD解除</li>
           <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
                   </ul>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">🔧 v2 変更点</div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">🔧 v3 変更点</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>サイドナビ：ログイン・登録/編集・詳細・マッチング提案を削除</li>
           <li>サイドナビ：「設定」→「マスタ」に変更</li>
           <li>サイドナビ：最下部にログアウトを追加</li>
           <li>検索条件：スキルドロップダウンを追加（言語 / FW / インフラ・DBのoptgroup構成）</li>
           <li>ヘッダー：CSVエクスポートボタンを削除</li>
+          <li>人材ステータス：3択確定に伴いTBD解除・バッジ色分け追加（提案可=緑 / 面談中=黄 / 提案不可=グレー）</li>
+          <li>カード3「参画中」→「提案不可」に変更</li>
+          <li>カード4「保留」→「提案不可」に変更・opacity除去</li>
         </ul>
       </div>
     </div>
