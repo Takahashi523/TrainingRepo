@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_12_マスタ管理 | 国内SES 人材・案件マッチングシステム</title>
+<title>WF_12_マスタ管理 v1.1 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -34,25 +34,14 @@
     flex-direction: column;
   }
 
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
   .sidebar-logo {
     padding: 16px 14px 14px;
     border-bottom: 1.5px solid #555;
-    font-size: 11px; font-weight: 700;
-    color: #333; line-height: 1.5;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
   }
-
-  .sidebar-logo .logo-mark {
-    display: inline-block;
-    width: 28px; height: 28px;
-    border: 2px solid #333;
-    margin-bottom: 6px; position: relative;
-  }
-  .sidebar-logo .logo-mark::before,
-  .sidebar-logo .logo-mark::after {
-    content: ''; position: absolute; background: #333;
-  }
-  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
-  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
 
   .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
 
@@ -313,10 +302,8 @@
 
   <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark"></div>
-      <div>SES マッチング<br>システム</div>
-    </div>
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">メイン</div>
@@ -373,9 +360,6 @@
       </div>
       <div class="tab-item" id="tab-form-btn" onclick="switchTab('form')">
         フォーム設定
-      </div>
-      <div class="tab-bar-note">
-        [WF注] 工程・勤務形態・ステータスはJSONカラム管理のため対象外
       </div>
     </div>
 
@@ -522,41 +506,18 @@
                   <button class="btn btn-sm btn-delete-active">削除</button>
                 </div></td>
               </tr>
-              <tr>
-                <td class="col-name">Docker</td>
-                <td class="col-cat"><span class="cat-badge tool">ツール</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">Kubernetes</td>
-                <td class="col-cat"><span class="cat-badge tool">ツール</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete-active">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">Git</td>
-                <td class="col-cat"><span class="cat-badge tool">ツール</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
+              <!-- QA #67: Docker / Kubernetes / Git はツール類のためスキルタグ非対象。削除（4/29 確定） -->
             </tbody>
           </table>
 
           <div class="annotation-block">
-            <div class="annotation-title">WF注釈</div>
+            <div class="annotation-title">WF注釈（v1.1更新）</div>
             <div class="annotation-list">
-              <div class="annotation-item">・ カテゴリ5分類（言語 / FW / DB / クラウド / ツール）は暫定採用。QA表の案件サンプル環境欄を根拠とするが、クライアント確認推奨</div>
-              <div class="annotation-item">・ カテゴリはWF_03スキル絞り込みの ms-group-label（言語 / FW / インフラ・DB）と整合が必要。DB・クラウド・ツール分離に合わせてWF_03も要更新</div>
+              <div class="annotation-item">・ [QA #67] ツール類（Docker / Kubernetes / Git 等）は案件登録の「稼働環境」フリーテキストで入力する運用のため、スキルタグ対象外。ツールカテゴリを廃止し<strong>カテゴリ4分類（言語 / FW / DB / クラウド）</strong>に変更（4/29 確定）</div>
+              <div class="annotation-item">・ カテゴリはWF_03スキル絞り込みのグループ表示に使用。WF_03のグループラベルとの整合は次バージョン対応</div>
               <div class="annotation-item">・ 削除ボタン（グレー）：使用中タグ。ホバー時ツールチップ「使用中のため削除不可」を表示</div>
               <div class="annotation-item">・ 削除ボタン（赤枠）：未使用タグ。物理削除を許可</div>
-              <div class="annotation-item">・ 表示順はカテゴリ内で名称の昇順（あいうえお / ABC順）に自動ソート。並び順フィールドは不要</div>
+              <div class="annotation-item">・ 表示順はカテゴリ内で名称の昇順（あいうえお / ABC順）に自動ソート</div>
             </div>
           </div>
         </div>
@@ -589,7 +550,7 @@
                 <td class="col-name">田中 一郎</td>
                 <td class="col-email">tanaka@example.com</td>
                 <td class="col-role"><span class="role-badge">管理者</span></td>
-                <td class="col-login">2025-04-15</td>
+                <td class="col-login">2026-04-15</td>
                 <td class="col-ops"><div class="ops-group">
                   <button class="btn btn-sm btn-edit">編集</button>
                   <button class="btn btn-sm btn-delete" title="自分自身は削除不可">削除</button>
@@ -599,7 +560,7 @@
                 <td class="col-name">鈴木 花子</td>
                 <td class="col-email">suzuki@example.com</td>
                 <td class="col-role"><span class="role-badge general">一般</span></td>
-                <td class="col-login">2025-04-14</td>
+                <td class="col-login">2026-04-14</td>
                 <td class="col-ops"><div class="ops-group">
                   <button class="btn btn-sm btn-edit">編集</button>
                   <button class="btn btn-sm btn-delete-active">削除</button>
@@ -609,7 +570,7 @@
                 <td class="col-name">佐藤 次郎</td>
                 <td class="col-email">sato@example.com</td>
                 <td class="col-role"><span class="role-badge general">一般</span></td>
-                <td class="col-login">2025-03-20</td>
+                <td class="col-login">2026-03-20</td>
                 <td class="col-ops"><div class="ops-group">
                   <button class="btn btn-sm btn-edit">編集</button>
                   <button class="btn btn-sm btn-delete-active">削除</button>
@@ -704,13 +665,88 @@
             </tbody>
           </table>
 
+          <!-- 案件登録フォーム設定（QA #82: 案件側も同様の対応 4/29 確定） -->
+          <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:10px;">案件登録フォーム</div>
+          <table class="master-table" style="margin-bottom:28px;">
+            <thead>
+              <tr>
+                <th class="col-name">項目名</th>
+                <th style="width:140px;">必須 / 任意</th>
+                <th style="font-size:9px;color:#bbb;font-weight:400;">[WF注] 管理者のみ変更可能（QA #65確定）。トグルON=必須 / OFF=任意</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-name">案件名</td>
+                <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
+              </tr>
+              <tr>
+                <td class="col-name">顧客名</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">必須スキル</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">尚可スキル</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">単価（下限〜上限）</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">参画開始時期</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">稼働形態</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">勤務地</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">商流</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">面談回数</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">募集人数</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">稼働環境</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">精算幅</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">顧客折衝経験</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+                <td style="font-size:10px;color:#aaa;">選択肢：不問 / 要。マッチングスコア（5点）の判定に使用</td>
+              </tr>
+              <tr>
+                <td class="col-name">業務内容詳細</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+            </tbody>
+          </table>
+
           <div class="annotation-block">
-            <div class="annotation-title">WF注釈</div>
+            <div class="annotation-title">WF注釈（v1.1更新）</div>
             <div class="annotation-list">
+              <div class="annotation-item">・ [QA #82] 案件登録フォームも人材登録フォームと同様の必須/任意切替設定を実装（前田様 4/29 確定）</div>
               <div class="annotation-item">・ 必須/任意の変更は管理者ロールのみ実行可能（QA #65確定）</div>
               <div class="annotation-item">・ 変更はシステム全体に即時反映。全営業担当者の登録画面に適用される</div>
-              <div class="annotation-item">・ 「氏名/カナ」はシステム上の必須項目のため管理者も変更不可</div>
-              <div class="annotation-item">・ 案件登録フォームも同様の設定が必要だが、今回は人材フォームのみ表示（案件フォームの設定は詳細設計フェーズで追加）</div>
+              <div class="annotation-item">・ 「案件名」はシステム上の必須項目のため管理者も変更不可</div>
             </div>
           </div>
         </div>
@@ -781,7 +817,7 @@
           <option value="fw">FW</option>
           <option value="db">DB</option>
           <option value="cloud">クラウド</option>
-          <option value="tool">ツール</option>
+          <!-- QA #67: ツールカテゴリ廃止。4分類（言語/FW/DB/クラウド）に変更（4/29 確定） -->
         </select>
         <span class="hint-text">人材一覧・案件一覧のスキル絞り込みでグループ表示に使用します</span>
       </div>
@@ -836,6 +872,19 @@
   function openUserModal()  { document.getElementById('modal-user').classList.add('open'); }
   function closeUserModal() { document.getElementById('modal-user').classList.remove('open'); }
 </script>
-
+<!--
+  WF_12_マスタ管理.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #82] フォーム設定タブに「案件登録フォーム」セクションを追加（前田様 4/29 確定）
+      - [QA #67] スキルタグ一覧から Docker / Kubernetes / Git を削除
+               ツールカテゴリ廃止→4分類（言語/FW/DB/クラウド）に変更
+               スキル追加モーダルの「ツール」option を削除
+      - ユーザー管理サンプルの最終ログイン日付を2026年に更新
+-->
 </body>
 </html>

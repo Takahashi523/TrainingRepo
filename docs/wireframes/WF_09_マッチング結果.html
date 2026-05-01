@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_09_マッチング結果 | 国内SES 人材・案件マッチングシステム</title>
+<title>WF_09_マッチング結果 v1.1 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -37,25 +37,14 @@
     z-index: 1;
   }
 
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
   .sidebar-logo {
     padding: 16px 14px 14px;
     border-bottom: 1.5px solid #555;
-    font-size: 11px; font-weight: 700;
-    color: #333; line-height: 1.5;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
   }
-
-  .sidebar-logo .logo-mark {
-    display: inline-block;
-    width: 28px; height: 28px;
-    border: 2px solid #333;
-    margin-bottom: 6px; position: relative;
-  }
-  .sidebar-logo .logo-mark::before,
-  .sidebar-logo .logo-mark::after {
-    content: ''; position: absolute; background: #333;
-  }
-  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
-  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
 
   .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
 
@@ -529,10 +518,8 @@
 
   <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark"></div>
-      <div>SES マッチング<br>システム</div>
-    </div>
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
     <nav class="sidebar-nav">
       <div class="nav-section-label">メイン</div>
       <div class="nav-item"><span class="nav-icon">◫</span><span>ダッシュボード</span></div>
@@ -576,17 +563,17 @@
           <span>新宿駅（JR中央線）</span>
           <span class="summary-sep">｜</span>
           <span class="status-badge">提案可</span>
-          <span style="font-size:11px;color:#888;">⏱ 即日〜</span>
+          <span style="font-size:11px;color:#888;">⏱ 2026/05/01〜</span>
           <span class="summary-sep">｜</span>
           <span style="font-size:11px;color:#888;">希望単価：65万円　勤務形態：常駐可 / 一部リモート可</span>
         </div>
       </div>
+      <!-- QA #67: Docker等ツール類はスキルタグ非対象のため除外 -->
       <div class="skill-tags">
         <span class="wf-tag">Java（3年）</span>
         <span class="wf-tag">Spring Boot（2年）</span>
         <span class="wf-tag">PostgreSQL（3年）</span>
         <span class="wf-tag">AWS（1年）</span>
-        <span class="wf-tag">Docker（1年）</span>
       </div>
       <div class="process-list" style="margin-top:5px;">
         <span style="font-size:10px;font-weight:700;color:#999;white-space:nowrap;">工程経験</span>
@@ -621,17 +608,17 @@
           <div class="card-project-name">大手金融系 勘定系システム リプレース開発</div>
           <div class="card-project-meta">
             <span>○○銀行</span>
-            <span>｜ 1次請け</span>
+            <span>｜ プライム</span>
             <span>｜ 60〜80万円</span>
-            <span>｜ ⏱ 即日〜</span>
+            <span>｜ ⏱ 2026/05/01〜</span>
             <span>｜ 👤 2名</span>
           </div>
           <div class="card-skill-tags">
             <span class="card-wf-tag">Java</span>
             <span class="card-wf-tag">Spring Boot</span>
             <span class="card-wf-tag">Oracle DB</span>
+            <!-- QA #67: Docker（尚可）を除外 -->
             <span class="card-wf-tag" style="border-style:dashed;color:#888;">AWS</span>
-            <span class="card-wf-tag" style="border-style:dashed;color:#888;">Docker</span>
             <span class="card-wf-tag" style="border-color:#ccc;">一部リモート可</span>
           </div>
           <div class="process-list" style="margin-top:4px;">
@@ -659,16 +646,16 @@
           <div class="card-project-name">大手EC 在庫管理システム 新規開発</div>
           <div class="card-project-meta">
             <span>○○通販</span>
-            <span>｜ エンド直</span>
+            <span>｜ プライム</span>
             <span>｜ 55〜70万円</span>
-            <span>｜ ⏱ 来月〜</span>
+            <span>｜ ⏱ 2026/06/01〜</span>
             <span>｜ 👤 1名</span>
           </div>
           <div class="card-skill-tags">
             <span class="card-wf-tag">Java</span>
             <span class="card-wf-tag">Spring Boot</span>
             <span class="card-wf-tag">MySQL</span>
-            <span class="card-wf-tag" style="border-style:dashed;color:#888;">Docker</span>
+            <!-- QA #67: Docker（尚可）を除外 -->
             <span class="card-wf-tag" style="border-color:#ccc;">常駐</span>
           </div>
           <div class="process-list" style="margin-top:4px;">
@@ -698,7 +685,7 @@
             <span>○○製作所</span>
             <span>｜ 2次請け</span>
             <span>｜ 50〜65万円</span>
-            <span>｜ ⏱ 2ヶ月後〜</span>
+            <span>｜ ⏱ 2026/07/01〜</span>
             <span>｜ 👤 3名</span>
           </div>
           <div class="card-skill-tags">
@@ -731,9 +718,9 @@
           <div class="card-project-name">社内基幹システム 開発・テスト支援</div>
           <div class="card-project-meta">
             <span>○○商事</span>
-            <span>｜ 3次請け</span>
+            <span>｜ 3次</span>
             <span>｜ 45〜55万円</span>
-            <span>｜ ⏱ 即日〜</span>
+            <span>｜ ⏱ 2026/05/15〜</span>
             <span>｜ 👤 2名</span>
           </div>
           <div class="card-skill-tags">
@@ -765,9 +752,9 @@
           <div class="card-project-name">Webアプリ フロントエンド開発</div>
           <div class="card-project-meta">
             <span>○○スタートアップ</span>
-            <span>｜ エンド直</span>
+            <span>｜ プライム</span>
             <span>｜ 50〜60万円</span>
-            <span>｜ ⏱ 来月〜</span>
+            <span>｜ ⏱ 2026/06/01〜</span>
             <span>｜ 👤 1名</span>
           </div>
           <div class="card-skill-tags">
@@ -897,36 +884,55 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_09_マッチング結果</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_09_マッチング結果（v1.1）</div>
     <div style="font-size:11px;color:#555;margin-bottom:12px;">
       <strong>カードのスキルタグ凡例：</strong>
       実線タグ = 必須スキル　／　<span style="border:1.5px dashed #888;padding:1px 6px;border-radius:2px;color:#888;font-size:11px;">点線タグ = 尚可スキル</span>　／　<span style="border:1.5px solid #ccc;padding:1px 6px;border-radius:2px;font-size:11px;">薄枠タグ = 勤務形態</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ TBD解除済み</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>AI推薦理由の生成タイミング：同期処理確定。TBD解除（QA #47）</li>
-          <li>パイプライン追加の初期ステータス：<strong>上位提案</strong>に確定。TBD解除（QA #49）</li>
-          <li>マッチング結果の表示件数：<strong>上位5件</strong>に確定。ページネーション削除（QA #33 / #50）</li>
+          <li>[QA #77] システム名を「Nexus」に統一</li>
+          <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
+          <li>[QA #80] 全カードの商流を確定選択肢に統一（「1次請け」→「プライム」／「エンド直」→「プライム」／「3次請け」→「3次」）</li>
+          <li>[稼働開始] 「即日〜」「来月〜」「2ヶ月後〜」を日付表示に統一（エンジニアサマリー・全カード）</li>
+          <li>[QA #67] エンジニアサマリー・CARD1・CARD2から「Docker」タグを除外</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ 確定済み（変更なし）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>AI推薦理由の生成タイミング：同期処理確定（QA #47）</li>
+          <li>パイプライン追加の初期ステータス：上位提案に確定（QA #49）</li>
+          <li>マッチング結果の表示件数：上位5件固定（QA #33 / #50）</li>
         </ul>
       </div>
       <div>
         <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">⚠️ レイアウト・設計メモ</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>一覧＋右ドロワー方式を採用（カード1枚クリックでドロワーが開く）</li>
-          <li>表示件数は上位5件固定。Pythonエンジンがスコア計算後に上位5件のみ返却する。5件以下のためランク絞り込みフィルタは不要と判断し削除</li>
+          <li>表示件数は上位5件固定。Pythonエンジンがスコア計算後に上位5件のみ返却する</li>
           <li>スコア内訳・AI推薦理由・不足条件はドロワー内に集約</li>
           <li>マッチングは人材から起動（案件からのマッチングは不要・確定済み）</li>
           <li>Dランクカードはopacity低めで見送り推奨を視覚的に表現</li>
-          <li>パイプライン追加ボタンはドロワーフッターに固定配置</li>
-          <li>カード右の「詳細 →」ボタンはドロワーと別に案件詳細（画面8）へ遷移</li>
-          <li>除外ロジック：Pythonがマッチング実行時にDBのパイプラインテーブルを参照し、対象エンジニアのパイプラインに存在する案件IDをすべて除外（ステータス問わず）。残りの募集中案件で上位5件を返す</li>
+          <li>除外ロジック：Pythonがマッチング実行時にパイプラインテーブルを参照し、対象エンジニアの既存パイプラインカードに存在する案件IDをすべて除外（ステータス問わず）</li>
         </ul>
       </div>
     </div>
   </div>
 </div>
+
+<!--
+  WF_09_マッチング結果.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #80] 全カードの商流を確定選択肢に統一
+      - [稼働開始] 「即日〜」等の相対表記を日付表示に統一
+      - [QA #67] エンジニアサマリー・CARD1・CARD2から「Docker」タグを除外
+-->
 
 <script>
 function openDrawer() {

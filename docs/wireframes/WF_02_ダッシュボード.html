@@ -1,10 +1,10 @@
-<!-- WF_02_ダッシュボード | SES Match | v1 -->
+<!-- WF_02_ダッシュボード | Nexus | v1.1 -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_02_ダッシュボード | 国内SES 人材・案件マッチングシステム</title>
+<title>WF_02_ダッシュボード v1.1 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -35,28 +35,16 @@
     flex-direction: column;
   }
 
+  /* QA #76: ロゴ画像は提供されないため削除。システム名テキスト「Nexus」のみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
   .sidebar-logo {
     padding: 16px 14px 14px;
     border-bottom: 1.5px solid #555;
-    font-size: 11px;
+    font-size: 15px;
     font-weight: 700;
     color: #333;
-    line-height: 1.5;
+    letter-spacing: 0.08em;
   }
-
-  .sidebar-logo .logo-mark {
-    display: inline-block;
-    width: 28px; height: 28px;
-    border: 2px solid #333;
-    margin-bottom: 6px;
-    position: relative;
-  }
-  .sidebar-logo .logo-mark::before,
-  .sidebar-logo .logo-mark::after {
-    content: ''; position: absolute; background: #333;
-  }
-  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
-  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
 
   .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
 
@@ -325,10 +313,8 @@
 
   <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark"></div>
-      <div>SES マッチング<br>システム</div>
-    </div>
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">メイン</div>
@@ -427,16 +413,13 @@
         <div class="section-header">
           <div class="section-title">
             パイプライン進捗
-            <!-- 仕様QA未確定・確認待ち：集計軸（担当のみ / 全件） -->
-            <span class="tbd-label">TBD</span>
-            <span style="font-size:11px;color:#aaa;font-weight:400;">集計軸（担当のみ / 全件）</span>
+            <!-- QA #70 / #70-1 確定（4/24）: 集計軸＝メイン・サブ担当を含む自分の担当カードのみ -->
+            <span style="font-size:11px;color:#888;font-weight:400;margin-left:4px;">自分担当（メイン・サブ含む）</span>
           </div>
         </div>
 
-        <!-- 進行中12種 -->
-        <!-- 仕様QA未確定・確認待ち：各ステータスの業務的意味（QA #62未着手） -->
-
-        <!-- 仕様QA未確定・確認待ち：各ステータスの業務的意味（QA #62未着手） -->
+        <!-- 各ステータスの業務的意味は ※仕様QA #62 参照・未確定 -->
+        <!-- QA #62 未着手のため、ステータス名・件数はすべてサンプル値。TBDを維持 -->
         <table class="pipeline-table">
           <colgroup>
             <col><col style="width:56px;"><col style="width:160px;">
@@ -561,5 +544,18 @@
 
 </div><!-- /app-shell -->
 
+<!--
+  WF_02_ダッシュボード.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク（.logo-mark）を削除、「Nexus」テキストのみに変更
+      - [QA #70 / #70-1] パイプライン進捗の集計軸TBDを解除。
+                          確定値：メイン・サブ担当を含む自分の担当カードのみ（前田様 4/24 確定）
+  維持TBD:
+    - 各ステータス行の業務的意味（QA #62 未着手）
+-->
 </body>
 </html>

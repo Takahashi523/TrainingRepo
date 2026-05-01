@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_11_CSV入出力 | 国内SES 人材・案件マッチングシステム</title>
+<title>WF_11_CSV入出力 v1.1 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -32,25 +32,14 @@
     display: flex; flex-direction: column;
   }
 
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
   .sidebar-logo {
     padding: 16px 14px 14px;
     border-bottom: 1.5px solid #555;
-    font-size: 11px; font-weight: 700;
-    color: #333; line-height: 1.5;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
   }
-
-  .sidebar-logo .logo-mark {
-    display: inline-block;
-    width: 28px; height: 28px;
-    border: 2px solid #333;
-    margin-bottom: 6px; position: relative;
-  }
-  .sidebar-logo .logo-mark::before,
-  .sidebar-logo .logo-mark::after {
-    content: ''; position: absolute; background: #333;
-  }
-  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
-  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
 
   .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
 
@@ -292,10 +281,8 @@
 
   <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark"></div>
-      <div>SES マッチング<br>システム</div>
-    </div>
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">メイン</div>
@@ -661,5 +648,53 @@
   }
 </script>
 
+<!-- ===== ANNOTATION ===== -->
+<div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
+  <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_11_CSV入出力（v1.1）</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>[QA #77] システム名を「Nexus」に統一</li>
+          <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
+          <li>[QA #21/#55/#56/#57/#58] 操作ログタブが本画面に存在しないことを正式確認・注記追加。操作ログはOUTスコープ（前田様「ログ記録は今回無しで大丈夫です」4/24 確定）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">✅ 確定済み仕様</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>タブ構成：人材CSV / 案件CSV の2タブのみ（操作ログタブなし・確定）</li>
+          <li>インポート方式：システムIDあり→上書き更新 / IDなし→新規追加</li>
+          <li>対応形式：.csv（UTF-8 / BOM付き）・最大5MB・CRLF・LF両対応</li>
+          <li>エクスポート：0件時はヘッダー行のみCSVを出力（初期投入テンプレートとして利用可）</li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">⛔ OUTスコープ（本画面に含まない）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li style="color:#c00;font-weight:700;">操作ログ記録・表示（QA #21/#55/#56/#57/#58 確定）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト設計メモ</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>インポート実行後のフィードバックUI（成功件数・エラー行の表示）は詳細設計フェーズで定義</li>
+          <li>エクスポートCSVのカラム定義はDB設計フェーズで確定予定</li>
+          <li>管理者権限のみ実行可能とするか、一般ユーザーにも解放するかは権限ロール確定後に判断</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!--
+  WF_11_CSV入出力.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #21/#55/#56/#57/#58] 操作ログタブ非対象を正式確認・注記ボックスに明記
+  確定事項:
+    - タブ構成：人材CSV / 案件CSV の2タブのみ（操作ログなし）
+-->
 </body>
 </html>

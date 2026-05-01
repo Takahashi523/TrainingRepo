@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_07_案件登録_編集 | 国内SES 人材・案件マッチングシステム</title>
+<title>WF_07_案件登録_編集 v1.1 | Nexus</title>
 <style>
   /* ===== WF_04と共通のベーススタイル ===== */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,25 +36,14 @@
     flex-direction: column;
   }
 
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
   .sidebar-logo {
     padding: 16px 14px 14px;
     border-bottom: 1.5px solid #555;
-    font-size: 11px; font-weight: 700;
-    color: #333; line-height: 1.5;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
   }
-
-  .sidebar-logo .logo-mark {
-    display: inline-block;
-    width: 28px; height: 28px;
-    border: 2px solid #333;
-    margin-bottom: 6px; position: relative;
-  }
-  .sidebar-logo .logo-mark::before,
-  .sidebar-logo .logo-mark::after {
-    content: ''; position: absolute; background: #333;
-  }
-  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
-  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
 
   .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
 
@@ -285,10 +274,8 @@
 
   <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark"></div>
-      <div>SES マッチング<br>システム</div>
-    </div>
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
     <nav class="sidebar-nav">
       <div class="nav-section-label">メイン</div>
       <div class="nav-item"><span class="nav-icon">◫</span><span>ダッシュボード</span></div>
@@ -415,14 +402,14 @@
         </div>
         <div class="form-field col">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <!-- QA #80: プライム / 2次 / 3次 / その他 の4種に確定（4/29 確定） -->
             <select class="wf-select" style="width:180px;">
               <option>選択してください</option>
-              <option>プライム（エンド直）</option>
-              <option>2次請け</option>
-              <option>3次請け</option>
+              <option>プライム</option>
+              <option>2次</option>
+              <option>3次</option>
               <option>その他</option>
             </select>
-            <span class="tbd-label">TBD 商流の選択肢未確定</span>
           </div>
         </div>
       </div>
@@ -539,9 +526,10 @@
               <button class="btn-icon">✕</button>
             </div>
             <!-- 行2 -->
+            <!-- QA #67: Docker等ツール類はスキルタグ非対象。尚可スキルサンプルから除外 -->
             <div class="skill-pair">
               <div style="display:flex;flex-direction:column;gap:3px;">
-                <select class="wf-select" style="width:190px;"><option>Docker</option></select>
+                <select class="wf-select" style="width:190px;"><option>GraphQL</option></select>
                 <span style="height:18px;"></span>
               </div>
               <button class="btn-icon">✕</button>
@@ -618,12 +606,12 @@
         </div>
         <div class="form-field col">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <!-- QA #79: 募集中 / 終了 / ペンディング の3種に確定（4/29 確定） -->
             <select class="wf-select" style="width:180px;">
               <option>募集中</option>
               <option>終了</option>
               <option>ペンディング</option>
             </select>
-            <span class="tbd-label">TBD 案件ステータス定義未確定</span>
           </div>
         </div>
       </div>
@@ -690,36 +678,57 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_07_案件登録_編集</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_07_案件登録_編集（v1.1）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li style="color:#c00;font-weight:700;">TBD ヘッダーのstickyが正しく実装された場合、フォーム下部の保存・キャンセルボタンは不要になる可能性あり。実装時に判断すること</li>
-          <li>商流の選択肢定義：<span style="color:#c00;">[TBD 商流の選択肢未確定]</span></li>
-          <li>必須・尚可スキルの入力方式：<span style="color:#c00;">[TBD マスタ選択 or 自由入力 ※チーム内確認中]</span></li>
-          <li>案件ステータスの定義：<span style="color:#c00;">[TBD 案件ステータス定義未確定]</span></li>
-          <li>勤務地：フリーテキスト採用確定。TBD解除（QA #59）。稼働形態と連動し、フルリモート選択時は行を非表示・入力値クリア。フルリモート以外は必須扱い</li>
-          <li>単価：スキル見合いチェックボックス追加。ON時に数値欄グレーアウト・テキスト入力へ切替（QA #14）</li>
-          <li>稼働環境：フリーテキストでスキル要件セクション末尾に追加（QA #67）</li>
-          <li>精算幅：フリーテキストで就業条件セクションに独立追加（QA #66）</li>
-                  </ul>
+          <li>[QA #77] システム名を「Nexus」に統一</li>
+          <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
+          <li>[QA #80] 商流「プライム（エンド直）」→「プライム」に統一・TBD解除</li>
+          <li>[QA #79] ステータスのTBDラベル削除（選択肢：募集中 / 終了 / ペンディング確定）</li>
+          <li>[QA #67] 尚可スキルサンプルの「Docker」を「GraphQL」に変更</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-top:8px;margin-bottom:4px;">🔴 維持TBD</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li style="color:#c00;font-weight:700;">ヘッダーstickyが正しく実装された場合、フォーム下部の保存・キャンセルボタンは不要になる可能性あり。実装時に判断すること</li>
+          <li>必須・尚可スキルの入力方式：<span style="color:#c00;">[※仕様QA未確定・確認待ち マスタ選択 or 自由入力　チーム内確認中]</span></li>
+        </ul>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">⚠️ WF_04（人材登録）との主な差分</div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>顔写真・アバターエリアなし</li>
+          <li>勤務地：フリーテキスト確定。フルリモート選択時は行を非表示・入力値クリア（QA #59）</li>
+          <li>単価：スキル見合いチェックボックスあり。ON時に数値欄→テキスト入力へ切替（QA #14）</li>
+          <li>稼働環境：フリーテキストでスキル要件セクション末尾に追加（QA #67）</li>
+          <li>精算幅：フリーテキストで就業条件セクションに独立追加（QA #66）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ WF_04（人材登録）との主な差分</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>スキルを「必須（年数あり）」と「尚可（年数なし）」に分離</li>
           <li>単価は下限〜上限の2フィールド横並び・非公開フラグなし</li>
           <li>勤務形態はチェックボックスではなくプルダウン（稼働形態）</li>
           <li>「業務内容詳細」テキストエリアを追加（AIマッチング用）</li>
-          <li>就業条件セクションを独立して追加</li>
-          <li>保存ボタンはヘッダー固定＋フォーム下部の2か所に配置</li>
         </ul>
       </div>
     </div>
   </div>
 </div>
+
+<!--
+  WF_07_案件登録_編集.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #80] 商流選択肢確定（プライム/2次/3次/その他）・TBD解除
+      - [QA #79] ステータスTBDラベル削除
+      - [QA #67] 尚可スキルサンプルの「Docker」を「GraphQL」に変更
+  維持TBD:
+    - 必須・尚可スキルの入力方式（マスタ選択 or 自由入力 チーム内確認中・QA未掲載）
+-->
 
 <script>
 function toggleSkillMerit(chk) {

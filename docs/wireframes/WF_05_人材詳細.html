@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_05_人材詳細 | 国内SES 人材・案件マッチングシステム</title>
+<title>WF_05_人材詳細 v1.1 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -35,25 +35,14 @@
     flex-direction: column;
   }
 
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
   .sidebar-logo {
     padding: 16px 14px 14px;
     border-bottom: 1.5px solid #555;
-    font-size: 11px; font-weight: 700;
-    color: #333; line-height: 1.5;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
   }
-
-  .sidebar-logo .logo-mark {
-    display: inline-block;
-    width: 28px; height: 28px;
-    border: 2px solid #333;
-    margin-bottom: 6px; position: relative;
-  }
-  .sidebar-logo .logo-mark::before,
-  .sidebar-logo .logo-mark::after {
-    content: ''; position: absolute; background: #333;
-  }
-  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
-  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
 
   .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
 
@@ -300,10 +289,8 @@
 
   <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark"></div>
-      <div>SES マッチング<br>システム</div>
-    </div>
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
     <nav class="sidebar-nav">
       <div class="nav-section-label">メイン</div>
       <div class="nav-item"><span class="nav-icon">◫</span><span>ダッシュボード</span></div>
@@ -357,7 +344,7 @@
           <div class="profile-kana">ヤマダ タロウ　｜　35歳</div>
           <div class="profile-badges">
             <span class="status-badge status-teian">提案可</span>
-            <span class="timing-badge">⏱ 即日〜</span>
+            <span class="timing-badge">⏱ 2026/05/01〜</span>
           </div>
           <div class="profile-meta">
             <div class="meta-item"><span class="meta-label">最寄駅</span>新宿駅（JR中央線）</div>
@@ -408,7 +395,7 @@
         </div>
         <div class="detail-row">
           <div class="detail-label">稼働可能時期</div>
-          <div class="detail-value">即日〜（2025年1月15日以降）</div>
+          <div class="detail-value">2026/05/01〜</div>
         </div>
       </div>
 
@@ -514,32 +501,53 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_05_人材詳細</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_05_人材詳細（v1.1）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li style="color:#c00;font-weight:700;">TBD ヘッダーのstickyが正しく実装された場合、フッターの編集ボタンは不要になる可能性あり。実装時に判断すること</li>
-          <li>ステータスバッジ：<strong>提案可 / 面談中 / 提案不可</strong> の3択に確定。TBD解除（QA #69）</li>
-          <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
-          <li>削除ルール：管理者のみ物理削除（確定済み）</li>
-          <li>職務経歴ダウンロード権限：<span style="color:#c00;">[TBD ダウンロード権限未確定]</span></li>
-          <li>AI職務要約：登録・編集の保存時に同期処理で自動生成。TBD解除（QA #47）</li>
-                  </ul>
+          <li>[QA #77] システム名を「Nexus」に統一</li>
+          <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-top:8px;margin-bottom:4px;">🔴 維持TBD</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li style="color:#c00;font-weight:700;">ヘッダーstickyが正しく実装された場合、フッターの編集ボタンは不要になる可能性あり。実装時に判断すること</li>
+          <li>職務経歴ダウンロード権限：<span style="color:#c00;">[※仕様QA #84 未回答・確認待ち]</span></li>
+        </ul>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">⚠️ レイアウト判断・設計メモ</div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>WF_04の「見出し＋水平線・左ラベル＋右コンテンツ」を踏襲し入力欄を表示テキストに変更</li>
+          <li>ステータスバッジ：提案可 / 面談中 / 提案不可 の3択確定（QA #69）</li>
+          <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
+          <li>削除ボタン：管理者のみ表示・物理削除（確定済み）</li>
+          <li>AI職務要約：登録・編集の保存時に同期処理で自動生成（QA #47）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト設計メモ</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>AI職務要約はプロフィールサマリー直下に配置（提案判断の最初の参考情報として）</li>
-          <li>AI要約エリアは「生成済み」パターンを表示。未生成時は「AI要約は未生成です」グレー表示を想定</li>
+          <li>未生成時は「AI要約は未生成です」グレー表示を想定</li>
           <li>削除ボタンはヘッダー右端に赤文字ghostで誤操作リスクを低減</li>
-          <li>パイプライン履歴は削除（画面9で管理する設計方針）</li>
+          <li>【稼働可能時期の表示ロジック】稼働可能時期フィールドの値をもとにシステムが自動判定して表示する<br>
+            　未入力 → <strong>⏱ 未定</strong><br>
+            　日付あり → <strong>⏱ YYYY/MM/DD〜</strong>（入力された日付をそのまま表示）
+          </li>
         </ul>
       </div>
     </div>
   </div>
 </div>
 
+<!--
+  WF_05_人材詳細.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+  維持TBD:
+    - 職務経歴ファイルのダウンロード権限（QA #84 未回答）
+-->
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_08_案件詳細 | 国内SES 人材・案件マッチングシステム</title>
+<title>WF_08_案件詳細 v1.1 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -35,25 +35,14 @@
     flex-direction: column;
   }
 
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
   .sidebar-logo {
     padding: 16px 14px 14px;
     border-bottom: 1.5px solid #555;
-    font-size: 11px; font-weight: 700;
-    color: #333; line-height: 1.5;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
   }
-
-  .sidebar-logo .logo-mark {
-    display: inline-block;
-    width: 28px; height: 28px;
-    border: 2px solid #333;
-    margin-bottom: 6px; position: relative;
-  }
-  .sidebar-logo .logo-mark::before,
-  .sidebar-logo .logo-mark::after {
-    content: ''; position: absolute; background: #333;
-  }
-  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
-  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
 
   .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
 
@@ -273,10 +262,8 @@
 
   <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark"></div>
-      <div>SES マッチング<br>システム</div>
-    </div>
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
     <nav class="sidebar-nav">
       <div class="nav-section-label">メイン</div>
       <div class="nav-item"><span class="nav-icon">◫</span><span>ダッシュボード</span></div>
@@ -321,14 +308,16 @@
       <!-- ==================== 案件サマリー ==================== -->
       <div class="project-summary">
         <div class="project-name">大手金融系 勘定系システム リプレース開発</div>
-        <div class="project-client">クライアント：○○銀行　｜　商流：1次請け</div>
+        <!-- QA #80: 商流「1次請け」→「プライム」（4/29 確定） -->
+        <div class="project-client">クライアント：○○銀行　｜　商流：プライム</div>
         <div class="project-badges">
           <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
+            <!-- QA #79: ステータス確定・TBD解除 -->
             <span class="status-badge">募集中</span>
-            <span class="tbd-label">TBD 案件ステータス定義未確定</span>
           </div>
-          <span class="recruit-badge">👤 2名募集中</span>
-          <span class="timing-badge">⏱ 即日〜</span>
+          <span class="recruit-badge">👤 2名</span>
+          <!-- 稼働開始：即日〜廃止・日付表示に統一 -->
+          <span class="timing-badge">⏱ 2026/05/01〜</span>
         </div>
         <div class="project-meta">
           <div class="meta-item">
@@ -355,7 +344,7 @@
         </div>
         <div class="detail-row">
           <div class="detail-label">参画開始時期</div>
-          <div class="detail-value">即日〜（2025年2月1日以降）</div>
+          <div class="detail-value">2026/05/01〜</div>
         </div>
       </div>
 
@@ -372,7 +361,8 @@
         </div>
         <div class="detail-row">
           <div class="detail-label">商流</div>
-          <div class="detail-value">1次請け</div>
+          <!-- QA #80: 「1次請け」→「プライム」 -->
+          <div class="detail-value">プライム</div>
         </div>
       </div>
 
@@ -410,9 +400,9 @@
         <div class="detail-row">
           <div class="detail-label">尚可スキル</div>
           <div class="detail-value">
+            <!-- QA #67: Docker等ツール類はスキルタグ非対象のため除外 -->
             <div class="tag-list">
               <span class="wf-tag optional">AWS</span>
-              <span class="wf-tag optional">Docker</span>
               <span class="wf-tag optional">Jenkins</span>
             </div>
           </div>
@@ -453,10 +443,8 @@
         <div class="section-card-header">管理情報</div>
         <div class="detail-row">
           <div class="detail-label">ステータス</div>
-          <div class="detail-value" style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
-            <span>募集中</span>
-            <span class="tbd-label">TBD 案件ステータス定義未確定</span>
-          </div>
+          <!-- QA #79: ステータス確定・TBD解除 -->
+          <div class="detail-value">募集中</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">担当営業</div>
@@ -491,33 +479,56 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_08_案件詳細</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_08_案件詳細（v1.1）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li style="color:#c00;font-weight:700;">TBD ヘッダーのstickyが正しく実装された場合、フッターの編集ボタンは不要になる可能性あり。実装時に判断すること</li>
-          <li>案件ステータスの定義：<span style="color:#c00;">[TBD 案件ステータス定義未確定]</span></li>
-          <li>稼働環境：スキル要件カードに追加（QA #67）</li>
-          <li>精算幅：就業条件カードに独立行として追加（QA #66）</li>
+          <li>[QA #77] システム名を「Nexus」に統一</li>
+          <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
+          <li>[QA #80] 商流サンプルデータ「1次請け」→「プライム」（サマリー・契約条件）</li>
+          <li>[QA #79] ステータスTBDラベル削除（サマリー・管理情報）</li>
+          <li>[稼働開始] 「即日〜」廃止・日付表示に統一（サマリーバッジ・基本情報）</li>
+          <li>[QA #67] 尚可スキルサンプルから「Docker」を除外</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-top:8px;margin-bottom:4px;">🔴 維持TBD</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li style="color:#c00;font-weight:700;">ヘッダーstickyが正しく実装された場合、フッターの編集ボタンは不要になる可能性あり。実装時に判断すること</li>
         </ul>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">⚠️ WF_05（人材詳細）との主な差分</div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>プロフィールサマリー → 案件サマリー（顔写真なし・案件名を大テキストで表示）</li>
-          <li>AI職務要約エリアなし</li>
-          <li>必須スキル（実線＋年数）と尚可スキル（点線・年数なし）を区別して表示</li>
-          <li>対象工程をチェックリスト表示</li>
-          <li>単価は下限〜上限の範囲表示</li>
-          <li>就業条件セクションを追加</li>
+          <li>稼働環境：スキル要件カードに追加（QA #67）</li>
+          <li>精算幅：就業条件カードに独立行として追加（QA #66）</li>
           <li>削除ボタン：管理者のみ・物理削除（確定済み）</li>
           <li>担当営業：担当＋サブの2名体制（確定済み）</li>
+          <li>【募集人数バッジの表示ロジック】WF_07「募集人数」の入力値をそのまま表示。「募集中」の文言は付けない（ステータスに関わらず人数のみ表示）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ WF_05（人材詳細）との主な差分</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>案件サマリー（顔写真なし・案件名を大テキストで表示）</li>
+          <li>AI職務要約エリアなし</li>
+          <li>必須スキル（実線＋年数）と尚可スキル（点線）を区別して表示</li>
+          <li>単価は下限〜上限の範囲表示</li>
         </ul>
       </div>
     </div>
   </div>
 </div>
 
+<!--
+  WF_08_案件詳細.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #80] 商流サンプルデータ「1次請け」→「プライム」
+      - [QA #79] ステータスTBDラベル削除
+      - [稼働開始] 「即日〜」廃止・日付表示（2026/05/01〜）に統一
+      - [QA #67] 尚可スキルサンプルから「Docker」除外
+-->
 </body>
 </html>

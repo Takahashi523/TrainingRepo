@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_06_案件一覧_カード型 | 国内SES 人材・案件マッチングシステム</title>
+<title>WF_06_案件一覧_カード型 v1.1 | Nexus</title>
 <style>
   /* ===== 人材一覧と共通のベーススタイル ===== */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,26 +36,14 @@
     flex-direction: column;
   }
 
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
   .sidebar-logo {
     padding: 16px 14px 14px;
     border-bottom: 1.5px solid #555;
-    font-size: 11px; font-weight: 700;
-    color: #333; line-height: 1.5;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
   }
-
-  .sidebar-logo .logo-mark {
-    display: inline-block;
-    width: 28px; height: 28px;
-    border: 2px solid #333;
-    margin-bottom: 6px;
-    position: relative;
-  }
-  .sidebar-logo .logo-mark::before,
-  .sidebar-logo .logo-mark::after {
-    content: ''; position: absolute; background: #333;
-  }
-  .sidebar-logo .logo-mark::before { width: 16px; height: 2px; top: 12px; left: 4px; }
-  .sidebar-logo .logo-mark::after  { width: 2px; height: 16px; top: 4px; left: 12px; }
 
   .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
 
@@ -167,18 +155,7 @@
     display: inline-block; flex-shrink: 0;
   }
 
-  .view-toggle {
-    display: flex;
-    border: 1.5px solid #999; border-radius: 3px;
-    overflow: hidden;
-  }
-  .view-btn {
-    padding: 5px 12px; font-size: 11px; font-weight: 600;
-    border: none; cursor: pointer; font-family: inherit;
-  }
-  .view-btn.active { background: #333; color: #fff; }
-  .view-btn:not(.active) { background: #fff; color: #666; }
-  .view-btn + .view-btn { border-left: 1.5px solid #999; }
+  /* QA #86: テーブルビュー切替は廃止。カード形式のみ確定（4/29 確定） */
 
   .btn {
     height: 32px; padding: 0 14px;
@@ -426,10 +403,8 @@
 
   <!-- ===== SIDEBAR（人材一覧と共通） ===== -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark"></div>
-      <div>SES マッチング<br>システム</div>
-    </div>
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">メイン</div>
@@ -508,17 +483,15 @@
 
         <div class="filter-sep"></div>
 
-        <!-- ステータス -->
+        <!-- ステータス（QA #79: 募集中 / 終了 / ペンディング の3種に確定 4/29） -->
         <div class="ms-wrap" id="ms-status">
           <button class="ms-btn" onclick="toggleMs('ms-status')">
             ステータス <span class="ms-badge" id="badge-status"></span> ▾
-            <span class="tbd-inline">[TBD]</span>
           </button>
           <div class="ms-panel">
             <label class="ms-item"><span class="wf-checkbox"></span> 募集中</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> 選考中</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> 充足済</label>
             <label class="ms-item"><span class="wf-checkbox"></span> 終了</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> ペンディング</label>
           </div>
         </div>
 
@@ -540,10 +513,10 @@
             <label class="ms-item"><span class="wf-checkbox"></span> React</label>
             <label class="ms-item"><span class="wf-checkbox"></span> Vue.js</label>
             <label class="ms-item"><span class="wf-checkbox"></span> Laravel</label>
+            <!-- QA #67: Docker等ツール類は「稼働環境」フリーテキスト入力に変更。スキルタグから除外（4/29 確定） -->
             <div class="ms-group-label">インフラ・DB</div>
             <label class="ms-item"><span class="wf-checkbox"></span> AWS</label>
             <label class="ms-item"><span class="wf-checkbox"></span> Azure</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Docker</label>
           </div>
         </div>
 
@@ -559,16 +532,16 @@
           </div>
         </div>
 
-        <!-- 商流 -->
+        <!-- 商流（QA #80: プライム / 2次 / 3次 / その他 の4種に確定 4/29） -->
         <div class="ms-wrap" id="ms-channel">
           <button class="ms-btn" onclick="toggleMs('ms-channel')">
             商流 <span class="ms-badge" id="badge-channel"></span> ▾
           </button>
           <div class="ms-panel">
-            <label class="ms-item"><span class="wf-checkbox"></span> エンド直</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> 1次請け</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> 2次請け</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> 3次請け以上</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> プライム</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 2次</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 3次</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> その他</label>
           </div>
         </div>
 
@@ -613,21 +586,14 @@
         <div class="result-count"><strong>32</strong> 件の案件が見つかりました</div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
           <span class="filter-label">ソート</span>
+          <!-- QA #85: デフォルトソートは「登録日が新しい順」に確定（4/29 確定） -->
           <select class="wf-select">
-            <option>更新日順（新しい順）</option>
-            <option>更新日順（古い順）</option>
+            <option>登録日順（新しい順）</option>
+            <option>登録日順（古い順）</option>
             <option>稼働開始時期順</option>
             <option>単価順（高い順）</option>
             <option>単価順（低い順）</option>
           </select>
-          <div style="width:1px;height:20px;background:#ccc;"></div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-            <div class="view-toggle">
-              <button class="view-btn active">■ カード</button>
-              <button class="view-btn">≡ テーブル</button>
-            </div>
-            <span class="tbd-label">TBD テーブル表示仕様未確定</span>
-          </div>
         </div>
       </div>
 
@@ -639,16 +605,16 @@
             <div class="card-top-row">
               <div>
                 <div class="project-name">大手金融系 勘定系システム リプレース開発</div>
-                <div class="project-meta">クライアント：○○銀行　｜　商流：1次請け　｜　担当：田中　/　サブ：鈴木
+                <div class="project-meta">クライアント：○○銀行　｜　商流：プライム　｜　担当：田中　/　サブ：鈴木
                 </div>
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                  <!-- QA #79: ステータス確定・TBD解除 -->
                   <span class="status-badge">募集中</span>
-                  <span class="tbd-label">TBD 案件ステータス定義未確定</span>
                 </div>
                 <span class="interview-badge">面談 1回</span>
-                <span class="recruit-badge">👤 2名募集中</span>
+                <span class="recruit-badge">👤 2名</span>
               </div>
             </div>
 
@@ -680,7 +646,7 @@
               </div>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">稼働開始</span>
-              <span class="timing-badge">⏱ 即日〜</span>
+              <span class="timing-badge">⏱ 2026/05/01〜</span>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">勤務形態</span>
               <div class="tag-list">
@@ -704,16 +670,16 @@
             <div class="card-top-row">
               <div>
                 <div class="project-name">ECサイト フロントエンド刷新プロジェクト</div>
-                <div class="project-meta">クライアント：○○通販　｜　商流：エンド直　｜　担当：鈴木　/　サブ：田中
+                <div class="project-meta">クライアント：○○通販　｜　商流：プライム　｜　担当：鈴木　/　サブ：田中
                 </div>
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                  <!-- QA #79: ステータス確定・TBD解除 -->
                   <span class="status-badge">募集中</span>
-                  <span class="tbd-label">TBD 案件ステータス定義未確定</span>
                 </div>
                 <span class="interview-badge">面談 2回</span>
-                <span class="recruit-badge">👤 1名募集中</span>
+                <span class="recruit-badge">👤 1名</span>
               </div>
             </div>
 
@@ -742,7 +708,7 @@
               </div>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">稼働開始</span>
-              <span class="timing-badge">⏱ 来月〜</span>
+              <span class="timing-badge">⏱ 2026/06/01〜</span>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">勤務形態</span>
               <div class="tag-list">
@@ -766,16 +732,16 @@
             <div class="card-top-row">
               <div>
                 <div class="project-name">製造業 生産管理システム 新規構築</div>
-                <div class="project-meta">クライアント：○○製作所　｜　商流：2次請け　｜　担当：田中　/　サブ：佐藤
+                <div class="project-meta">クライアント：○○製作所　｜　商流：2次　｜　担当：田中　/　サブ：佐藤
                 </div>
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-                  <span class="status-badge">選考中</span>
-                  <span class="tbd-label">TBD 案件ステータス定義未確定</span>
+                  <!-- QA #79: 「選考中」→「ペンディング」に変更・TBD解除 -->
+                  <span class="status-badge">ペンディング</span>
                 </div>
                 <span class="interview-badge">面談 2回</span>
-                <span class="recruit-badge">👤 3名募集中</span>
+                <span class="recruit-badge">👤 3名</span>
               </div>
             </div>
 
@@ -804,7 +770,7 @@
               </div>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">稼働開始</span>
-              <span class="timing-badge">⏱ 2ヶ月後〜</span>
+              <span class="timing-badge">⏱ 2026/07/01〜</span>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">勤務形態</span>
               <div class="tag-list">
@@ -828,16 +794,16 @@
             <div class="card-top-row">
               <div>
                 <div class="project-name">社内基幹システム 保守運用</div>
-                <div class="project-meta">クライアント：○○商事　｜　商流：1次請け　｜　担当：佐藤　/　サブ：未割当
+                <div class="project-meta">クライアント：○○商事　｜　商流：プライム　｜　担当：佐藤　/　サブ：未割当
                 </div>
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-                  <span class="status-badge" style="border-style:dashed;color:#888;">充足済</span>
-                  <span class="tbd-label">TBD 案件ステータス定義未確定</span>
+                  <!-- QA #79: 「充足済」→「終了」に変更・TBD解除 -->
+                  <span class="status-badge" style="border-style:dashed;color:#888;">終了</span>
                 </div>
                 <span class="interview-badge">面談 1回</span>
-                <span class="recruit-badge" style="color:#aaa;">👤 0名（充足）</span>
+                <span class="recruit-badge" style="color:#aaa;">👤 0名</span>
               </div>
             </div>
 
@@ -861,7 +827,7 @@
               </div>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">稼働開始</span>
-              <span class="timing-badge">⏱ 充足済</span>
+              <span class="timing-badge">⏱ 未定</span>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">勤務形態</span>
               <div class="tag-list">
@@ -896,32 +862,56 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 40px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_06_案件一覧_カード型</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_06_案件一覧_カード型（v1.1）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">🔴 TBDラベル付与箇所</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>案件ステータスバッジ（各カード）：<span style="color:#c00;">[TBD 案件ステータス定義未確定]</span></li>
-          <li>ステータスフィルタ：<span style="color:#c00;">[TBD 案件ステータス定義未確定]</span></li>
-          <li>単価：非公開フラグなし（確定済み）</li>
-          <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
-          <li>テーブルビュー切替：<span style="color:#c00;">[TBD テーブル表示仕様未確定]</span></li>
-                  </ul>
+          <li>[QA #77] システム名を「Nexus」に統一</li>
+          <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
+          <li>[QA #79] 案件ステータスを3種に確定（募集中 / 終了 / ペンディング）・全カードTBD解除<br>CARD3「選考中」→「ペンディング」、CARD4「充足済」→「終了」</li>
+          <li>[QA #80] 商流選択肢を4種に確定（プライム / 2次 / 3次 / その他）・全カードサンプルデータ修正</li>
+          <li>[QA #86] テーブルビュー切替ボタン削除・カード形式のみ確定</li>
+          <li>[QA #85] ソートデフォルトを「登録日順（新しい順）」に変更</li>
+          <li>[QA #67] 必須スキルフィルタから「Docker」を除外</li>
+        </ul>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">⚠️ レイアウト判断・人材一覧との差分</div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様（変更なし）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>カードにアバターなし（案件には顔写真が不要なため）</li>
+          <li>単価：非公開フラグなし（確定済み）</li>
+          <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト判断・人材一覧との差分</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>スキルタグを必須（実線）と尚可（点線）で視覚的に区別</li>
           <li>単価・稼働開始・勤務形態を1行にまとめて横並び配置</li>
-          <li>充足済カードはopacity低め＋マッチングボタンを非活性で表示</li>
+          <li>終了カードはopacity低め＋アクション非活性で表示</li>
           <li>ソートに「単価順（高い順／低い順）」を追加</li>
-          <li>商流・面談回数のマルチセレクトを追加</li>
+          <li>【稼働開始の表示ロジック】人材の稼働可能時期と表記を統一<br>
+            　未入力 → <strong>⏱ 未定</strong><br>
+            　日付あり → <strong>⏱ YYYY/MM/DD〜</strong>（入力された日付をそのまま表示）
+          </li>
         </ul>
       </div>
     </div>
   </div>
 </div>
+
+<!--
+  WF_06_案件一覧.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #79] 案件ステータス確定・全カードTBD解除（募集中/終了/ペンディングの3種）
+      - [QA #80] 商流選択肢確定（プライム/2次/3次/その他）・サンプルデータ修正
+      - [QA #86] テーブルビュー切替ボタン削除
+      - [QA #85] ソートデフォルトを「登録日順」に変更
+      - [QA #67] 必須スキルフィルタから「Docker」除外
+-->
 
 <script>
 function toggleMs(id) {
