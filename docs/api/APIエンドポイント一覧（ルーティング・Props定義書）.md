@@ -63,7 +63,7 @@
 | skill_ids[] | int[] | 任意 | スキルID配列 | 同一項目内OR |
 | work_types[] | string[] | 任意 | 勤務形態キー配列 | onsite / partial_remote / full_remote |
 | phases[] | string[] | 任意 | 工程経験キー配列 | basic_design / development など |
-| keyword | string | 任意 | フリーワード検索 | 氏名・スキル名・自己PRに対して部分一致 検索対象項目はTBD |
+| keyword | string | 任意 | フリーワード検索 | 氏名・スキル名・アピールポイントに対して部分一致 検索対象項目はTBD |
 | sort | string | 任意 | ソート項目 | デフォルト：updated_at |
 | order | string | 任意 | 並び順 | asc / desc（デフォルト：desc） |
 | page | int | 任意 | ページ番号 | デフォルト：1 |
@@ -158,9 +158,6 @@
 | engineer.phases[].has_experience | boolean | 経験有無 |
 | engineer.client_communication_experience | boolean | 顧客折衝経験 |
 | engineer.self_promotion | string | アピールポイント |
-| engineer.resume_file | object/null | 職務経歴書 |
-| engineer.resume_file.file_name | string | ファイル名 |
-| engineer.resume_file.download_url | string | ダウンロードURL |
 | engineer.desired_monthly_rate | int | 希望単価月額（単位：万円） |
 | engineer.work_types[] | array | 勤務形態 |
 | engineer.work_types[].key | string | キー |
@@ -221,7 +218,6 @@
 | phases.maintenance | bool | ✓ | 保守運用（true:経験あり） |
 | client_communication_experience | bool | ✓ | 顧客折衝経験（true:有） |
 | self_promotion | string | 任意 | アピールポイント |
-| resume_file | file | 任意 | PDF等 |
 | desired_monthly_rate | int | 任意 | 希望単価月額（単位：万円） |
 | work_types[] | string[] | 任意 | 勤務形態（onsite / partial_remote / full_remote） |
 | notes | string | 任意 | 特記事項 |
