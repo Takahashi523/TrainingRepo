@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_08_案件詳細 v1.1 | Nexus</title>
+<title>WF_08_案件詳細 v2.0 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -187,15 +187,17 @@
   .section-card {
     border: 1.5px solid #ddd;
     border-radius: 6px;
-    overflow: hidden;
+    overflow: visible;  /* skill detail panel が親要素でクリップされないよう visible に変更 */
     margin-bottom: 16px;
   }
 
+  /* section-card の角丸を子要素でも維持するため header/footer に個別指定 */
   .section-card-header {
     background: #f5f5f5;
     border-bottom: 1.5px solid #ddd;
     padding: 9px 16px;
     font-size: 12px; font-weight: 700; color: #333;
+    border-radius: 6px 6px 0 0;
   }
 
   /* ===== 詳細行（WF_05と共通） ===== */
@@ -226,8 +228,37 @@
     font-size: 11px; color: #333; background: #fff; white-space: nowrap;
   }
 
-  /* 尚可スキルは点線 */
-  .wf-tag.optional { border-style: dashed; color: #777; }
+  /* ===== スキル表示（一覧画面と同じ角型タグ＋詳細展開） ===== */
+  .skill-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+
+  .skill-display-item { position: relative; display: inline-flex; flex-direction: column; gap: 0; }
+
+  .skill-label-tag {
+    padding: 2px 8px;
+    border: 1.5px solid #888; border-radius: 2px;
+    font-size: 11px; color: #333; background: #fff; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .skill-label-tag.optional { border-style: dashed; color: #666; }
+
+  .skill-detail-toggle {
+    font-size: 10px; color: #999; cursor: pointer;
+    border: none; background: none; padding: 0;
+    font-family: inherit; line-height: 1; flex-shrink: 0;
+  }
+  .skill-detail-toggle:hover { color: #555; }
+
+  .skill-detail-panel {
+    display: none;
+    position: absolute; top: calc(100% + 4px); left: 0;
+    min-width: 240px; max-width: 360px;
+    background: #fff; border: 1.5px solid #bbb;
+    border-radius: 3px; padding: 8px 10px;
+    font-size: 11px; color: #555; line-height: 1.7;
+    z-index: 10; box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    white-space: normal;
+  }
+  .skill-detail-panel.open { display: block; }
 
   /* ===== チェックリスト（工程） ===== */
   .process-list { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -389,21 +420,52 @@
         <div class="detail-row">
           <div class="detail-label">必須スキル</div>
           <div class="detail-value">
-            <div class="tag-list">
-              <span class="wf-tag">PHP（10年以上）</span>
-              <span class="wf-tag">RDBMS / SQL</span>
-              <span class="wf-tag">Linux環境での開発</span>
-              <span class="wf-tag">大規模サービス運用</span>
+            <div class="skill-list">
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag">
+                  PHP開発経験
+                  <button class="skill-detail-toggle" onclick="toggleSkillDetail(this)">▼ 詳細</button>
+                </span>
+                <div class="skill-detail-panel">PHPによるWebアプリ開発10年以上、大規模サービスの実務経験あること</div>
+              </div>
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag">
+                  RDBMS / SQL
+                  <button class="skill-detail-toggle" onclick="toggleSkillDetail(this)">▼ 詳細</button>
+                </span>
+                <div class="skill-detail-panel">RDBMSを用いた設計・チューニング経験</div>
+              </div>
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag">Linux開発環境</span>
+              </div>
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag">
+                  大規模運用経験
+                  <button class="skill-detail-toggle" onclick="toggleSkillDetail(this)">▼ 詳細</button>
+                </span>
+                <div class="skill-detail-panel">月間数千万PVクラスのサービス運用経験があること</div>
+              </div>
+
             </div>
           </div>
         </div>
         <div class="detail-row">
           <div class="detail-label">尚可スキル</div>
           <div class="detail-value">
-            <!-- QA #67: Docker等ツール類はスキルタグ非対象のため除外 -->
-            <div class="tag-list">
-              <span class="wf-tag optional">AWS</span>
-              <span class="wf-tag optional">Jenkins</span>
+            <div class="skill-list">
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag optional">AWS</span>
+              </div>
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag optional">Jenkins</span>
+              </div>
+
             </div>
           </div>
         </div>
@@ -479,17 +541,21 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_08_案件詳細（v1.1）</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_08_案件詳細（v2.0）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v2.0 変更点（仕様変更適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>スキル表示：年数入りタグ → ラベルタグ（角丸・グレー背景）＋詳細テキストの縦並び構成に変更（登録画面と統一）</li>
+          <li>必須スキル：実線タグ / 尚可スキル：点線タグで視覚区分を維持</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>[QA #77] システム名を「Nexus」に統一</li>
           <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
           <li>[QA #80] 商流サンプルデータ「1次請け」→「プライム」（サマリー・契約条件）</li>
           <li>[QA #79] ステータスTBDラベル削除（サマリー・管理情報）</li>
           <li>[稼働開始] 「即日〜」廃止・日付表示に統一（サマリーバッジ・基本情報）</li>
-          <li>[QA #67] 尚可スキルサンプルから「Docker」を除外</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#c00;margin-top:8px;margin-bottom:4px;">🔴 維持TBD</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
@@ -499,17 +565,17 @@
       <div>
         <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>スキル：一覧画面と同じ角型タグ表示。詳細テキストがある場合のみ「▼ 詳細」ボタンをタグ内に表示し、クリックでツールチップ展開</li>
           <li>稼働環境：スキル要件カードに追加（QA #67）</li>
           <li>精算幅：就業条件カードに独立行として追加（QA #66）</li>
           <li>削除ボタン：管理者のみ・物理削除（確定済み）</li>
           <li>担当営業：担当＋サブの2名体制（確定済み）</li>
-          <li>【募集人数バッジの表示ロジック】WF_07「募集人数」の入力値をそのまま表示。「募集中」の文言は付けない（ステータスに関わらず人数のみ表示）</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ WF_05（人材詳細）との主な差分</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>案件サマリー（顔写真なし・案件名を大テキストで表示）</li>
           <li>AI職務要約エリアなし</li>
-          <li>必須スキル（実線＋年数）と尚可スキル（点線）を区別して表示</li>
+          <li>必須スキル（実線タグ）と尚可スキル（点線タグ）を区別して表示</li>
           <li>単価は下限〜上限の範囲表示</li>
         </ul>
       </div>
@@ -530,5 +596,27 @@
       - [稼働開始] 「即日〜」廃止・日付表示（2026/05/01〜）に統一
       - [QA #67] 尚可スキルサンプルから「Docker」除外
 -->
+<script>
+function toggleSkillDetail(btn) {
+  var panel = btn.closest('.skill-display-item').querySelector('.skill-detail-panel');
+  var isOpen = panel.classList.contains('open');
+  document.querySelectorAll('.skill-detail-panel.open').forEach(function(p) {
+    p.classList.remove('open');
+    p.closest('.skill-display-item').querySelector('.skill-detail-toggle').textContent = '▼ 詳細';
+  });
+  if (!isOpen) {
+    panel.classList.add('open');
+    btn.textContent = '▲ 詳細';
+  }
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.skill-display-item')) {
+    document.querySelectorAll('.skill-detail-panel.open').forEach(function(p) {
+      p.classList.remove('open');
+      p.closest('.skill-display-item').querySelector('.skill-detail-toggle').textContent = '▼ 詳細';
+    });
+  }
+});
+</script>
 </body>
 </html>

@@ -495,30 +495,7 @@
           </div>
         </div>
 
-        <!-- 必須スキル -->
-        <div class="ms-wrap" id="ms-skill">
-          <button class="ms-btn" onclick="toggleMs('ms-skill')">
-            必須スキル <span class="ms-badge" id="badge-skill"></span> ▾
-          </button>
-          <div class="ms-panel">
-            <div class="ms-group-label">言語</div>
-            <label class="ms-item"><span class="wf-checkbox"></span> Java</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Python</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> C#</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> PHP</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> TypeScript</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Go</label>
-            <div class="ms-group-label">FW</div>
-            <label class="ms-item"><span class="wf-checkbox"></span> Spring Boot</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> React</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Vue.js</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Laravel</label>
-            <!-- QA #67: Docker等ツール類は「稼働環境」フリーテキスト入力に変更。スキルタグから除外（4/29 確定） -->
-            <div class="ms-group-label">インフラ・DB</div>
-            <label class="ms-item"><span class="wf-checkbox"></span> AWS</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Azure</label>
-          </div>
-        </div>
+        <!-- 必須スキルプルダウン検索：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
 
         <!-- 勤務形態 -->
         <div class="ms-wrap" id="ms-work">
@@ -862,18 +839,22 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 40px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_06_案件一覧_カード型（v1.1）</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_06_案件一覧_カード型（v2.0）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v2.0 変更点（仕様変更適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>必須スキルプルダウン検索を削除（スキルがフリーテキスト入力に変更されたため）</li>
+          <li>カードのスキルタグはフリーテキスト入力のラベル（最大15文字）で表示</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>[QA #77] システム名を「Nexus」に統一</li>
           <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
-          <li>[QA #79] 案件ステータスを3種に確定（募集中 / 終了 / ペンディング）・全カードTBD解除<br>CARD3「選考中」→「ペンディング」、CARD4「充足済」→「終了」</li>
+          <li>[QA #79] 案件ステータスを3種に確定（募集中 / 終了 / ペンディング）・全カードTBD解除</li>
           <li>[QA #80] 商流選択肢を4種に確定（プライム / 2次 / 3次 / その他）・全カードサンプルデータ修正</li>
           <li>[QA #86] テーブルビュー切替ボタン削除・カード形式のみ確定</li>
           <li>[QA #85] ソートデフォルトを「登録日順（新しい順）」に変更</li>
-          <li>[QA #67] 必須スキルフィルタから「Docker」を除外</li>
         </ul>
       </div>
       <div>
@@ -881,17 +862,14 @@
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>単価：非公開フラグなし（確定済み）</li>
           <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
+          <li>スキル：フリーテキスト入力（マスタ選択廃止）。最大15文字のラベル</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト判断・人材一覧との差分</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>スキルタグを必須（実線）と尚可（点線）で視覚的に区別</li>
+          <li>スキルタグを必須（実線）と尚可（点線）で視覚的に区別（フリーテキストラベルで表示）</li>
           <li>単価・稼働開始・勤務形態を1行にまとめて横並び配置</li>
           <li>終了カードはopacity低め＋アクション非活性で表示</li>
           <li>ソートに「単価順（高い順／低い順）」を追加</li>
-          <li>【稼働開始の表示ロジック】人材の稼働可能時期と表記を統一<br>
-            　未入力 → <strong>⏱ 未定</strong><br>
-            　日付あり → <strong>⏱ YYYY/MM/DD〜</strong>（入力された日付をそのまま表示）
-          </li>
         </ul>
       </div>
     </div>

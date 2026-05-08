@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_04_人材登録_編集 v1.1 | Nexus</title>
+<title>WF_04_人材登録_編集 v2.0 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -275,12 +275,52 @@
   }
   .wf-checkbox.checked { border-color: #333; background: #fff; color: #333; }
 
-  /* ===== スキルペア ===== */
+  /* ===== スキルペア（タグ風ラベル＋詳細 縦並び構成） ===== */
   .skill-pair-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 
   .skill-pair {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 10px 12px;
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    background: #fafafa;
+    position: relative;
+  }
+
+  .skill-pair-top {
     display: flex; align-items: center; gap: 8px;
   }
+
+  .skill-label-input {
+    height: 26px;
+    border: 1.5px solid #999; background: #efefef;
+    padding: 0 10px; font-size: 11px; font-weight: 700;
+    font-family: inherit; color: #333; border-radius: 20px;
+    width: 180px; flex-shrink: 0;
+  }
+  .skill-label-input::placeholder { color: #bbb; font-weight: 400; }
+  .skill-label-input:focus { outline: none; border-color: #555; background: #e8e8e8; }
+
+  .skill-label-count { font-size: 10px; color: #bbb; white-space: nowrap; flex-shrink: 0; }
+
+  .skill-detail-input {
+    height: 30px; width: 100%;
+    border: 1.5px solid #ddd; background: #fff;
+    padding: 0 10px; font-size: 12px; font-family: inherit;
+    color: #333; border-radius: 3px;
+  }
+  .skill-detail-input::placeholder { color: #ccc; }
+  .skill-detail-input:focus { outline: none; border-color: #999; }
+
+  .skill-pair-remove {
+    position: absolute; top: 8px; right: 8px;
+    width: 20px; height: 20px;
+    border: 1.5px solid #ccc; background: #fff;
+    font-size: 11px; color: #bbb; cursor: pointer;
+    border-radius: 2px; font-family: inherit;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .skill-pair-remove:hover { border-color: #c00; color: #c00; background: #fff8f8; }
 
   /* ===== 日付 + 自動計算 ===== */
   .auto-calc {
@@ -448,36 +488,28 @@
         </div>
         <div class="form-field col">
           <div class="skill-pair-list">
+
             <div class="skill-pair">
-              <div style="display:flex;flex-direction:column;gap:3px;">
-                <select class="wf-select" style="width:190px;"><option>Java</option></select>
-                <span class="tbd-label" style="font-size:9px;">TBD マスタ選択 or 自由入力</span>
+              <button class="skill-pair-remove">✕</button>
+              <div class="skill-pair-top">
+                <input class="skill-label-input" type="text" value="Java開発経験" maxlength="15" placeholder="ラベル（最大15文字）">
+                <span class="skill-label-count">6 / 15</span>
               </div>
-              <input class="wf-input w-60" type="text" value="3">
-              <span style="font-size:12px;color:#888;">年</span>
-              <button class="btn-icon">✕</button>
+              <input class="skill-detail-input" type="text" value="Javaによるバッチ開発経験3年以上、Spring Boot使用経験あること" placeholder="詳細・条件（任意）">
             </div>
+
             <div class="skill-pair">
-              <div style="display:flex;flex-direction:column;gap:3px;">
-                <select class="wf-select" style="width:190px;"><option>Spring Boot</option></select>
-                <span style="height:18px;"></span>
+              <button class="skill-pair-remove">✕</button>
+              <div class="skill-pair-top">
+                <input class="skill-label-input" type="text" value="Spring Boot" maxlength="15" placeholder="ラベル（最大15文字）">
+                <span class="skill-label-count">11 / 15</span>
               </div>
-              <input class="wf-input w-60" type="text" value="2">
-              <span style="font-size:12px;color:#888;">年</span>
-              <button class="btn-icon">✕</button>
+              <input class="skill-detail-input" type="text" value="" placeholder="詳細・条件（任意）">
             </div>
-            <div class="skill-pair">
-              <div style="display:flex;flex-direction:column;gap:3px;">
-                <select class="wf-select" style="width:190px;"><option>AWS</option></select>
-                <span style="height:18px;"></span>
-              </div>
-              <input class="wf-input w-60" type="text" value="1">
-              <span style="font-size:12px;color:#888;">年</span>
-              <button class="btn-icon">✕</button>
-            </div>
+
           </div>
           <button class="btn-add-row">＋ スキルを追加</button>
-          <span class="hint-text">スキルと経験年数をセットで登録します（例：Java 3年）</span>
+          <span class="hint-text">ラベルは一覧・マッチング結果にタグ表示されます。詳細はAIマッチング判定の参考情報として使用します</span>
         </div>
       </div>
 
@@ -526,23 +558,11 @@
         </div>
         <div class="form-field col">
           <textarea class="wf-textarea" placeholder="例：Java・Spring Bootを用いた金融系システムの開発経験が豊富です。チームリードの経験もあり、コミュニケーション能力にも自信があります。"></textarea>
-          <span class="hint-text">案件提案時にAIが推薦コメントを生成する際の参考情報として使用します</span>
+          <span class="hint-text">AIによる職務要約の生成元となります。人材の強み・経験・自己PRを記載してください</span>
         </div>
       </div>
 
-      <!-- 職務経歴ファイル -->
-      <div class="form-row">
-        <div class="form-label">
-          <span class="badge-optional">任意</span>職務経歴ファイル
-        </div>
-        <div class="form-field col">
-          <div class="file-upload-area">
-            □ PDF / Word ファイルをドラッグ＆ドロップ<br>
-            <span style="font-size:11px;">または クリックしてファイルを選択</span>
-          </div>
-          <span class="hint-text">職務経歴書を添付します（PDF / Word）。スキルシート等の添付も可</span>
-        </div>
-      </div>
+      <!-- 職務経歴ファイルアップロード：仕様変更により削除。AIによる職務要約はプロフィール項目を参照して生成 -->
 
       <!-- ==================== 希望条件 ==================== -->
       <div class="section-heading">
@@ -643,10 +663,16 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_04_人材登録_編集（v1.1）</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_04_人材登録_編集（v2.0）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v2.0 変更点（仕様変更適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>経験スキル入力：ラベル（最大15文字）＋詳細テキストエリアの2フィールド構成。年数フィールドは廃止</li>
+          <li>職務経歴ファイルアップロードセクション削除（仕様変更）</li>
+          <li>AI職務要約はアピールポイントを参照して生成</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>[QA #77] システム名を「Nexus」に統一</li>
           <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
@@ -658,8 +684,6 @@
         <div style="font-size:11px;font-weight:700;color:#c00;margin-top:8px;margin-bottom:4px;">🔴 維持TBD</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li style="color:#c00;font-weight:700;">ヘッダーstickyが正しく実装された場合、フォーム下部の保存・キャンセルボタンは不要になる可能性あり。実装時に判断すること</li>
-          <li>経験スキル：入力方式<br><span style="color:#c00;">[※仕様QA未確定・確認待ち マスタ選択 or 自由入力　チーム内確認中]</span></li>
-          <li>職務経歴ファイル：ダウンロード権限・ファイル形式詳細<br><span style="color:#c00;">[※仕様QA #84 未回答・確認待ち]</span></li>
         </ul>
       </div>
       <div>
@@ -667,7 +691,7 @@
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>最寄駅：フリーテキスト採用確定（QA #59）</li>
           <li>ステータス：提案可 / 面談中 / 提案不可 の3択確定（QA #69）</li>
-          <li>職務経歴ファイル形式：PDF / Word 確定。スキルシート等も許容（QA #13）</li>
+          <li>スキル：ラベル（最大15文字）＋詳細テキストエリア構成。ラベルは一覧・マッチング結果に表示</li>
           <li>担当営業：担当＋サブの2名体制（確定済み）</li>
           <li>必須/任意の動的切替：マスタ管理画面「フォーム設定」タブで管理者が変更可能（QA #65）</li>
         </ul>

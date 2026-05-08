@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_12_マスタ管理 v1.1 | Nexus</title>
+<title>WF_12_マスタ管理 v2.0 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -351,11 +351,9 @@
     </div>
 
     <!-- ===== タブバー（WF_10準拠：アンダーライン型） ===== -->
+    <!-- スキルタグタブ：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
     <div class="tab-bar">
-      <div class="tab-item active" id="tab-skill-btn" onclick="switchTab('skill')">
-        スキルタグ
-      </div>
-      <div class="tab-item" id="tab-user-btn" onclick="switchTab('user')">
+      <div class="tab-item active" id="tab-user-btn" onclick="switchTab('user')">
         ユーザー管理
       </div>
       <div class="tab-item" id="tab-form-btn" onclick="switchTab('form')">
@@ -366,165 +364,10 @@
     <!-- ===== コンテンツエリア ===== -->
     <div class="tab-content-area">
 
-      <!-- ========== タブ1：スキルタグ ========== -->
-      <div class="tab-content active" id="tab-skill">
+      <!-- スキルタグタブ：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
 
-        <div class="content-header">
-          <div class="content-title">スキルタグ</div>
-          <button class="btn btn-primary" onclick="openModal()">＋ 新規追加</button>
-        </div>
-
-        <div class="table-wrap">
-          <table class="master-table">
-            <thead>
-              <tr>
-                <th class="col-name">名称</th>
-                <th class="col-cat">
-                  カテゴリ
-                  <span style="font-size:9px;color:#bbb;font-weight:400;margin-left:4px;">
-                    [WF注] スキル絞り込みドロップダウンのグループ表示に使用（WF_03と対応）
-                  </span>
-                </th>
-                <th class="col-ops">
-                  操作
-                  <span style="font-size:9px;color:#bbb;font-weight:400;margin-left:4px;">
-                    [WF注] 使用中タグは削除不可
-                  </span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="col-name">Java</td>
-                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">Python</td>
-                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">PHP</td>
-                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">TypeScript</td>
-                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">JavaScript</td>
-                <td class="col-cat"><span class="cat-badge lang">言語</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">React</td>
-                <td class="col-cat"><span class="cat-badge fw">FW</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">Laravel</td>
-                <td class="col-cat"><span class="cat-badge fw">FW</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">Spring Boot</td>
-                <td class="col-cat"><span class="cat-badge fw">FW</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete-active">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">PostgreSQL</td>
-                <td class="col-cat"><span class="cat-badge db">DB</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">MySQL</td>
-                <td class="col-cat"><span class="cat-badge db">DB</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">SQL Server</td>
-                <td class="col-cat"><span class="cat-badge db">DB</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete-active">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">AWS</td>
-                <td class="col-cat"><span class="cat-badge cloud">クラウド</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete" title="使用中のため削除不可">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">Azure</td>
-                <td class="col-cat"><span class="cat-badge cloud">クラウド</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete-active">削除</button>
-                </div></td>
-              </tr>
-              <tr>
-                <td class="col-name">GCP</td>
-                <td class="col-cat"><span class="cat-badge cloud">クラウド</span></td>
-                <td class="col-ops"><div class="ops-group">
-                  <button class="btn btn-sm btn-edit">編集</button>
-                  <button class="btn btn-sm btn-delete-active">削除</button>
-                </div></td>
-              </tr>
-              <!-- QA #67: Docker / Kubernetes / Git はツール類のためスキルタグ非対象。削除（4/29 確定） -->
-            </tbody>
-          </table>
-
-          <div class="annotation-block">
-            <div class="annotation-title">WF注釈（v1.1更新）</div>
-            <div class="annotation-list">
-              <div class="annotation-item">・ [QA #67] ツール類（Docker / Kubernetes / Git 等）は案件登録の「稼働環境」フリーテキストで入力する運用のため、スキルタグ対象外。ツールカテゴリを廃止し<strong>カテゴリ4分類（言語 / FW / DB / クラウド）</strong>に変更（4/29 確定）</div>
-              <div class="annotation-item">・ カテゴリはWF_03スキル絞り込みのグループ表示に使用。WF_03のグループラベルとの整合は次バージョン対応</div>
-              <div class="annotation-item">・ 削除ボタン（グレー）：使用中タグ。ホバー時ツールチップ「使用中のため削除不可」を表示</div>
-              <div class="annotation-item">・ 削除ボタン（赤枠）：未使用タグ。物理削除を許可</div>
-              <div class="annotation-item">・ 表示順はカテゴリ内で名称の昇順（あいうえお / ABC順）に自動ソート</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ========== タブ2：ユーザー管理 ========== -->
-      <div class="tab-content" id="tab-user">
+      <!-- ========== タブ1：ユーザー管理 ========== -->
+      <div class="tab-content active" id="tab-user">
 
         <div class="content-header">
           <div class="content-title">ユーザー管理</div>
@@ -797,52 +640,18 @@
   </div>
 </div>
 
-<!-- ===== モーダル：スキルタグ新規追加 ===== -->
-<div class="modal-overlay" id="modal-skill">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">スキルタグを追加</div>
-      <button class="modal-close" onclick="closeModal()">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <label class="form-label">名称 <span class="required-mark">※必須</span></label>
-        <input class="wf-input" type="text" placeholder="例：Go、Vue.js、Oracle">
-      </div>
-      <div class="form-row">
-        <label class="form-label">カテゴリ <span class="required-mark">※必須</span></label>
-        <select class="wf-select-modal">
-          <option value="">選択してください</option>
-          <option value="lang">言語</option>
-          <option value="fw">FW</option>
-          <option value="db">DB</option>
-          <option value="cloud">クラウド</option>
-          <!-- QA #67: ツールカテゴリ廃止。4分類（言語/FW/DB/クラウド）に変更（4/29 確定） -->
-        </select>
-        <span class="hint-text">人材一覧・案件一覧のスキル絞り込みでグループ表示に使用します</span>
-      </div>
-
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal()">キャンセル</button>
-      <button class="btn btn-primary">保存</button>
-    </div>
-  </div>
-</div>
+<!-- スキルタグ追加モーダル：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('modal-skill').addEventListener('click', function (e) {
-      if (e.target === this) closeModal();
-    });
     document.getElementById('modal-user').addEventListener('click', function (e) {
       if (e.target === this) closeUserModal();
     });
   });
 
-  // タブ切り替え
+  // タブ切り替え（スキルタグタブ削除済み：user / form の2タブ構成）
   function switchTab(tab) {
-    ['skill','user','form'].forEach(function(t) {
+    ['user','form'].forEach(function(t) {
       document.getElementById('tab-' + t + '-btn').classList.remove('active');
       document.getElementById('tab-' + t).classList.remove('active');
     });
@@ -864,27 +673,26 @@
     });
   });
 
-  // スキルタグモーダル
-  function openModal()  { document.getElementById('modal-skill').classList.add('open'); }
-  function closeModal() { document.getElementById('modal-skill').classList.remove('open'); }
-
   // ユーザーモーダル
   function openUserModal()  { document.getElementById('modal-user').classList.add('open'); }
   function closeUserModal() { document.getElementById('modal-user').classList.remove('open'); }
 </script>
 <!--
   WF_12_マスタ管理.html
-  バージョン: v1.1
-  更新日: 2026-04-30
+  バージョン: v2.0
+  更新日: 2026-05-07
   変更履歴:
+    v2.0 (2026-05-07)
+      - スキルタグタブを削除（スキルがフリーテキスト入力に変更されたため）
+      - スキルタグ追加モーダルを削除
+      - タブ構成：スキルタグ / ユーザー管理 / フォーム設定 → ユーザー管理 / フォーム設定 の2タブに変更
+      - ユーザー管理タブをデフォルト表示に変更
+      - switchTab関数からskillタブ参照を削除
     v1.1 (2026-04-30)
       - [QA #77] システム名を「Nexus（ネクサス）」に統一
       - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
       - [QA #82] フォーム設定タブに「案件登録フォーム」セクションを追加（前田様 4/29 確定）
       - [QA #67] スキルタグ一覧から Docker / Kubernetes / Git を削除
-               ツールカテゴリ廃止→4分類（言語/FW/DB/クラウド）に変更
-               スキル追加モーダルの「ツール」option を削除
-      - ユーザー管理サンプルの最終ログイン日付を2026年に更新
 -->
 </body>
 </html>

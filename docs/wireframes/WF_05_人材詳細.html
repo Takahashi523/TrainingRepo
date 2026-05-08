@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_05_人材詳細 v1.1 | Nexus</title>
+<title>WF_05_人材詳細 v2.0 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -221,7 +221,7 @@
   .section-card {
     border: 1.5px solid #ddd;
     border-radius: 6px;
-    overflow: hidden;
+    overflow: visible;  /* skill detail panel が親要素でクリップされないよう visible に変更 */
     margin-bottom: 16px;
   }
 
@@ -230,6 +230,7 @@
     border-bottom: 1.5px solid #ddd;
     padding: 9px 16px;
     font-size: 12px; font-weight: 700; color: #333;
+    border-radius: 6px 6px 0 0;
   }
 
   /* 詳細行 */
@@ -271,9 +272,40 @@
   .process-check.checked   { border-color: #333; color: #333; }
   .process-check.unchecked { background: #f2f2f2; color: transparent; }
 
-  .skill-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .skill-item { display: inline-flex; align-items: center; }
-  .skill-year { font-size: 10px; color: #888; margin-left: 3px; }
+  .skill-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+
+  .skill-display-item { position: relative; display: inline-flex; flex-direction: column; gap: 0; }
+
+  /* 一覧画面と同じ角型タグスタイル */
+  .skill-label-tag {
+    padding: 2px 8px;
+    border: 1.5px solid #888; border-radius: 2px;
+    font-size: 11px; color: #333; background: #fff; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .skill-label-tag.optional { border-style: dashed; color: #666; }
+
+  /* 詳細展開ボタン */
+  .skill-detail-toggle {
+    font-size: 10px; color: #999; cursor: pointer;
+    border: none; background: none; padding: 0;
+    font-family: inherit; line-height: 1;
+    flex-shrink: 0;
+  }
+  .skill-detail-toggle:hover { color: #555; }
+
+  /* 展開パネル */
+  .skill-detail-panel {
+    display: none;
+    position: absolute; top: calc(100% + 4px); left: 0;
+    min-width: 240px; max-width: 360px;
+    background: #fff; border: 1.5px solid #bbb;
+    border-radius: 3px; padding: 8px 10px;
+    font-size: 11px; color: #555; line-height: 1.7;
+    z-index: 10; box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    white-space: normal;
+  }
+  .skill-detail-panel.open { display: block; }
 
   .download-link {
     display: inline-flex; align-items: center; gap: 5px;
@@ -375,7 +407,7 @@
           <span class="ai-tag">チームリード</span>
           <span class="ai-tag">顧客折衝</span>
         </div>
-        <div class="ai-hint">※ AIが職務経歴書・アピールポイントをもとに自動生成した要約です。内容は参考情報としてご確認ください。</div>
+        <div class="ai-hint">※ AIがアピールポイントをもとに自動生成した要約です。内容は参考情報としてご確認ください。</div>
       </div>
 
       <!-- 基本情報 -->
@@ -406,14 +438,34 @@
         <div class="detail-row">
           <div class="detail-label">経験スキル</div>
           <div class="detail-value">
-          <div class="skill-list">
-            <span class="wf-tag">Java<span class="skill-year">（3年）</span></span>
-            <span class="wf-tag">Spring Boot<span class="skill-year">（2年）</span></span>
-            <span class="wf-tag">AWS<span class="skill-year">（1年）</span></span>
-            <span class="wf-tag">PostgreSQL<span class="skill-year">（2年）</span></span>
-            <span class="wf-tag">Docker<span class="skill-year">（1年）</span></span>
+            <div class="skill-list">
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag">
+                  Java開発経験
+                  <button class="skill-detail-toggle" onclick="toggleSkillDetail(this)">▼ 詳細</button>
+                </span>
+                <div class="skill-detail-panel">Javaによるバッチ開発経験3年以上、Spring Boot使用経験あること</div>
+              </div>
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag">Spring Boot</span>
+              </div>
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag">
+                  AWS
+                  <button class="skill-detail-toggle" onclick="toggleSkillDetail(this)">▼ 詳細</button>
+                </span>
+                <div class="skill-detail-panel">クラウドインフラ構築・運用経験</div>
+              </div>
+
+              <div class="skill-display-item">
+                <span class="skill-label-tag">PostgreSQL</span>
+              </div>
+
+            </div>
           </div>
-        </div>
         </div>
         <div class="detail-row">
           <div class="detail-label">経験工程</div>
@@ -443,15 +495,7 @@
           Java・Spring Bootを用いた金融系システムの開発経験が豊富です。チームリードの経験もあり、コミュニケーション能力にも自信があります。上流工程から関わった案件も多く、要件整理から設計・実装まで一気通貫で対応できます。
         </div>
         </div>
-        <div class="detail-row">
-          <div class="detail-label">職務経歴ファイル</div>
-          <div class="detail-value">
-          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
-            <a class="download-link">📄 職務経歴書_山田太郎_202501.pdf　↓ ダウンロード</a>
-            <span class="tbd-label" style="font-size:9px;">TBD ダウンロード権限未確定</span>
-          </div>
-        </div>
-        </div>
+        <!-- 職務経歴ファイル：仕様変更によりアップロード機能廃止のため削除 -->
       </div>
       <!-- 希望条件 -->
       <div class="section-card">
@@ -501,10 +545,16 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_05_人材詳細（v1.1）</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_05_人材詳細（v2.0）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v2.0 変更点（仕様変更適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>職務経歴ファイルダウンロードリンク削除（アップロード機能廃止）</li>
+          <li>AI職務要約ヒント文更新：「職務経歴書」→「プロフィール情報（スキル・工程経験・アピールポイント等）」</li>
+          <li>スキルタグはフリーテキスト入力のラベルで表示</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>[QA #77] システム名を「Nexus」に統一</li>
           <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
@@ -512,7 +562,6 @@
         <div style="font-size:11px;font-weight:700;color:#c00;margin-top:8px;margin-bottom:4px;">🔴 維持TBD</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li style="color:#c00;font-weight:700;">ヘッダーstickyが正しく実装された場合、フッターの編集ボタンは不要になる可能性あり。実装時に判断すること</li>
-          <li>職務経歴ダウンロード権限：<span style="color:#c00;">[※仕様QA #84 未回答・確認待ち]</span></li>
         </ul>
       </div>
       <div>
@@ -521,7 +570,7 @@
           <li>ステータスバッジ：提案可 / 面談中 / 提案不可 の3択確定（QA #69）</li>
           <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
           <li>削除ボタン：管理者のみ表示・物理削除（確定済み）</li>
-          <li>AI職務要約：登録・編集の保存時に同期処理で自動生成（QA #47）</li>
+          <li>AI職務要約：登録・編集の保存時に同期処理で自動生成（QA #47）。プロフィール項目参照に変更</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト設計メモ</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
@@ -549,5 +598,28 @@
   維持TBD:
     - 職務経歴ファイルのダウンロード権限（QA #84 未回答）
 -->
+<script>
+function toggleSkillDetail(btn) {
+  var panel = btn.closest('.skill-display-item').querySelector('.skill-detail-panel');
+  var isOpen = panel.classList.contains('open');
+  // 他を閉じる
+  document.querySelectorAll('.skill-detail-panel.open').forEach(function(p) {
+    p.classList.remove('open');
+    p.closest('.skill-display-item').querySelector('.skill-detail-toggle').textContent = '▼ 詳細';
+  });
+  if (!isOpen) {
+    panel.classList.add('open');
+    btn.textContent = '▲ 詳細';
+  }
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.skill-display-item')) {
+    document.querySelectorAll('.skill-detail-panel.open').forEach(function(p) {
+      p.classList.remove('open');
+      p.closest('.skill-display-item').querySelector('.skill-detail-toggle').textContent = '▼ 詳細';
+    });
+  }
+});
+</script>
 </body>
 </html>

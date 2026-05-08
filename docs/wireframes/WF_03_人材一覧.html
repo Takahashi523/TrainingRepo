@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
-<title>WF_03_人材一覧_カード型 v2.1 | Nexus</title>
+<title>WF_03_人材一覧_カード型 v3.0 | Nexus</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -614,31 +614,7 @@
           </div>
         </div>
 
-        <!-- スキル（マルチセレクト） -->
-        <div class="ms-wrap" id="ms-skill">
-          <button class="ms-btn" onclick="toggleMs('ms-skill')">
-            スキル <span class="ms-badge" id="badge-skill"></span> ▾
-          </button>
-          <div class="ms-panel">
-            <div class="ms-group-label">言語</div>
-            <label class="ms-item"><span class="wf-checkbox"></span> Java</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Python</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> C#</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> PHP</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> TypeScript</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Go</label>
-            <div class="ms-group-label">FW</div>
-            <label class="ms-item"><span class="wf-checkbox"></span> Spring Boot</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> React</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Vue.js</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Laravel</label>
-            <!-- QA #67: Docker等ツール類は「稼働環境」フリーテキスト入力に変更。スキルタグから除外（4/29 確定） -->
-            <div class="ms-group-label">インフラ・DB</div>
-            <label class="ms-item"><span class="wf-checkbox"></span> AWS</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> Azure</label>
-            <label class="ms-item"><span class="wf-checkbox"></span> PostgreSQL</label>
-          </div>
-        </div>
+        <!-- スキルプルダウン検索：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
 
         <!-- 勤務形態（マルチセレクト） -->
         <div class="ms-wrap" id="ms-work">
@@ -675,7 +651,6 @@
       <!-- アクション行 -->
       <div class="filter-row" style="margin-top:8px;">
         <span style="font-size:11px;color:#aaa;">絞り込み条件：</span>
-        <span class="active-tag">Java <span style="cursor:pointer;">✕</span></span>
         <span class="active-tag">提案可 <span style="cursor:pointer;">✕</span></span>
         <span class="active-tag">フルリモート <span style="cursor:pointer;">✕</span></span>
         <button class="btn btn-ghost" style="margin-left:4px;">✕ すべてクリア</button>
@@ -952,7 +927,12 @@
     <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記（v2.1）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v2.1 変更点（差分レポート適用）</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v3.0 変更点（仕様変更適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>スキルプルダウン検索を削除（スキルがフリーテキスト入力に変更されたため）</li>
+          <li>カードのスキルタグはフリーテキスト入力のラベル（最大15文字）で表示</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v2.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>[QA #77] システム名を「Nexus」に統一</li>
           <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
@@ -980,7 +960,8 @@
 
 <!--
   WF_03_人材一覧.html
-  バージョン: v2.1
+  バージョン: v3.0
+  更新日: 2026-05-07
   更新日: 2026-04-30
   変更履歴:
     v2.1 (2026-04-30)
