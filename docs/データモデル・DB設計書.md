@@ -270,6 +270,7 @@ erDiagram
 | メールアドレス | email | VARCHAR(255) | NOT NULL | UQ | なし（要指定） | ログインID。社内メールのみ。QA #19 確定 |
 | パスワード（ハッシュ） | password | VARCHAR(255) | NOT NULL | | なし（要指定） | bcrypt等でハッシュ化 |
 | ロール | role | ENUM('admin','general') | NOT NULL | | `general` | admin / general。QA #17 確定。→ §6-5 |
+| ログイン状態保持トークン | remember_token | VARCHAR(100) | NULL | | NULL | WF_01「ログイン情報を保存する」チェックボックス対応。Laravel Breeze の `$table->rememberToken()` で生成。未チェック時は NULL。 |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -277,6 +278,7 @@ erDiagram
 > アカウントのCRUDは管理者のみが実施（QA #16 確定）。  
 > 登録項目は氏名・メールアドレス・パスワード・権限の4項目（QA #18 確定）。  
 > **論理削除なし。物理削除のみ**（マスタ管理画面から管理者が実施）。  
+> **`email_verified_at` は設けない。** 社内ツール・管理者によるアカウント発行運用のためメール認証フローは不要。Breezeが生成する User モデルから `MustVerifyEmail` の実装・casts の `email_verified_at` を削除すること。
 
 -----
 
