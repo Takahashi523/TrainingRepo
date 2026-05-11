@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_11_CSV入出力 v1.1 | Nexus</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+  }
+
+  .app-shell {
+    display: flex;
+    width: 1440px;
+    height: 100vh;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: hidden;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: 220px; height: 100%;
+    border-right: 1.5px solid #555;
+    background: #fafafa;
+    flex-shrink: 0;
+    display: flex; flex-direction: column;
+  }
+
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
+  .sidebar-logo {
+    padding: 16px 14px 14px;
+    border-bottom: 1.5px solid #555;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
+  }
+
+  .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+  .nav-section-label {
+    font-size: 10px; color: #888; font-weight: 700;
+    padding: 10px 14px 4px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px; color: #444;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+
+  .nav-item.active {
+    background: #e8e8e8; border-left-color: #333;
+    font-weight: 700; color: #111;
+  }
+
+  .nav-item:hover:not(.active) { background: #f2f2f2; }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    border: 1.5px solid #666; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  .nav-item.active .nav-icon { border-color: #111; background: #333; color: #fff; }
+
+  .sidebar-bottom { border-top: 1.5px solid #ccc; flex-shrink: 0; }
+  .sidebar-footer { padding: 12px 14px; font-size: 11px; color: #777; border-bottom: 1px solid #e8e8e8; }
+  .nav-item.logout { color: #888; }
+  .nav-item.logout .nav-icon { border-color: #aaa; color: #aaa; }
+
+  /* ===== MAIN ===== */
+  .main-content {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  .page-header {
+    padding: 16px 24px 14px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .page-title { font-size: 18px; font-weight: 700; color: #111; }
+  .page-subtitle { font-size: 11px; color: #888; margin-top: 3px; }
+
+  /* ===== タブバー ===== */
+  .tab-bar {
+    display: flex; align-items: flex-end;
+    border-bottom: 2px solid #ddd;
+    padding: 0 24px;
+    background: #fff; flex-shrink: 0;
+  }
+
+  .tab-item {
+    padding: 10px 18px 8px;
+    font-size: 13px; font-weight: 600; color: #888;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tab-item.active { color: #111; border-bottom-color: #333; }
+  .tab-item:hover:not(.active) { color: #555; }
+
+  /* ===== コンテンツエリア ===== */
+  .tab-content-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .tab-content { display: none; flex: 1; overflow-y: auto; padding: 24px; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* ===== セクションカード ===== */
+  .section-card {
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .section-header {
+    padding: 12px 20px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .section-body { padding: 20px 24px; }
+
+  /* ===== 説明文 ===== */
+  .desc-text {
+    font-size: 11px; color: #888; line-height: 1.8;
+    margin-bottom: 18px;
+  }
+
+  /* ===== ドラッグ＆ドロップエリア ===== */
+  .upload-area {
+    border: 2px dashed #bbb;
+    background: #fafafa;
+    padding: 36px 24px;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: border-color .15s, background .15s;
+    margin-bottom: 16px;
+  }
+  .upload-area:hover, .upload-area.dragover {
+    border-color: #333; background: #f0f0f0;
+  }
+  .upload-area-main {
+    font-size: 14px; font-weight: 600; color: #444; margin-bottom: 8px;
+  }
+  .upload-area-icon {
+    font-size: 28px; margin-bottom: 10px; color: #bbb;
+  }
+  .upload-area-sub {
+    font-size: 10px; color: #aaa; margin-bottom: 14px; line-height: 1.7;
+  }
+
+  /* ===== ファイル選択後の表示 ===== */
+  .file-selected {
+    display: none;
+    align-items: center; gap: 8px;
+    background: #f0f0f0; border: 1px solid #ddd;
+    border-radius: 2px; padding: 8px 14px;
+    font-size: 12px; color: #333; margin-bottom: 4px;
+  }
+  .file-selected.show { display: flex; }
+  .file-selected-name { font-weight: 600; }
+  .file-selected-size { color: #888; font-size: 11px; }
+  .file-remove {
+    margin-left: auto; font-size: 11px; color: #aaa;
+    cursor: pointer; text-decoration: underline;
+  }
+
+  /* ===== ボタン ===== */
+  .btn {
+    height: 32px; padding: 0 16px;
+    border: 1.5px solid #555; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #333; cursor: pointer; border-radius: 2px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .btn-primary { background: #222; color: #fff; border-color: #222; }
+  .btn-primary:hover { background: #000; }
+  .btn-secondary { background: #fff; color: #333; border: 1.5px solid #555; }
+  .btn-secondary:hover { background: #f5f5f5; }
+  .btn-ghost { background: transparent; color: #555; border: 1px solid #ccc; }
+  .btn-ghost:hover { background: #f5f5f5; }
+
+  /* ===== 実行ボタン行 ===== */
+  .action-row {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 10px; margin-top: 16px;
+    padding-top: 16px; border-top: 1px solid #eee;
+  }
+  .action-note {
+    margin-right: auto; font-size: 11px; color: #aaa;
+  }
+
+  /* ===== フォーム ===== */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 0;
+  }
+
+  .form-row { display: flex; flex-direction: column; gap: 5px; }
+  .form-label {
+    font-size: 11px; font-weight: 700; color: #555;
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  .wf-input {
+    height: 32px; padding: 0 10px;
+    border: 1px solid #ccc; border-radius: 2px;
+    font-size: 12px; font-family: inherit; color: #333;
+    background: #fff; width: 100%;
+  }
+  .wf-input:focus { outline: none; border-color: #333; }
+
+  .wf-select {
+    height: 32px; padding: 0 8px;
+    border: 1px solid #ccc; border-radius: 2px;
+    font-size: 12px; font-family: inherit; color: #333;
+    background: #fff; width: 100%;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+
+  .checkbox-group {
+    display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px;
+  }
+  .checkbox-item {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; color: #333; cursor: pointer;
+  }
+  .checkbox-item input[type="checkbox"] {
+    width: 14px; height: 14px; accent-color: #333;
+  }
+
+  .date-range-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .date-range-sep { font-size: 11px; color: #aaa; flex-shrink: 0; }
+
+  /* ===== アノテーション ===== */
+  .annotation {
+    position: relative;
+    display: inline-flex; align-items: flex-start; gap: 6px;
+    border: 1.5px solid #c00; background: #fff8f8;
+    padding: 6px 10px; border-radius: 2px;
+    font-size: 10px; color: #c00; line-height: 1.6;
+    margin-top: 10px;
+  }
+  .annotation-icon { font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ===== セクション内ラベル区切り ===== */
+  .sub-section-label {
+    font-size: 11px; font-weight: 700; color: #555;
+    margin: 20px 0 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sub-section-label::after {
+    content: ''; flex: 1; height: 1px; background: #eee;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">メイン</div>
+      <div class="nav-item">
+        <span class="nav-icon">◫</span><span>ダッシュボード</span>
+      </div>
+
+      <div class="nav-section-label">人材</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span><span>人材一覧</span>
+      </div>
+
+      <div class="nav-section-label">案件</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span><span>案件一覧</span>
+      </div>
+
+      <div class="nav-section-label">進捗管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">⊞</span><span>パイプライン</span>
+      </div>
+
+      <div class="nav-section-label">管理</div>
+      <div class="nav-item active">
+        <span class="nav-icon">↓</span><span>CSV入出力</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">⚙</span><span>マスタ管理</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">田中 営業（ログイン中）</div>
+      <div class="nav-item logout">
+        <span class="nav-icon">→</span><span>ログアウト</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <!-- ページヘッダー -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">CSV入出力</div>
+        <div class="page-subtitle">人材・案件データのインポート（登録/更新）とエクスポート（ダウンロード）を行います</div>
+      </div>
+    </div>
+
+    <!-- タブバー -->
+    <div class="tab-bar">
+      <div class="tab-item active" id="tab-engineer" onclick="switchTab('engineer')">人材CSV</div>
+      <div class="tab-item" id="tab-project" onclick="switchTab('project')">案件CSV</div>
+    </div>
+
+    <!-- ===== タブコンテンツエリア ===== -->
+    <div class="tab-content-area">
+
+      <!-- ========== 人材CSV タブ ========== -->
+      <div class="tab-content active" id="content-engineer">
+
+        <!-- セクション① インポート -->
+        <div class="section-card">
+          <div class="section-header">
+            インポート（登録 / 更新）
+          </div>
+          <div class="section-body">
+
+            <p class="desc-text">
+              CSVファイルをアップロードして、人材データを一括登録または更新します。<br>
+              システムIDが含まれる行は既存データを上書き更新、IDが空の行は新規追加として処理します。<br>
+              ※ エクスポートしたCSVを編集して再インポートする運用を想定しています。
+            </p>
+
+            <!-- アップロードエリア -->
+            <div class="upload-area" id="upload-area-eng"
+                 ondragover="onDragOver(event,'upload-area-eng')"
+                 ondragleave="onDragLeave('upload-area-eng')"
+                 ondrop="onDrop(event,'upload-area-eng','file-eng')"
+                 onclick="document.getElementById('input-eng').click()">
+              <div class="upload-area-icon">📂</div>
+              <div class="upload-area-main">CSVファイルをドラッグ＆ドロップ、またはクリックして選択</div>
+              <div class="upload-area-sub">
+                対応形式：.csv（UTF-8 / BOM付き）　最大ファイルサイズ：5MB　改行コード：CRLF・LF両対応
+              </div>
+              <button class="btn btn-secondary" onclick="event.stopPropagation(); document.getElementById('input-eng').click()">ファイルを選択</button>
+              <input type="file" id="input-eng" accept=".csv" style="display:none"
+                     onchange="onFileSelect(this,'file-eng','upload-area-eng')">
+            </div>
+
+            <!-- ファイル選択後表示 -->
+            <div class="file-selected" id="file-eng">
+              <span>📄</span>
+              <span class="file-selected-name" id="file-eng-name"></span>
+              <span class="file-selected-size" id="file-eng-size"></span>
+              <span class="file-remove" onclick="clearFile('input-eng','file-eng','upload-area-eng')">✕ 取り消す</span>
+            </div>
+
+            <!-- 実行ボタン行 -->
+            <div class="action-row">
+              <span class="action-note">※ 実行前にバックアップを取得することを推奨します</span>
+              <button class="btn btn-primary">インポート実行</button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- セクション② エクスポート -->
+        <div class="section-card">
+          <div class="section-header">
+            エクスポート（ダウンロード）
+          </div>
+          <div class="section-body">
+
+            <p class="desc-text">
+              絞り込み条件を指定して、対象の人材データをCSVでダウンロードします。<br>
+              条件を指定しない場合は全件をエクスポートします。<br>
+              対象が0件の場合もヘッダー行のみのCSVをダウンロードできます（初期データ一括投入用のテンプレートとして利用可）。
+            </p>
+
+            <div class="sub-section-label">絞り込み条件（任意）</div>
+
+            <div class="form-grid">
+
+              <!-- ステータス -->
+              <div class="form-row">
+                <label class="form-label">ステータス</label>
+                <select class="wf-select">
+                  <option value="">すべて</option>
+                  <option>提案可</option>
+                  <option>面談中</option>
+                  <option>提案不可</option>
+                </select>
+              </div>
+
+              <!-- 担当営業 -->
+              <div class="form-row">
+                <label class="form-label">担当営業</label>
+                <select class="wf-select">
+                  <option value="">全員</option>
+                  <option>田中 営業</option>
+                  <option>鈴木 営業</option>
+                  <option>佐藤 営業</option>
+                </select>
+              </div>
+
+              <!-- 稼働可能時期 From / To -->
+              <div class="form-row">
+                <label class="form-label">稼働可能時期</label>
+                <div class="date-range-row">
+                  <input type="date" class="wf-input" style="flex:1;">
+                  <span class="date-range-sep">〜</span>
+                  <input type="date" class="wf-input" style="flex:1;">
+                </div>
+              </div>
+
+              <!-- スキル -->
+              <div class="form-row">
+                <label class="form-label">スキル（キーワード）</label>
+                <input type="text" class="wf-input" placeholder="例：Java, AWS">
+              </div>
+
+              <!-- 勤務形態タグ（2カラムにまたがる） -->
+              <div class="form-row" style="grid-column: 1 / -1;">
+                <label class="form-label">勤務形態タグ</label>
+                <div class="checkbox-group">
+                  <label class="checkbox-item"><input type="checkbox"> 常駐可</label>
+                  <label class="checkbox-item"><input type="checkbox"> 一部リモート可</label>
+                  <label class="checkbox-item"><input type="checkbox"> フルリモート希望</label>
+                </div>
+              </div>
+
+            </div><!-- /form-grid -->
+
+            <!-- 実行ボタン行 -->
+            <div class="action-row">
+              <button class="btn btn-primary">エクスポート実行</button>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /content-engineer -->
+
+
+      <!-- ========== 案件CSV タブ ========== -->
+      <div class="tab-content" id="content-project">
+
+        <!-- セクション① インポート -->
+        <div class="section-card">
+          <div class="section-header">
+            インポート（登録 / 更新）
+          </div>
+          <div class="section-body">
+
+            <p class="desc-text">
+              CSVファイルをアップロードして、案件データを一括登録または更新します。<br>
+              システムIDが含まれる行は既存データを上書き更新、IDが空の行は新規追加として処理します。<br>
+              ※ エクスポートしたCSVを編集して再インポートする運用を想定しています。
+            </p>
+
+            <!-- アップロードエリア -->
+            <div class="upload-area" id="upload-area-prj"
+                 ondragover="onDragOver(event,'upload-area-prj')"
+                 ondragleave="onDragLeave('upload-area-prj')"
+                 ondrop="onDrop(event,'upload-area-prj','file-prj')"
+                 onclick="document.getElementById('input-prj').click()">
+              <div class="upload-area-icon">📂</div>
+              <div class="upload-area-main">CSVファイルをドラッグ＆ドロップ、またはクリックして選択</div>
+              <div class="upload-area-sub">
+                対応形式：.csv（UTF-8 / BOM付き）　最大ファイルサイズ：5MB　改行コード：CRLF・LF両対応
+              </div>
+              <button class="btn btn-secondary" onclick="event.stopPropagation(); document.getElementById('input-prj').click()">ファイルを選択</button>
+              <input type="file" id="input-prj" accept=".csv" style="display:none"
+                     onchange="onFileSelect(this,'file-prj','upload-area-prj')">
+            </div>
+
+            <!-- ファイル選択後表示 -->
+            <div class="file-selected" id="file-prj">
+              <span>📄</span>
+              <span class="file-selected-name" id="file-prj-name"></span>
+              <span class="file-selected-size" id="file-prj-size"></span>
+              <span class="file-remove" onclick="clearFile('input-prj','file-prj','upload-area-prj')">✕ 取り消す</span>
+            </div>
+
+            <!-- 実行ボタン行 -->
+            <div class="action-row">
+              <span class="action-note">※ 実行前にバックアップを取得することを推奨します</span>
+              <button class="btn btn-primary">インポート実行</button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- セクション② エクスポート -->
+        <div class="section-card">
+          <div class="section-header">
+            エクスポート（ダウンロード）
+          </div>
+          <div class="section-body">
+
+            <p class="desc-text">
+              絞り込み条件を指定して、対象の案件データをCSVでダウンロードします。<br>
+              条件を指定しない場合は全件をエクスポートします。<br>
+              対象が0件の場合もヘッダー行のみのCSVをダウンロードできます（初期データ一括投入用のテンプレートとして利用可）。
+            </p>
+
+            <div class="sub-section-label">絞り込み条件（任意）</div>
+
+            <div class="form-grid">
+
+              <!-- ステータス -->
+              <div class="form-row">
+                <label class="form-label">ステータス</label>
+                <select class="wf-select">
+                  <option value="">すべて</option>
+                  <option>募集中</option>
+                  <option>終了</option>
+                  <option>ペンディング</option>
+                </select>
+              </div>
+
+              <!-- 担当営業 -->
+              <div class="form-row">
+                <label class="form-label">担当営業</label>
+                <select class="wf-select">
+                  <option value="">全員</option>
+                  <option>田中 営業</option>
+                  <option>鈴木 営業</option>
+                  <option>佐藤 営業</option>
+                </select>
+              </div>
+
+              <!-- 参画開始時期 From / To -->
+              <div class="form-row">
+                <label class="form-label">参画開始時期</label>
+                <div class="date-range-row">
+                  <input type="date" class="wf-input" style="flex:1;">
+                  <span class="date-range-sep">〜</span>
+                  <input type="date" class="wf-input" style="flex:1;">
+                </div>
+              </div>
+
+              <!-- 必須スキル -->
+              <div class="form-row">
+                <label class="form-label">必須スキル（キーワード）</label>
+                <input type="text" class="wf-input" placeholder="例：PHP, Laravel">
+              </div>
+
+              <!-- 稼働形態（2カラムにまたがる） -->
+              <div class="form-row" style="grid-column: 1 / -1;">
+                <label class="form-label">稼働形態</label>
+                <div class="checkbox-group">
+                  <label class="checkbox-item"><input type="checkbox"> 常駐</label>
+                  <label class="checkbox-item"><input type="checkbox"> 一部リモート可</label>
+                  <label class="checkbox-item"><input type="checkbox"> フルリモート</label>
+                </div>
+              </div>
+
+            </div><!-- /form-grid -->
+
+            <!-- 実行ボタン行 -->
+            <div class="action-row">
+              <button class="btn btn-primary">エクスポート実行</button>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /content-project -->
+
+    </div><!-- /tab-content-area -->
+
+  </div><!-- /main-content -->
+
+</div><!-- /app-shell -->
+
+<script>
+  // ===== タブ切り替え =====
+  function switchTab(name) {
+    document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    document.getElementById('content-' + name).classList.add('active');
+  }
+
+  // ===== ドラッグ＆ドロップ =====
+  function onDragOver(e, areaId) {
+    e.preventDefault();
+    document.getElementById(areaId).classList.add('dragover');
+  }
+  function onDragLeave(areaId) {
+    document.getElementById(areaId).classList.remove('dragover');
+  }
+  function onDrop(e, areaId, fileId) {
+    e.preventDefault();
+    document.getElementById(areaId).classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) showFile(file, fileId, areaId);
+  }
+
+  // ===== ファイル選択 =====
+  function onFileSelect(input, fileId, areaId) {
+    const file = input.files[0];
+    if (file) showFile(file, fileId, areaId);
+  }
+
+  function showFile(file, fileId, areaId) {
+    const size = file.size < 1024 * 1024
+      ? (file.size / 1024).toFixed(0) + 'KB'
+      : (file.size / 1024 / 1024).toFixed(1) + 'MB';
+    document.getElementById(fileId + '-name').textContent = file.name;
+    document.getElementById(fileId + '-size').textContent = '（' + size + '）';
+    document.getElementById(fileId).classList.add('show');
+    document.getElementById(areaId).style.display = 'none';
+  }
+
+  function clearFile(inputId, fileId, areaId) {
+    document.getElementById(inputId).value = '';
+    document.getElementById(fileId).classList.remove('show');
+    document.getElementById(areaId).style.display = '';
+  }
+</script>
+
+<!-- ===== ANNOTATION ===== -->
+<div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
+  <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_11_CSV入出力（v1.1）</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>[QA #77] システム名を「Nexus」に統一</li>
+          <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
+          <li>[QA #21/#55/#56/#57/#58] 操作ログタブが本画面に存在しないことを正式確認・注記追加。操作ログはOUTスコープ（前田様「ログ記録は今回無しで大丈夫です」4/24 確定）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">✅ 確定済み仕様</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>タブ構成：人材CSV / 案件CSV の2タブのみ（操作ログタブなし・確定）</li>
+          <li>インポート方式：システムIDあり→上書き更新 / IDなし→新規追加</li>
+          <li>対応形式：.csv（UTF-8 / BOM付き）・最大5MB・CRLF・LF両対応</li>
+          <li>エクスポート：0件時はヘッダー行のみCSVを出力（初期投入テンプレートとして利用可）</li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#c00;margin-bottom:4px;">⛔ OUTスコープ（本画面に含まない）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li style="color:#c00;font-weight:700;">操作ログ記録・表示（QA #21/#55/#56/#57/#58 確定）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト設計メモ</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>インポート実行後のフィードバックUI（成功件数・エラー行の表示）は詳細設計フェーズで定義</li>
+          <li>エクスポートCSVのカラム定義はDB設計フェーズで確定予定</li>
+          <li>管理者権限のみ実行可能とするか、一般ユーザーにも解放するかは権限ロール確定後に判断</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!--
+  WF_11_CSV入出力.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #21/#55/#56/#57/#58] 操作ログタブ非対象を正式確認・注記ボックスに明記
+  確定事項:
+    - タブ構成：人材CSV / 案件CSV の2タブのみ（操作ログなし）
+-->
+</body>
+</html>

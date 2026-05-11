@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_12_マスタ管理 v2.0 | Nexus</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+  }
+
+  .app-shell {
+    display: flex;
+    width: 1440px;
+    height: 100vh;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: hidden;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: 220px;
+    height: 100%;
+    border-right: 1.5px solid #555;
+    background: #fafafa;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
+  .sidebar-logo {
+    padding: 16px 14px 14px;
+    border-bottom: 1.5px solid #555;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
+  }
+
+  .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+  .nav-section-label {
+    font-size: 10px; color: #888; font-weight: 700;
+    padding: 10px 14px 4px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px; color: #444;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+
+  .nav-item.active {
+    background: #e8e8e8; border-left-color: #333;
+    font-weight: 700; color: #111;
+  }
+
+  .nav-item:hover:not(.active) { background: #f2f2f2; }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    border: 1.5px solid #666; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  .nav-item.active .nav-icon { border-color: #111; background: #333; color: #fff; }
+
+  .sidebar-bottom { border-top: 1.5px solid #ccc; flex-shrink: 0; }
+  .sidebar-footer { padding: 12px 14px; font-size: 11px; color: #777; border-bottom: 1px solid #e8e8e8; }
+  .nav-item.logout { color: #888; }
+  .nav-item.logout .nav-icon { border-color: #aaa; color: #aaa; }
+
+  /* ===== MAIN ===== */
+  .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .page-header {
+    padding: 16px 24px 14px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .page-title { font-size: 18px; font-weight: 700; color: #111; }
+  .page-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* ===== 上部タブバー（WF_10準拠：アンダーライン型） ===== */
+  .tab-bar {
+    display: flex; align-items: flex-end;
+    border-bottom: 2px solid #ddd;
+    padding: 0 24px;
+    background: #fff; flex-shrink: 0;
+  }
+
+  .tab-item {
+    padding: 10px 18px 8px;
+    font-size: 13px; font-weight: 600; color: #888;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+
+  .tab-item.active { color: #111; border-bottom-color: #333; }
+  .tab-item:hover:not(.active) { color: #555; }
+
+  .tab-bar-note {
+    margin-left: 16px; margin-bottom: 10px;
+    font-size: 10px; color: #bbb; align-self: center;
+  }
+
+  /* ===== トグルスイッチ ===== */
+  .toggle-wrap { display:flex; align-items:center; gap:8px; }
+  .toggle {
+    position:relative; width:36px; height:20px; flex-shrink:0;
+  }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle-slider {
+    position:absolute; cursor:pointer; inset:0;
+    background:#ccc; border-radius:20px; transition:.2s;
+  }
+  .toggle-slider::before {
+    content:""; position:absolute;
+    width:14px; height:14px; left:3px; bottom:3px;
+    background:#fff; border-radius:50%; transition:.2s;
+  }
+  .toggle input:checked + .toggle-slider { background:#333; }
+  .toggle input:checked + .toggle-slider::before { transform:translateX(16px); }
+  .toggle-label { font-size:11px; font-weight:700; color:#333; min-width:24px; }
+
+  /* ===== TBDラベル（既存WFと統一） ===== */
+  .tbd-label {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.04);
+    color: #c00; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  }
+
+  /* ===== コンテンツエリア ===== */
+  .tab-content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .tab-content { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .tab-content.active { display: flex; }
+
+  .content-header {
+    padding: 14px 24px; border-bottom: 1.5px solid #e8e8e8;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .content-title { font-size: 14px; font-weight: 700; color: #111; }
+
+  /* QA未確定バナー */
+  .qa-banner {
+    margin: 14px 24px 0; padding: 10px 14px;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.03);
+    border-radius: 3px; font-size: 11px; color: #c00; line-height: 1.7;
+    flex-shrink: 0;
+  }
+
+  /* ===== ボタン ===== */
+  .btn {
+    height: 30px; padding: 0 14px;
+    border: 1.5px solid #555; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #333; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .btn.btn-primary        { background: #333; color: #fff; border-color: #333; }
+  .btn.btn-sm             { height: 26px; padding: 0 10px; font-size: 11px; }
+  .btn.btn-edit           { border-color: #aaa; color: #666; font-weight: 400; }
+  .btn.btn-delete         { border-color: #ddd; color: #ccc; font-weight: 400; cursor: not-allowed; }
+  .btn.btn-delete-active  { border-color: #c00; color: #c00; font-weight: 400; }
+
+  .ops-group { display: flex; gap: 6px; align-items: center; }
+
+  /* ===== テーブル ===== */
+  .table-wrap { flex: 1; overflow-y: auto; padding: 16px 24px 24px; }
+
+  .master-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  .master-table th {
+    padding: 8px 12px; text-align: left;
+    font-size: 11px; font-weight: 700; color: #666;
+    background: #f5f5f5;
+    border-top: 1.5px solid #ddd; border-bottom: 1.5px solid #ddd;
+    white-space: nowrap;
+  }
+
+  .master-table td {
+    padding: 10px 12px; border-bottom: 1px solid #eee;
+    color: #333; vertical-align: middle;
+  }
+
+  .master-table tr:hover td { background: #fafafa; }
+
+  .master-table td.col-name  { font-weight: 600; }
+  .master-table td.col-cat   { width: 110px; }
+  .master-table td.col-ops   { width: 140px; white-space: nowrap; }
+  .master-table td.col-email { font-size: 11px; color: #555; }
+  .master-table td.col-role  { width: 80px; }
+  .master-table td.col-login { width: 110px; font-size: 11px; color: #888; }
+
+  /* カテゴリバッジ */
+  .cat-badge {
+    display: inline-block; padding: 2px 8px;
+    border: 1.5px solid #aaa; border-radius: 2px;
+    font-size: 10px; color: #555; white-space: nowrap;
+  }
+
+  /* ロール */
+  .role-badge {
+    display: inline-block; padding: 2px 8px;
+    border: 1.5px solid #555; border-radius: 2px;
+    font-size: 10px; font-weight: 700; color: #333;
+  }
+  .role-badge.general { border-color: #bbb; color: #888; font-weight: 400; }
+
+  /* ===== 注釈ブロック ===== */
+  .annotation-block {
+    margin-top: 16px; padding: 10px 14px;
+    background: #fafafa; border: 1px solid #eee; border-radius: 3px;
+  }
+  .annotation-title {
+    font-size: 10px; font-weight: 700; color: #bbb;
+    letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .annotation-list { display: flex; flex-direction: column; gap: 3px; }
+  .annotation-item { font-size: 10px; color: #aaa; line-height: 1.5; }
+
+  /* ===== モーダル ===== */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: #fff; border: 1.5px solid #555; border-radius: 4px;
+    width: 460px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 14px 18px; border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    background: #f7f7f7;
+  }
+  .modal-title { font-size: 14px; font-weight: 700; color: #111; }
+  .modal-close {
+    width: 24px; height: 24px; border: 1.5px solid #bbb; background: #fff;
+    font-size: 14px; font-family: inherit; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 2px; color: #666;
+  }
+
+  .modal-body { padding: 20px 18px; display: flex; flex-direction: column; gap: 16px; }
+  .form-row { display: flex; flex-direction: column; gap: 5px; }
+  .form-label {
+    font-size: 11px; font-weight: 700; color: #555;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .required-mark { font-size: 10px; color: #c00; font-weight: 700; }
+
+  .wf-input {
+    width: 100%; height: 34px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 10px; font-size: 12px; font-family: inherit;
+    color: #333; border-radius: 3px;
+  }
+  .wf-input.short { width: 100px; }
+
+  .wf-select-modal {
+    width: 100%; height: 34px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 28px 0 10px; font-size: 12px; font-family: inherit;
+    color: #333; border-radius: 3px;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    cursor: pointer;
+  }
+
+  .hint-text { font-size: 10px; color: #aaa; }
+
+  .modal-footer {
+    padding: 12px 18px; border-top: 1.5px solid #eee;
+    display: flex; justify-content: flex-end; gap: 8px;
+    background: #fafafa;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">メイン</div>
+      <div class="nav-item">
+        <span class="nav-icon">◫</span><span>ダッシュボード</span>
+      </div>
+      <div class="nav-section-label">人材</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span><span>人材一覧</span>
+      </div>
+      <div class="nav-section-label">案件</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span><span>案件一覧</span>
+      </div>
+      <div class="nav-section-label">進捗管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">⊞</span><span>パイプライン</span>
+      </div>
+      <div class="nav-section-label">管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">↓</span><span>CSV入出力</span>
+      </div>
+      <div class="nav-item active">
+        <span class="nav-icon">⚙</span><span>マスタ管理</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">田中 営業（ログイン中）</div>
+      <div class="nav-item logout">
+        <span class="nav-icon">→</span><span>ログアウト</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <!-- ページヘッダー -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">マスタ管理</div>
+        <div class="page-subtitle">システム全体で使用するマスタデータを管理します</div>
+      </div>
+    </div>
+
+    <!-- ===== タブバー（WF_10準拠：アンダーライン型） ===== -->
+    <!-- スキルタグタブ：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
+    <div class="tab-bar">
+      <div class="tab-item active" id="tab-user-btn" onclick="switchTab('user')">
+        ユーザー管理
+      </div>
+      <div class="tab-item" id="tab-form-btn" onclick="switchTab('form')">
+        フォーム設定
+      </div>
+    </div>
+
+    <!-- ===== コンテンツエリア ===== -->
+    <div class="tab-content-area">
+
+      <!-- スキルタグタブ：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
+
+      <!-- ========== タブ1：ユーザー管理 ========== -->
+      <div class="tab-content active" id="tab-user">
+
+        <div class="content-header">
+          <div class="content-title">ユーザー管理</div>
+          <button class="btn btn-primary" onclick="openUserModal()">＋ 新規追加</button>
+        </div>
+
+        <div class="table-wrap" style="padding-top:16px;">
+          <table class="master-table">
+            <thead>
+              <tr>
+                <th class="col-name">氏名</th>
+                <th class="col-email">メールアドレス（ログインID）</th>
+                <th class="col-role">ロール</th>
+                <th class="col-login">最終ログイン</th>
+                <th class="col-ops">
+                  操作
+                  <span style="font-size:9px;color:#bbb;font-weight:400;margin-left:4px;">[WF注] 管理者のみ操作可</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-name">田中 一郎</td>
+                <td class="col-email">tanaka@example.com</td>
+                <td class="col-role"><span class="role-badge">管理者</span></td>
+                <td class="col-login">2026-04-15</td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete" title="自分自身は削除不可">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">鈴木 花子</td>
+                <td class="col-email">suzuki@example.com</td>
+                <td class="col-role"><span class="role-badge general">一般</span></td>
+                <td class="col-login">2026-04-14</td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td class="col-name">佐藤 次郎</td>
+                <td class="col-email">sato@example.com</td>
+                <td class="col-role"><span class="role-badge general">一般</span></td>
+                <td class="col-login">2026-03-20</td>
+                <td class="col-ops"><div class="ops-group">
+                  <button class="btn btn-sm btn-edit">編集</button>
+                  <button class="btn btn-sm btn-delete-active">削除</button>
+                </div></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="annotation-block">
+            <div class="annotation-title">WF注釈</div>
+            <div class="annotation-list">
+              <div class="annotation-item">・ ユーザー追加・編集・削除は管理者ロールのみ実行可能（QA #16 回答済）</div>
+              <div class="annotation-item">・ ログインIDは社内メールアドレスのみ許可（QA #19 回答済）</div>
+              <div class="annotation-item">・ ロールは「管理者」「一般」の2階層（QA #17 回答済）</div>
+              <div class="annotation-item">・ ステータス列は削除。ユーザーの無効化は削除で運用（退職者の紐付けデータ保持が必要な場合はQA追加要）</div>
+              <div class="annotation-item">・ 氏名は必須登録項目（QA #68 確定）。担当営業名の画面表示に使用</div>
+              <div class="annotation-item">・ パスワードリセットは管理者が手動リセット・本人へ通知する運用（QA #20 回答済）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== タブ3：フォーム設定 ========== -->
+      <div class="tab-content" id="tab-form">
+
+        <div class="content-header">
+          <div class="content-title">フォーム設定</div>
+          <div style="font-size:11px;color:#888;">変更は即時反映されます。全ユーザーの登録フォームに適用されます</div>
+        </div>
+
+        <div class="table-wrap">
+
+          <!-- 人材登録フォーム設定 -->
+          <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:10px;">人材登録フォーム</div>
+          <table class="master-table" style="margin-bottom:28px;">
+            <thead>
+              <tr>
+                <th class="col-name">項目名</th>
+                <th style="width:140px;">必須 / 任意</th>
+                <th style="font-size:9px;color:#bbb;font-weight:400;">[WF注] 管理者のみ変更可能（QA #65確定）。トグルON=必須 / OFF=任意</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-name">氏名 / カナ</td>
+                <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
+              </tr>
+              <tr>
+                <td class="col-name">年齢（生年月日）</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">最寄駅 / 路線</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">稼働可能時期</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">経験スキル</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">経験工程</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">顧客折衝経験</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">アピールポイント</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">職務経歴ファイル</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">希望単価</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">勤務形態タグ</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">特記事項</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- 案件登録フォーム設定（QA #82: 案件側も同様の対応 4/29 確定） -->
+          <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:10px;">案件登録フォーム</div>
+          <table class="master-table" style="margin-bottom:28px;">
+            <thead>
+              <tr>
+                <th class="col-name">項目名</th>
+                <th style="width:140px;">必須 / 任意</th>
+                <th style="font-size:9px;color:#bbb;font-weight:400;">[WF注] 管理者のみ変更可能（QA #65確定）。トグルON=必須 / OFF=任意</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-name">案件名</td>
+                <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
+              </tr>
+              <tr>
+                <td class="col-name">顧客名</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">必須スキル</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">尚可スキル</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">単価（下限〜上限）</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">参画開始時期</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">稼働形態</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">勤務地</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">商流</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">面談回数</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">募集人数</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">稼働環境</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">精算幅</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">顧客折衝経験</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+                <td style="font-size:10px;color:#aaa;">選択肢：不問 / 要。マッチングスコア（5点）の判定に使用</td>
+              </tr>
+              <tr>
+                <td class="col-name">業務内容詳細</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="annotation-block">
+            <div class="annotation-title">WF注釈（v1.1更新）</div>
+            <div class="annotation-list">
+              <div class="annotation-item">・ [QA #82] 案件登録フォームも人材登録フォームと同様の必須/任意切替設定を実装（前田様 4/29 確定）</div>
+              <div class="annotation-item">・ 必須/任意の変更は管理者ロールのみ実行可能（QA #65確定）</div>
+              <div class="annotation-item">・ 変更はシステム全体に即時反映。全営業担当者の登録画面に適用される</div>
+              <div class="annotation-item">・ 「案件名」はシステム上の必須項目のため管理者も変更不可</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-content-area -->
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+
+
+<!-- ===== モーダル：ユーザー追加 ===== -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">ユーザーを追加</div>
+      <button class="modal-close" onclick="closeUserModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">氏名 <span class="required-mark">※必須</span></label>
+        <input class="wf-input" type="text" placeholder="例：田中 一郎">
+        <span class="hint-text">担当営業名として各画面に表示されます（QA #68確定）</span>
+      </div>
+      <div class="form-row">
+        <label class="form-label">メールアドレス <span class="required-mark">※必須</span></label>
+        <input class="wf-input" type="text" placeholder="例：tanaka@company.co.jp">
+        <span class="hint-text">社内メールアドレスのみ使用可。ログインIDとして使用（QA #19確定）</span>
+      </div>
+      <div class="form-row">
+        <label class="form-label">初期パスワード <span class="required-mark">※必須</span></label>
+        <input class="wf-input" type="password" placeholder="8文字以上">
+        <span class="hint-text">パスワードリセットは管理者が手動で再設定（QA #20確定）</span>
+      </div>
+      <div class="form-row">
+        <label class="form-label">ロール <span class="required-mark">※必須</span></label>
+        <select class="wf-select-modal">
+          <option value="">選択してください</option>
+          <option value="admin">管理者</option>
+          <option value="general">一般</option>
+        </select>
+        <span class="hint-text">管理者：全機能＋マスタ管理。一般：通常営業機能のみ（QA #17確定）</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeUserModal()">キャンセル</button>
+      <button class="btn btn-primary">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- スキルタグ追加モーダル：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('modal-user').addEventListener('click', function (e) {
+      if (e.target === this) closeUserModal();
+    });
+  });
+
+  // タブ切り替え（スキルタグタブ削除済み：user / form の2タブ構成）
+  function switchTab(tab) {
+    ['user','form'].forEach(function(t) {
+      document.getElementById('tab-' + t + '-btn').classList.remove('active');
+      document.getElementById('tab-' + t).classList.remove('active');
+    });
+    document.getElementById('tab-' + tab + '-btn').classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+  }
+
+  // フォーム設定：トグル切替で必須/任意ラベルを動的更新
+  document.querySelectorAll('#tab-form .toggle input:not([disabled])').forEach(function(chk) {
+    chk.addEventListener('change', function() {
+      var label = this.closest('.toggle-wrap').querySelector('.toggle-label');
+      if (this.checked) {
+        label.textContent = '必須';
+        label.style.color = '#333';
+      } else {
+        label.textContent = '任意';
+        label.style.color = '#888';
+      }
+    });
+  });
+
+  // ユーザーモーダル
+  function openUserModal()  { document.getElementById('modal-user').classList.add('open'); }
+  function closeUserModal() { document.getElementById('modal-user').classList.remove('open'); }
+</script>
+<!--
+  WF_12_マスタ管理.html
+  バージョン: v2.0
+  更新日: 2026-05-07
+  変更履歴:
+    v2.0 (2026-05-07)
+      - スキルタグタブを削除（スキルがフリーテキスト入力に変更されたため）
+      - スキルタグ追加モーダルを削除
+      - タブ構成：スキルタグ / ユーザー管理 / フォーム設定 → ユーザー管理 / フォーム設定 の2タブに変更
+      - ユーザー管理タブをデフォルト表示に変更
+      - switchTab関数からskillタブ参照を削除
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #82] フォーム設定タブに「案件登録フォーム」セクションを追加（前田様 4/29 確定）
+      - [QA #67] スキルタグ一覧から Docker / Kubernetes / Git を削除
+-->
+</body>
+</html>

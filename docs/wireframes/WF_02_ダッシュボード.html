@@ -1,0 +1,561 @@
+<!-- WF_02_ダッシュボード | Nexus | v1.1 -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_02_ダッシュボード v1.1 | Nexus</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+  }
+
+  .app-shell {
+    display: flex;
+    width: 1440px;
+    height: 100vh;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: hidden;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: 220px;
+    height: 100%;
+    border-right: 1.5px solid #555;
+    background: #fafafa;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* QA #76: ロゴ画像は提供されないため削除。システム名テキスト「Nexus」のみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
+  .sidebar-logo {
+    padding: 16px 14px 14px;
+    border-bottom: 1.5px solid #555;
+    font-size: 15px;
+    font-weight: 700;
+    color: #333;
+    letter-spacing: 0.08em;
+  }
+
+  .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+  .nav-section-label {
+    font-size: 10px; color: #888; font-weight: 700;
+    padding: 10px 14px 4px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px; color: #444;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+
+  .nav-item.active {
+    background: #e8e8e8; border-left-color: #333;
+    font-weight: 700; color: #111;
+  }
+
+  .nav-item:hover:not(.active) { background: #f2f2f2; }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    border: 1.5px solid #666;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  .nav-item.active .nav-icon { border-color: #111; background: #333; color: #fff; }
+
+  .nav-badge {
+    margin-left: auto;
+    background: #555; color: #fff;
+    font-size: 9px; padding: 1px 5px;
+    border-radius: 8px; font-weight: 700;
+  }
+
+  .sidebar-bottom { border-top: 1.5px solid #ccc; flex-shrink: 0; }
+
+  .sidebar-footer {
+    padding: 12px 14px;
+    font-size: 11px; color: #777;
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  .nav-item.logout { color: #888; }
+  .nav-item.logout .nav-icon { border-color: #aaa; color: #aaa; }
+
+  /* ===== MAIN ===== */
+  .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .page-header {
+    padding: 18px 24px 14px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .page-title { font-size: 18px; font-weight: 700; color: #111; }
+  .page-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* ===== DASHBOARD BODY ===== */
+  .dashboard-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    background: #f7f7f7;
+  }
+
+  /* ===== BUTTONS ===== */
+  .btn {
+    height: 32px; padding: 0 14px;
+    border: 1.5px solid #555; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #333; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .btn.btn-primary { background: #333; color: #fff; border-color: #333; }
+  .btn.btn-ghost   { border-color: #bbb; color: #666; font-weight: 400; }
+  .btn.btn-sm { height: 28px; font-size: 11px; padding: 0 10px; }
+
+  /* ===== TBD ===== */
+  .tbd-label {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.04);
+    color: #c00; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  }
+
+  /* ===== SECTION ===== */
+  .section {
+    background: #fff;
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-size: 14px; font-weight: 700; color: #111;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ===== KPI ===== */
+  .kpi-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .kpi-card {
+    flex: 1;
+    background: #fff;
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    padding: 20px 24px;
+  }
+
+  .kpi-label {
+    display: block;
+    font-size: 12px; color: #666;
+    margin-bottom: 10px;
+  }
+
+  .kpi-value {
+    display: block;
+    font-size: 32px; font-weight: 700; color: #111;
+    margin-bottom: 6px;
+    line-height: 1;
+  }
+
+  .kpi-sub {
+    display: block;
+    font-size: 11px; color: #aaa;
+  }
+
+  /* ===== PIPELINE TABLE ===== */
+  .pipeline-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: fixed;
+  }
+
+  .pipeline-table colgroup col:nth-child(1) { width: auto; }
+  .pipeline-table colgroup col:nth-child(2) { width: 56px; }
+  .pipeline-table colgroup col:nth-child(3) { width: 160px; }
+
+  .pipeline-table th {
+    text-align: left;
+    font-size: 11px; font-weight: 700; color: #888;
+    padding: 6px 8px 6px 0;
+    border-bottom: 1.5px solid #ddd;
+    white-space: nowrap;
+  }
+
+  .pipeline-table th.num { text-align: right; }
+  .pipeline-table th.pct { text-align: right; }
+
+  .pipeline-table td {
+    padding: 6px 8px 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+    color: #333;
+    vertical-align: middle;
+  }
+
+  .pipeline-table td.num {
+    text-align: right;
+    font-weight: 700;
+    color: #111;
+  }
+
+  .pipeline-table td.pct {
+    text-align: right;
+    color: #888;
+  }
+
+  .pct-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .pct-bar-wrap {
+    width: 80px;
+    height: 6px;
+    background: #eee;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .pct-bar-fill {
+    height: 100%;
+    background: #555;
+    border-radius: 2px;
+  }
+
+  .pct-label {
+    font-size: 11px;
+    color: #888;
+    width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .pipeline-table tr:last-child td { border-bottom: none; }
+  .pipeline-table tr:hover td { background: #fafafa; }
+  .pipeline-table tr.zero td { color: #bbb; }
+  .pipeline-table tr.zero td.num { color: #bbb; font-weight: 400; }
+
+  /* ===== ACTION LIST ===== */
+  .action-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .action-row:last-child { border-bottom: none; }
+
+  .action-date {
+    font-size: 12px; color: #666;
+    width: 90px; flex-shrink: 0;
+  }
+
+  .action-label {
+    flex: 1;
+    font-size: 12px; color: #111;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-dot {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; color: #555;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .status-dot::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #555;
+    flex-shrink: 0;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">メイン</div>
+      <div class="nav-item active">
+        <span class="nav-icon">◫</span>
+        <span>ダッシュボード</span>
+      </div>
+
+      <div class="nav-section-label">人材</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span>
+        <span>人材一覧</span>
+      </div>
+
+      <div class="nav-section-label">案件</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span>
+        <span>案件一覧</span>
+      </div>
+
+      <div class="nav-section-label">進捗管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">⊞</span>
+        <span>パイプライン</span>
+      </div>
+
+      <div class="nav-section-label">管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">↓</span>
+        <span>CSV入出力</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">⚙</span>
+        <span>マスタ管理</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">
+        山田 花子（ログイン中）
+      </div>
+      <div class="nav-item logout">
+        <span class="nav-icon">→</span>
+        <span>ログアウト</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">ダッシュボード</div>
+        <div class="page-subtitle">担当案件・パイプラインの概況確認（メイン・サブ担当含む）</div>
+      </div>
+    </div>
+
+    <!-- ===== DASHBOARD BODY ===== -->
+    <div class="dashboard-body">
+
+      <!-- ① KPI サマリーバー -->
+      <div class="kpi-bar">
+
+        <div class="kpi-card">
+          <span class="kpi-label">提案可能人材</span>
+          <span class="kpi-value">12</span>
+          <span class="kpi-sub">ステータス「提案可」の人数</span>
+          <span class="kpi-sub" style="margin-top:6px; color:#555;">担当 4名（メイン・サブ含む）</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">稼働中案件</span>
+          <span class="kpi-value">8</span>
+          <span class="kpi-sub">ステータス「募集中」の案件数</span>
+          <span class="kpi-sub" style="margin-top:6px; color:#555;">担当 3件（メイン・サブ含む）</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">進行中カード総数</span>
+          <span class="kpi-value">18</span>
+          <span class="kpi-sub">担当パイプライン進行中件数（メイン・サブ含む）</span>
+        </div>
+
+      </div>
+
+      <!-- ② ③ 横並びレイアウト -->
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+
+      <!-- ② ③ 横並びレイアウト -->
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+
+      <!-- ② パイプライン進捗サマリー -->
+      <div class="section" style="flex:6;">
+        <div class="section-header">
+          <div class="section-title">
+            パイプライン進捗
+            <!-- QA #70 / #70-1 確定（4/24）: 集計軸＝メイン・サブ担当を含む自分の担当カードのみ -->
+            <span style="font-size:11px;color:#888;font-weight:400;margin-left:4px;">自分担当（メイン・サブ含む）</span>
+          </div>
+        </div>
+
+        <!-- 各ステータスの業務的意味は ※仕様QA #62 参照・未確定 -->
+        <!-- QA #62 未着手のため、ステータス名・件数はすべてサンプル値。TBDを維持 -->
+        <table class="pipeline-table">
+          <colgroup>
+            <col><col style="width:56px;"><col style="width:160px;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>ステータス</th>
+              <th class="num">件数</th>
+              <th class="num">割合</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>上位提案 <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">14</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:100%;"></div></div><span class="pct-label">30%</span></div></td>
+            </tr>
+            <tr>
+              <td>求職者応募済み <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">9</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:63%;"></div></div><span class="pct-label">19%</span></div></td>
+            </tr>
+            <tr>
+              <td>応募中 <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">7</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:50%;"></div></div><span class="pct-label">15%</span></div></td>
+            </tr>
+            <tr>
+              <td>一次調整中 <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">5</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:37%;"></div></div><span class="pct-label">11%</span></div></td>
+            </tr>
+            <tr>
+              <td>一次待ち <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">4</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:30%;"></div></div><span class="pct-label">9%</span></div></td>
+            </tr>
+            <tr>
+              <td>一次結果待ち <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">3</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:21%;"></div></div><span class="pct-label">6%</span></div></td>
+            </tr>
+            <tr>
+              <td>最終調整中 <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">2</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:14%;"></div></div><span class="pct-label">4%</span></div></td>
+            </tr>
+            <tr>
+              <td>最終待ち <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">2</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:14%;"></div></div><span class="pct-label">4%</span></div></td>
+            </tr>
+            <tr>
+              <td>最終結果待ち <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">1</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:7%;"></div></div><span class="pct-label">2%</span></div></td>
+            </tr>
+            <tr>
+              <td>オファー <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">1</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:7%;"></div></div><span class="pct-label">2%</span></div></td>
+            </tr>
+            <tr>
+              <td>アサイン承諾待ち <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">1</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:7%;"></div></div><span class="pct-label">2%</span></div></td>
+            </tr>
+            <tr class="zero">
+              <td>成約 <span class="tbd-label" style="font-size:9px;padding:0 4px;">TBD</span></td>
+              <td class="num">0</td>
+              <td class="pct"><div class="pct-wrap"><div class="pct-bar-wrap"><div class="pct-bar-fill" style="width:0%;"></div></div><span class="pct-label">0%</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+
+      </div><!-- /section パイプライン -->
+
+      <!-- ③ 近日アクション予定 -->
+      <div class="section" style="flex:4;">
+        <div class="section-header">
+          <div class="section-title">近日アクション予定</div>
+          <button class="btn btn-ghost btn-sm">進捗管理を見る →</button>
+        </div>
+
+        <div class="action-row">
+          <div class="action-date">2025/05/01</div>
+          <div class="action-label">田中 太郎 × ○○社 Webシステム開発</div>
+          <div class="status-dot">一次調整中</div>
+        </div>
+
+        <div class="action-row">
+          <div class="action-date">2025/05/02</div>
+          <div class="action-label">鈴木 二郎 × △△社 基幹システム保守</div>
+          <div class="status-dot">応募中</div>
+        </div>
+
+        <div class="action-row">
+          <div class="action-date">2025/05/03</div>
+          <div class="action-label">山本 三郎 × ××社 スマホアプリ開発</div>
+          <div class="status-dot">上位提案</div>
+        </div>
+
+        <div class="action-row">
+          <div class="action-date">2025/05/05</div>
+          <div class="action-label">中村 四郎 × □□社 クラウド移行支援</div>
+          <div class="status-dot">一次待ち</div>
+        </div>
+
+        <div class="action-row">
+          <div class="action-date">2025/05/06</div>
+          <div class="action-label">小林 五郎 × ▽▽社 ECサイト改修</div>
+          <div class="status-dot">求職者応募済み</div>
+        </div>
+
+      </div><!-- /section 近日アクション -->
+
+      </div><!-- /横並びレイアウト -->
+
+    </div><!-- /dashboard-body -->
+
+  </div><!-- /main-content -->
+
+</div><!-- /app-shell -->
+
+<!--
+  WF_02_ダッシュボード.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク（.logo-mark）を削除、「Nexus」テキストのみに変更
+      - [QA #70 / #70-1] パイプライン進捗の集計軸TBDを解除。
+                          確定値：メイン・サブ担当を含む自分の担当カードのみ（前田様 4/24 確定）
+  維持TBD:
+    - 各ステータス行の業務的意味（QA #62 未着手）
+-->
+</body>
+</html>

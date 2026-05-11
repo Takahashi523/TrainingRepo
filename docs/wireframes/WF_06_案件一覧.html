@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>WF_06_案件一覧_カード型 v1.1 | Nexus</title>
+<style>
+  /* ===== 人材一覧と共通のベーススタイル ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic Pro', 'ヒラギノ角ゴ Pro', 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #111;
+
+  }
+
+  .app-shell {
+    display: flex;
+    width: 1440px;
+    height: 100vh;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: hidden;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: 220px;
+    height: 100%;
+    border-right: 1.5px solid #555;
+    background: #fafafa;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* QA #76: ロゴ画像削除。「Nexus」テキストのみ表示（4/29 確定） */
+  /* QA #77: システム名を「Nexus（ネクサス）」に統一（4/29 確定） */
+  .sidebar-logo {
+    padding: 16px 14px 14px;
+    border-bottom: 1.5px solid #555;
+    font-size: 15px; font-weight: 700;
+    color: #333; letter-spacing: 0.08em;
+  }
+
+  .sidebar-nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+  .nav-section-label {
+    font-size: 10px; color: #888; font-weight: 700;
+    padding: 10px 14px 4px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px; color: #444;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+
+  .nav-item.active {
+    background: #e8e8e8; border-left-color: #333;
+    font-weight: 700; color: #111;
+  }
+
+  .nav-item:hover:not(.active) { background: #f2f2f2; }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    border: 1.5px solid #666;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+
+  .nav-item.active .nav-icon { border-color: #111; background: #333; color: #fff; }
+
+  .nav-badge {
+    margin-left: auto;
+    background: #555; color: #fff;
+    font-size: 9px; padding: 1px 5px;
+    border-radius: 8px; font-weight: 700;
+  }
+
+  .sidebar-bottom { border-top: 1.5px solid #ccc; flex-shrink: 0; }
+
+  .sidebar-footer {
+    padding: 12px 14px;
+    font-size: 11px; color: #777;
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  .nav-item.logout { color: #888; }
+  .nav-item.logout .nav-icon { border-color: #aaa; color: #aaa; }
+
+  /* ===== MAIN ===== */
+  .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .page-header {
+    padding: 18px 24px 14px;
+    border-bottom: 1.5px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .page-title { font-size: 18px; font-weight: 700; color: #111; }
+  .page-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* ===== FILTER ===== */
+  .filter-area {
+    background: #f7f7f7;
+    border-bottom: 1.5px solid #ddd;
+    padding: 14px 24px;
+  }
+
+  .filter-row {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .filter-row + .filter-row { margin-top: 10px; }
+
+  .wf-input {
+    height: 32px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 10px; font-size: 12px; font-family: inherit;
+    color: #555; border-radius: 3px;
+  }
+  .wf-input.search-box { width: 220px; }
+  .wf-input.search-box::placeholder { color: #aaa; }
+
+  .search-wrap { position: relative; }
+  .search-icon {
+    position: absolute; left: 8px; top: 50%;
+    transform: translateY(-50%); font-size: 13px; color: #999;
+  }
+  .wf-input.with-icon { padding-left: 26px; }
+
+  .wf-select {
+    height: 32px;
+    border: 1.5px solid #999; background: #fff;
+    padding: 0 24px 0 8px; font-size: 12px; font-family: inherit;
+    color: #444; border-radius: 3px;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    cursor: pointer;
+  }
+
+  .filter-label { font-size: 11px; color: #666; font-weight: 600; white-space: nowrap; }
+
+  .wf-checkbox {
+    width: 14px; height: 14px;
+    border: 1.5px solid #888; background: #fff;
+    display: inline-block; flex-shrink: 0;
+  }
+
+  /* QA #86: テーブルビュー切替は廃止。カード形式のみ確定（4/29 確定） */
+
+  .btn {
+    height: 32px; padding: 0 14px;
+    border: 1.5px solid #555; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #333; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .btn.btn-primary { background: #333; color: #fff; border-color: #333; }
+  .btn.btn-ghost   { border-color: #bbb; color: #666; font-weight: 400; }
+
+  .tbd-label {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1.5px solid #c00; background: rgba(204,0,0,0.04);
+    color: #c00; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  }
+
+  .filter-sep { width: 1px; height: 24px; background: #ccc; flex-shrink: 0; }
+
+  .should-badge {
+    display: inline-block;
+    border: 1px dashed #888; color: #888;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 4px; border-radius: 2px;
+    margin-left: 4px; vertical-align: middle;
+  }
+
+  /* ===== MULTI-SELECT DROPDOWN ===== */
+  .ms-wrap { position: relative; display: inline-block; }
+
+  .ms-btn {
+    height: 32px; padding: 0 10px;
+    border: 1.5px solid #999; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #444; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 5px;
+    white-space: nowrap;
+  }
+
+  .ms-wrap.open .ms-btn { border-color: #333; background: #f5f5f5; }
+
+  .ms-badge {
+    display: none;
+    background: #333; color: #fff;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 5px; border-radius: 8px;
+  }
+  .ms-badge.visible { display: inline-block; }
+
+  .ms-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px); left: 0;
+    min-width: 160px;
+    background: #fff;
+    border: 1.5px solid #999;
+    border-radius: 4px;
+    padding: 6px 0;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+
+  .ms-wrap.open .ms-panel { display: block; }
+
+  .ms-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    font-size: 12px; color: #333; cursor: pointer;
+  }
+  .ms-item:hover { background: #f5f5f5; }
+
+  .ms-group-label {
+    font-size: 10px; font-weight: 700; color: #999;
+    padding: 8px 12px 3px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    border-top: 1px solid #eee; margin-top: 2px;
+  }
+  .ms-group-label:first-child { border-top: none; margin-top: 0; }
+
+  .tbd-inline {
+    font-size: 9px; color: #c00; font-weight: 700;
+    border: 1px solid #c00; padding: 0 3px; border-radius: 2px;
+  }
+
+  .active-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px;
+    border: 1.5px solid #555; border-radius: 20px;
+    font-size: 11px; color: #333; background: #eee;
+    white-space: nowrap;
+  }
+
+  /* ===== CARD GRID ===== */
+  .card-area {
+    flex: 1; overflow-y: auto;
+    padding: 16px 24px; background: #f5f5f5;
+  }
+
+  .result-meta {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .result-count { font-size: 12px; color: #555; }
+  .result-count strong { color: #111; font-size: 14px; }
+
+  /* ===== 案件カード ===== */
+  .project-card {
+    background: #fff;
+    border: 1.5px solid #bbb; border-radius: 6px;
+    margin-bottom: 16px; overflow: hidden;
+  }
+
+  .card-inner { display: flex; align-items: stretch; }
+
+  .card-accent { width: 6px; background: #ccc; flex-shrink: 0; }
+
+  .card-body {
+    flex: 1; padding: 14px 16px; min-width: 0;
+  }
+
+  .card-top-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .project-name { font-size: 16px; font-weight: 700; color: #111; }
+  .project-meta { font-size: 11px; color: #777; margin-top: 2px; }
+
+  .card-badges {
+    display: flex; gap: 6px; align-items: flex-start;
+    flex-wrap: wrap; margin-left: auto; flex-shrink: 0;
+  }
+
+  .status-badge {
+    padding: 3px 8px;
+    border: 1.5px solid #555; border-radius: 20px;
+    font-size: 11px; font-weight: 700; color: #333;
+    white-space: nowrap;
+  }
+
+  .interview-badge {
+    padding: 3px 8px;
+    border: 1.5px solid #888; border-radius: 20px;
+    font-size: 11px; color: #555; background: #f9f9f9;
+    white-space: nowrap;
+  }
+
+  .recruit-badge {
+    padding: 3px 8px;
+    border: 1.5px solid #888; border-radius: 4px;
+    font-size: 11px; color: #555; background: #f9f9f9;
+    white-space: nowrap;
+  }
+
+  .card-divider { height: 1px; background: #e8e8e8; margin: 8px 0; }
+
+  .section-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-bottom: 8px; flex-wrap: wrap;
+  }
+
+  .section-label {
+    font-size: 10px; font-weight: 700; color: #888;
+    flex-shrink: 0; padding-top: 3px;
+    white-space: nowrap; min-width: 60px;
+  }
+
+  .tag-list { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+  .wf-tag {
+    padding: 2px 8px;
+    border: 1.5px solid #888; border-radius: 2px;
+    font-size: 11px; color: #333; background: #fff; white-space: nowrap;
+  }
+
+  /* 必須スキル：実線 / 尚可スキル：点線 */
+  .wf-tag.optional { border-style: dashed; color: #777; }
+  .wf-tag.remote-tag { border-style: dashed; color: #555; }
+
+  /* 単価 */
+  .rate-display {
+    font-size: 13px; font-weight: 700; color: #333;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .rate-unit { font-size: 11px; font-weight: 400; color: #777; }
+
+  /* 稼働開始バッジ */
+  .timing-badge {
+    padding: 3px 8px;
+    border: 1.5px dashed #888; border-radius: 20px;
+    font-size: 11px; color: #555; background: #f9f9f9;
+    white-space: nowrap;
+  }
+
+  /* ===== CARD ACTIONS ===== */
+  .card-actions {
+    width: 140px; flex-shrink: 0;
+    border-left: 1.5px solid #e0e0e0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    padding: 14px; background: #fafafa;
+  }
+
+  .btn-detail {
+    width: 100%; height: 34px;
+    border: 1.5px solid #333; background: #fff;
+    font-size: 12px; font-weight: 700; font-family: inherit; color: #333;
+    cursor: pointer; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .btn-matching {
+    width: 100%; height: 30px;
+    border: 1.5px solid #bbb; background: #fff;
+    font-size: 11px; font-weight: 600; font-family: inherit; color: #666;
+    cursor: pointer; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .card-updated { font-size: 10px; color: #aaa; text-align: center; }
+
+  /* ===== PAGINATION ===== */
+  .pagination {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 0; justify-content: center;
+  }
+
+  .page-btn {
+    width: 30px; height: 30px;
+    border: 1.5px solid #ccc; background: #fff;
+    font-size: 12px; font-family: inherit; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 2px;
+  }
+  .page-btn.active { background: #333; color: #fff; border-color: #333; font-weight: 700; }
+  .page-btn.ellipsis { border: none; background: none; cursor: default; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR（人材一覧と共通） ===== -->
+  <aside class="sidebar">
+    <!-- QA #76/#77: ロゴ削除・システム名「Nexus」テキストのみ表示 -->
+    <div class="sidebar-logo">Nexus</div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">メイン</div>
+      <div class="nav-item">
+        <span class="nav-icon">◫</span>
+        <span>ダッシュボード</span>
+      </div>
+
+      <div class="nav-section-label">人材</div>
+      <div class="nav-item">
+        <span class="nav-icon">≡</span>
+        <span>人材一覧</span>
+      </div>
+
+      <div class="nav-section-label">案件</div>
+      <div class="nav-item active">
+        <span class="nav-icon">≡</span>
+        <span>案件一覧</span>
+        <span class="nav-badge">32</span>
+      </div>
+
+      <div class="nav-section-label">進捗管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">⊞</span>
+        <span>パイプライン</span>
+      </div>
+
+      <div class="nav-section-label">管理</div>
+      <div class="nav-item">
+        <span class="nav-icon">↓</span>
+        <span>CSV入出力</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">⚙</span>
+        <span>マスタ管理</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">
+        田中 営業（ログイン中）<br>
+        
+      </div>
+      <div class="nav-item logout">
+        <span class="nav-icon">→</span>
+        <span>ログアウト</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">案件一覧</div>
+        <div style="font-size:10px;color:#888;margin-top:1px;">※ページヘッダーはstickyで常時固定表示（スクロール時もボタンが見える）</div>
+        <div class="page-subtitle">登録案件の検索・絞り込みと詳細確認</div>
+      </div>
+      <div>
+        <button class="btn btn-primary">＋ 新規案件登録（→画面7）</button>
+      </div>
+    </div>
+
+    <!-- ===== FILTER AREA ===== -->
+    <div class="filter-area">
+
+      <!-- Row 1：マルチセレクト -->
+      <div class="filter-row">
+        <!-- フリーワード -->
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="wf-input search-box with-icon" type="text" placeholder="案件名・スキルキーワードで検索">
+        </div>
+
+        <div class="filter-sep"></div>
+
+        <!-- ステータス（QA #79: 募集中 / 終了 / ペンディング の3種に確定 4/29） -->
+        <div class="ms-wrap" id="ms-status">
+          <button class="ms-btn" onclick="toggleMs('ms-status')">
+            ステータス <span class="ms-badge" id="badge-status"></span> ▾
+          </button>
+          <div class="ms-panel">
+            <label class="ms-item"><span class="wf-checkbox"></span> 募集中</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 終了</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> ペンディング</label>
+          </div>
+        </div>
+
+        <!-- 必須スキルプルダウン検索：スキルがフリーテキスト入力に変更されたため削除（仕様変更） -->
+
+        <!-- 勤務形態 -->
+        <div class="ms-wrap" id="ms-work">
+          <button class="ms-btn" onclick="toggleMs('ms-work')">
+            勤務形態 <span class="ms-badge" id="badge-work"></span> ▾
+          </button>
+          <div class="ms-panel">
+            <label class="ms-item"><span class="wf-checkbox"></span> 常駐</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 一部リモート可</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> フルリモート</label>
+          </div>
+        </div>
+
+        <!-- 商流（QA #80: プライム / 2次 / 3次 / その他 の4種に確定 4/29） -->
+        <div class="ms-wrap" id="ms-channel">
+          <button class="ms-btn" onclick="toggleMs('ms-channel')">
+            商流 <span class="ms-badge" id="badge-channel"></span> ▾
+          </button>
+          <div class="ms-panel">
+            <label class="ms-item"><span class="wf-checkbox"></span> プライム</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 2次</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 3次</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> その他</label>
+          </div>
+        </div>
+
+        <!-- 面談回数 -->
+        <div class="ms-wrap" id="ms-interview">
+          <button class="ms-btn" onclick="toggleMs('ms-interview')">
+            面談回数 <span class="ms-badge" id="badge-interview"></span> ▾
+          </button>
+          <div class="ms-panel">
+            <label class="ms-item"><span class="wf-checkbox"></span> 1回</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 2回</label>
+            <label class="ms-item"><span class="wf-checkbox"></span> 3回以上</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2：アクション行 -->
+      <div class="filter-row" style="margin-top:8px;">
+        <span style="font-size:11px;color:#aaa;">絞り込み条件：</span>
+        <span class="active-tag">Java <span style="cursor:pointer;">✕</span></span>
+        <span class="active-tag">募集中 <span style="cursor:pointer;">✕</span></span>
+        <span class="active-tag">フルリモート <span style="cursor:pointer;">✕</span></span>
+        <button class="btn btn-ghost" style="margin-left:4px;">✕ すべてクリア</button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <span class="filter-label">保存済み条件</span>
+          <select class="wf-select" style="width:175px;">
+            <option value="">条件を選択して呼び出す</option>
+            <option>Java × 募集中 × フルリモート</option>
+            <option>Python × エンド直</option>
+            <option>C# × 1次請け × 常駐</option>
+          </select>
+          <button class="btn">☆ 条件を保存 <span class="should-badge">Should</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CARD GRID ===== -->
+    <div class="card-area">
+
+      <!-- 件数 + ソート + ビュー切替 -->
+      <div class="result-meta">
+        <div class="result-count"><strong>32</strong> 件の案件が見つかりました</div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+          <span class="filter-label">ソート</span>
+          <!-- QA #85: デフォルトソートは「登録日が新しい順」に確定（4/29 確定） -->
+          <select class="wf-select">
+            <option>登録日順（新しい順）</option>
+            <option>登録日順（古い順）</option>
+            <option>稼働開始時期順</option>
+            <option>単価順（高い順）</option>
+            <option>単価順（低い順）</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ===== CARD 1：募集中 ===== -->
+      <div class="project-card">
+        <div class="card-inner">
+          <div class="card-accent"></div>
+          <div class="card-body">
+            <div class="card-top-row">
+              <div>
+                <div class="project-name">大手金融系 勘定系システム リプレース開発</div>
+                <div class="project-meta">クライアント：○○銀行　｜　商流：プライム　｜　担当：田中　/　サブ：鈴木
+                </div>
+              </div>
+              <div class="card-badges">
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                  <!-- QA #79: ステータス確定・TBD解除 -->
+                  <span class="status-badge">募集中</span>
+                </div>
+                <span class="interview-badge">面談 1回</span>
+                <span class="recruit-badge">👤 2名</span>
+              </div>
+            </div>
+
+            <div class="card-divider"></div>
+
+            <!-- 必須スキル -->
+            <div class="section-row">
+              <span class="section-label">必須スキル</span>
+              <div class="tag-list">
+                <span class="wf-tag">Java</span>
+                <span class="wf-tag">Spring Boot</span>
+                <span class="wf-tag">Oracle DB</span>
+                <span class="wf-tag">SQL</span>
+              </div>
+              <span style="font-size:10px;color:#999;padding-top:3px;">尚可→</span>
+              <div class="tag-list">
+                <span class="wf-tag optional">AWS</span>
+                <span class="wf-tag optional">Docker</span>
+              </div>
+            </div>
+
+            <!-- 単価 + 稼働開始 + 勤務形態 -->
+            <div class="section-row">
+              <span class="section-label">単価</span>
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <div class="rate-display">
+                  60<span class="rate-unit">万円</span>〜 80<span class="rate-unit">万円</span>
+                </div>
+              </div>
+              <div class="filter-sep" style="margin: 0 6px;"></div>
+              <span class="section-label">稼働開始</span>
+              <span class="timing-badge">⏱ 2026/05/01〜</span>
+              <div class="filter-sep" style="margin: 0 6px;"></div>
+              <span class="section-label">勤務形態</span>
+              <div class="tag-list">
+                <span class="wf-tag remote-tag">一部リモート可</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn-detail">詳細を見る →<br><span style="font-size:9px;font-weight:400;">（→画面8）</span></button>
+            <div class="card-updated">更新：2025-01-15</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== CARD 2：募集中 ===== -->
+      <div class="project-card">
+        <div class="card-inner">
+          <div class="card-accent"></div>
+          <div class="card-body">
+            <div class="card-top-row">
+              <div>
+                <div class="project-name">ECサイト フロントエンド刷新プロジェクト</div>
+                <div class="project-meta">クライアント：○○通販　｜　商流：プライム　｜　担当：鈴木　/　サブ：田中
+                </div>
+              </div>
+              <div class="card-badges">
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                  <!-- QA #79: ステータス確定・TBD解除 -->
+                  <span class="status-badge">募集中</span>
+                </div>
+                <span class="interview-badge">面談 2回</span>
+                <span class="recruit-badge">👤 1名</span>
+              </div>
+            </div>
+
+            <div class="card-divider"></div>
+
+            <div class="section-row">
+              <span class="section-label">必須スキル</span>
+              <div class="tag-list">
+                <span class="wf-tag">React</span>
+                <span class="wf-tag">TypeScript</span>
+                <span class="wf-tag">Next.js</span>
+              </div>
+              <span style="font-size:10px;color:#999;padding-top:3px;">尚可→</span>
+              <div class="tag-list">
+                <span class="wf-tag optional">GraphQL</span>
+                <span class="wf-tag optional">Figmaデザイン読解</span>
+              </div>
+            </div>
+
+            <div class="section-row">
+              <span class="section-label">単価</span>
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <div class="rate-display">
+                  65<span class="rate-unit">万円</span>〜 75<span class="rate-unit">万円</span>
+                </div>
+              </div>
+              <div class="filter-sep" style="margin: 0 6px;"></div>
+              <span class="section-label">稼働開始</span>
+              <span class="timing-badge">⏱ 2026/06/01〜</span>
+              <div class="filter-sep" style="margin: 0 6px;"></div>
+              <span class="section-label">勤務形態</span>
+              <div class="tag-list">
+                <span class="wf-tag remote-tag">フルリモート</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn-detail">詳細を見る →<br><span style="font-size:9px;font-weight:400;">（→画面8）</span></button>
+            <div class="card-updated">更新：2025-01-13</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== CARD 3：選考中 ===== -->
+      <div class="project-card">
+        <div class="card-inner">
+          <div class="card-accent"></div>
+          <div class="card-body">
+            <div class="card-top-row">
+              <div>
+                <div class="project-name">製造業 生産管理システム 新規構築</div>
+                <div class="project-meta">クライアント：○○製作所　｜　商流：2次　｜　担当：田中　/　サブ：佐藤
+                </div>
+              </div>
+              <div class="card-badges">
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                  <!-- QA #79: 「選考中」→「ペンディング」に変更・TBD解除 -->
+                  <span class="status-badge">ペンディング</span>
+                </div>
+                <span class="interview-badge">面談 2回</span>
+                <span class="recruit-badge">👤 3名</span>
+              </div>
+            </div>
+
+            <div class="card-divider"></div>
+
+            <div class="section-row">
+              <span class="section-label">必須スキル</span>
+              <div class="tag-list">
+                <span class="wf-tag">C#</span>
+                <span class="wf-tag">.NET</span>
+                <span class="wf-tag">SQL Server</span>
+                <span class="wf-tag">Azure</span>
+              </div>
+              <span style="font-size:10px;color:#999;padding-top:3px;">尚可→</span>
+              <div class="tag-list">
+                <span class="wf-tag optional">Vue.js</span>
+              </div>
+            </div>
+
+            <div class="section-row">
+              <span class="section-label">単価</span>
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <div class="rate-display">
+                  非公開
+                </div>
+              </div>
+              <div class="filter-sep" style="margin: 0 6px;"></div>
+              <span class="section-label">稼働開始</span>
+              <span class="timing-badge">⏱ 2026/07/01〜</span>
+              <div class="filter-sep" style="margin: 0 6px;"></div>
+              <span class="section-label">勤務形態</span>
+              <div class="tag-list">
+                <span class="wf-tag remote-tag">常駐</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn-detail">詳細を見る →<br><span style="font-size:9px;font-weight:400;">（→画面8）</span></button>
+            <div class="card-updated">更新：2025-01-10</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== CARD 4：充足済（opacity低め） ===== -->
+      <div class="project-card" style="opacity:0.65;">
+        <div class="card-inner">
+          <div class="card-accent" style="background:#aaa;"></div>
+          <div class="card-body">
+            <div class="card-top-row">
+              <div>
+                <div class="project-name">社内基幹システム 保守運用</div>
+                <div class="project-meta">クライアント：○○商事　｜　商流：プライム　｜　担当：佐藤　/　サブ：未割当
+                </div>
+              </div>
+              <div class="card-badges">
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                  <!-- QA #79: 「充足済」→「終了」に変更・TBD解除 -->
+                  <span class="status-badge" style="border-style:dashed;color:#888;">終了</span>
+                </div>
+                <span class="interview-badge">面談 1回</span>
+                <span class="recruit-badge" style="color:#aaa;">👤 0名</span>
+              </div>
+            </div>
+
+            <div class="card-divider"></div>
+
+            <div class="section-row">
+              <span class="section-label">必須スキル</span>
+              <div class="tag-list">
+                <span class="wf-tag">PHP</span>
+                <span class="wf-tag">Laravel</span>
+                <span class="wf-tag">MySQL</span>
+              </div>
+            </div>
+
+            <div class="section-row">
+              <span class="section-label">単価</span>
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <div class="rate-display">
+                  50<span class="rate-unit">万円</span>〜 60<span class="rate-unit">万円</span>
+                </div>
+              </div>
+              <div class="filter-sep" style="margin: 0 6px;"></div>
+              <span class="section-label">稼働開始</span>
+              <span class="timing-badge">⏱ 未定</span>
+              <div class="filter-sep" style="margin: 0 6px;"></div>
+              <span class="section-label">勤務形態</span>
+              <div class="tag-list">
+                <span class="wf-tag remote-tag">一部リモート可</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn-detail">詳細を見る →<br><span style="font-size:9px;font-weight:400;">（→画面8）</span></button>
+            <div class="card-updated">更新：2024-12-28</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <button class="page-btn">‹</button>
+        <button class="page-btn active">1</button>
+        <button class="page-btn">2</button>
+        <button class="page-btn">3</button>
+        <button class="page-btn ellipsis">…</button>
+        <button class="page-btn">7</button>
+        <button class="page-btn">›</button>
+        <span style="font-size:11px;color:#888;margin-left:8px;">1〜4件 / 全32件</span>
+      </div>
+
+    </div><!-- /card-area -->
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+
+<!-- ===== ANNOTATION ===== -->
+<div style="width:1440px;margin:24px auto 0;padding:0 24px 40px;">
+  <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_06_案件一覧_カード型（v2.0）</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v2.0 変更点（仕様変更適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>必須スキルプルダウン検索を削除（スキルがフリーテキスト入力に変更されたため）</li>
+          <li>カードのスキルタグはフリーテキスト入力のラベル（最大15文字）で表示</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>[QA #77] システム名を「Nexus」に統一</li>
+          <li>[QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示</li>
+          <li>[QA #79] 案件ステータスを3種に確定（募集中 / 終了 / ペンディング）・全カードTBD解除</li>
+          <li>[QA #80] 商流選択肢を4種に確定（プライム / 2次 / 3次 / その他）・全カードサンプルデータ修正</li>
+          <li>[QA #86] テーブルビュー切替ボタン削除・カード形式のみ確定</li>
+          <li>[QA #85] ソートデフォルトを「登録日順（新しい順）」に変更</li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様（変更なし）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>単価：非公開フラグなし（確定済み）</li>
+          <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
+          <li>スキル：フリーテキスト入力（マスタ選択廃止）。最大15文字のラベル</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト判断・人材一覧との差分</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>スキルタグを必須（実線）と尚可（点線）で視覚的に区別（フリーテキストラベルで表示）</li>
+          <li>単価・稼働開始・勤務形態を1行にまとめて横並び配置</li>
+          <li>終了カードはopacity低め＋アクション非活性で表示</li>
+          <li>ソートに「単価順（高い順／低い順）」を追加</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!--
+  WF_06_案件一覧.html
+  バージョン: v1.1
+  更新日: 2026-04-30
+  変更履歴:
+    v1.1 (2026-04-30)
+      - [QA #77] システム名を「Nexus（ネクサス）」に統一
+      - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
+      - [QA #79] 案件ステータス確定・全カードTBD解除（募集中/終了/ペンディングの3種）
+      - [QA #80] 商流選択肢確定（プライム/2次/3次/その他）・サンプルデータ修正
+      - [QA #86] テーブルビュー切替ボタン削除
+      - [QA #85] ソートデフォルトを「登録日順」に変更
+      - [QA #67] 必須スキルフィルタから「Docker」除外
+-->
+
+<script>
+function toggleMs(id) {
+  var wrap = document.getElementById(id);
+  var isOpen = wrap.classList.contains('open');
+  document.querySelectorAll('.ms-wrap').forEach(function(w){ w.classList.remove('open'); });
+  if (!isOpen) wrap.classList.add('open');
+}
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.ms-wrap')) {
+    document.querySelectorAll('.ms-wrap').forEach(function(w){ w.classList.remove('open'); });
+  }
+});
+</script>
+</body>
+</html>
