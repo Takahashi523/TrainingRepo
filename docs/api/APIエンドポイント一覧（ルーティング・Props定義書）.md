@@ -22,6 +22,7 @@
 | クエリパラメータ | GETリクエスト時にURLに付与してサーバーへ送るデータ（検索条件・ページング・ソート情報） |
 | Props | GETリクエスト時にControllerからReactコンポーネントへ渡すデータ |
 | 送信データ | POST/PUTリクエスト時にフロントから送るデータ |
+| ルート定義順 | Laravelのルーティング定義順を表す。静的ルート（create等）は動的ルート（{id}）より前に定義する |
 
 
 ## 詳細ブロックの構成ルール
@@ -43,15 +44,15 @@
 
 ## 2. 人材管理（Engineer）
 
-| # | メソッド | URL | Controller#Action | Props（GET時） | 送信データ |
-|---|---------|-----|------------------|--------------|-----------|
-| 1 | GET | /engineers | EngineerController@index | engineers, filters, skillTags, savedFilters | - |
-| 2 | GET | /engineers/{id} | EngineerController@show | engineer | - |
-| 3 | GET | /engineers/create | EngineerController@create | skillTags, phases, work_types, statuses, users | - |
-| 4 | POST | /engineers | EngineerController@store | - | 下記参照 |
-| 5 | GET | /engineers/{id}/edit | EngineerController@edit | engineer, skillTags, phases, work_types, statuses, users | - |
-| 6 | PUT | /engineers/{id} | EngineerController@update | - | 下記参照 |
-| 7 | DELETE | /engineers/{id} | EngineerController@destroy | - | - |
+| # | メソッド | URL | Controller#Action | アクセス可能ロール | Props（GET時） | 送信データ |
+|---|---|---|---|---|---|---|
+| 1 | GET | /engineers | EngineerController@index | 管理者 / 一般営業 | engineers, filters, skillTags, savedFilters | - |
+| 2 | GET | /engineers/create | EngineerController@create | 管理者 / 一般営業 | skillTags, phases, work_types, statuses, users | - |
+| 3 | POST | /engineers | EngineerController@store | 管理者 / 一般営業 | - | 下記参照 |
+| 4 | GET | /engineers/{id} | EngineerController@show | 管理者 / 一般営業 | engineer | - |
+| 5 | GET | /engineers/{id}/edit | EngineerController@edit | 管理者 / 一般営業 | engineer, skillTags, phases, work_types, statuses, users | - |
+| 6 | PUT | /engineers/{id} | EngineerController@update | 管理者 / 一般営業 | - | 下記参照 |
+| 7 | DELETE | /engineers/{id} | EngineerController@destroy | 管理者 / 一般営業 | - | - |
 
 > **削除ルール（QA #37確定）**：管理者は物理削除可。一般営業はステータス変更で対応し、データは残す。
 
@@ -102,6 +103,7 @@
 | engineers.data[].work_types[].name | string | 表示名 |
 | engineers.data[].updated_at | datetime（ISO8601） | 最終更新日 |
 | engineers.meta.current_page | int | 現在ページ番号 |
+| engineers.meta.last_page | int | 最終ページ番号 |
 | engineers.meta.per_page | int | 1ページあたり件数 |
 | engineers.meta.total | int | 全件数 |
 | engineers.meta.from | int | 現在ページの開始位置 |
@@ -114,20 +116,44 @@
 | filters.keyword | string | フリーワード検索（名前・スキルなど） |
 | filters.sort | string | ソート |
 | filters.order | string | 並び順 |
+| filters.per_page | int | 1ページあたり件数 |
 | skillTags[] | array | スキルタグ一覧（検索フォームの選択肢として使用するマスタデータ） |
 | skillTags[].id | int | スキルID |
 | skillTags[].name | string | スキル名 |
 | skillTags[].category | string | カテゴリ名 |
 | savedFilters[].id | int | 保存条件ID |
 | savedFilters[].label | string | 表示名 |
-| savedFilters[].conditions | object | 検索条件（filtersと同構造） |
+| savedFilters[].conditions | object | 保存済み検索条件（filtersと同構造） |
 | savedFilters[].conditions.status_ids | int[] | ステータス |
 | savedFilters[].conditions.skill_ids | int[] | スキル |
 | savedFilters[].conditions.work_types | string[] | 勤務形態 |
 | savedFilters[].conditions.phases | string[] | 工程 |
 | savedFilters[].conditions.keyword | string | フリーワード検索 |
+| savedFilters[].conditions.sort | string | ソート項目 |
+| savedFilters[].conditions.order | string | 並び順 |
 
-### GET /engineers/{id}　Props（#2）
+### GET /engineers/create Props（#2）
+
+| フィールド名 | 型 | 説明 |
+| ----------- | ------ | ---------------- |
+| skillTags[] | array | スキル一覧 |
+| skillTags[].id | int | スキルID |
+| skillTags[].name | string | スキル名 |
+| skillTags[].category | string | カテゴリ名 |
+| phases[] | array | 工程マスタ |
+| phases[].key | string | キー（basic_designなど） |
+| phases[].name | string | 表示名 |
+| work_types[] | array | 勤務形態マスタ |
+| work_types[].key | string | キー（onsiteなど） |
+| work_types[].name | string | 表示名 |
+| statuses[] | array | ステータス一覧 |
+| statuses[].id | int | ステータスID |
+| statuses[].name | string | ステータス名 |
+| users[] | array | 担当者一覧 |
+| users[].id | int | ユーザーID |
+| users[].name | string | ユーザー名 |
+
+### GET /engineers/{id}　Props（#4）
 
 | フィールド名 | 型 | 説明 |
 | ----------- | ------ | ---------------- |
@@ -165,39 +191,14 @@
 | engineer.notes | string | 特記事項 |
 | engineer.updated_at | datetime（ISO8601） | 最終更新日 |
 
-### GET /engineers/create Props（#3）
-
-| フィールド名 | 型 | 説明 |
-| ----------- | ------ | ---------------- |
-| skillTags[] | array | スキル一覧 |
-| skillTags[].id | int | スキルID |
-| skillTags[].name | string | スキル名 |
-| skillTags[].category | string | カテゴリ名 |
-| phases[] | array | 工程マスタ |
-| phases[].key | string | キー（basic_designなど） |
-| phases[].name | string | 表示名 |
-| work_types[] | array | 勤務形態マスタ |
-| work_types[].key | string | キー（onsiteなど） |
-| work_types[].name | string | 表示名 |
-| statuses[] | array | ステータス一覧 |
-| statuses[].id | int | ステータスID |
-| statuses[].name | string | ステータス名 |
-| users[] | array | 担当者一覧 |
-| users[].id | int | ユーザーID |
-| users[].name | string | ユーザー名 |
-
 ### GET /engineers/{id}/edit　Props（#5）
 
 | フィールド名 | 型 | 説明 |
 | ----------- | ------ | ---------------- |
-| engineer | object | 既存データ（#2 showと同構造） |
-| skillTags[] | array | スキル一覧 |
-| phases[] | array | 工程マスタ |
-| work_types[] | array | 勤務形態マスタ |
-| statuses[] | array | ステータス一覧 |
-| users[] | array | 担当者一覧 |
+| engineer | object | 既存データ（#4 showと同構造） |
+※ マスタ系Props（skillTags / phases / work_types / statuses / users）は #2 createと同構造
 
-### POST /engineers ・ PUT /engineers/{id}　送信データ（#4 / #6 共通）
+### POST /engineers ・ PUT /engineers/{id}　送信データ（#3 / #6 共通）
 
 | フィールド名 | 型 | 必須 | 備考 |
 |------------|---|:----:|------|
@@ -228,18 +229,23 @@
 ### DELETE /engineers/{id}（#7）
 
 #### 挙動
-- 管理者：物理削除
-- 一般営業：status_idを「削除（無効）」に更新（論理削除）
+| ロール | 動作 |
+|---|---|
+| 管理者 | 対象データを物理削除する |
+| 一般営業 | status_id を「削除（無効）」へ更新する（論理削除） |
 
-#### リダイレクト
-- 削除後は /engineers にリダイレクトする
-- フラッシュメッセージを付与する
+#### レスポンス
+| 条件 | 動作 |
+|---|---|
+| 成功時 | /engineers へリダイレクトし flash.success を返す |
+| 権限不足時 | 前画面へリダイレクトし flash.error を返す |
+| 対象データなし | 404 を返す |
 
 #### Props（リダイレクト後）
 | フィールド名 | 型 | 説明 |
-|-------------|----|------|
+|---|---|---|
 | flash.success | string | 成功メッセージ |
-| flash.error | string | 失敗メッセージ（削除不可時など） |
+| flash.error | string | エラーメッセージ |
 
 ---
 
@@ -257,10 +263,12 @@
 
 ## 6. 保存検索条件（SavedFilter）
 
-| # | メソッド | URL | Controller#Action | Props | 送信データ |
-|---|---------|-----|------------------|-------|-----------|
-| 1 | POST | /saved-filters | SavedFilterController@store | - | 下記参照 |
-| 2 | DELETE | /saved-filters/{id} | SavedFilterController@destroy | - | - |
+| # | メソッド | URL | Controller#Action | アクセス可能ロール | Props（GET時） | 送信データ |
+|---|---|---|---|---|---|---|
+| 1 | POST | /saved-filters | SavedFilterController@store | 管理者 / 一般営業 | - | 下記参照 |
+| 2 | DELETE | /saved-filters/{id} | SavedFilterController@destroy | 管理者 / 一般営業 | - | - |
+
+※ 保存検索条件はログインユーザー単位で管理する
 
 ### POST /saved-filters　送信データ（#1）
 
