@@ -3,7 +3,7 @@
 > 技術方針：Laravel + Inertia.js + React  
 > ルーティング定義：`routes/web.php`  
 > 認証方式：Laravel Breeze（セッション認証）  
-> 最終更新：2026-05-18
+> 最終更新：2026-05-22
 
 ---
 
@@ -42,8 +42,9 @@ Propsの構造はJSONツリー形式で記述する。型は値の位置に文�
 | `"bool"` | 真偽値 |
 | `"date(YYYY-MM-DD)"` | 日付文字列 |
 | `"datetime(ISO8601)"` | 日時文字列 |
-| `"型 \| null"` | null許容 |
 | `[{ ... }]` | オブジェクトの配列 |
+
+> **Propsのnull許容**：システム固定必須（`name` / `name_kana`）以外のフィールドはnullを返す場合がある。各フィールドの型表記では `| null` を省略する。
 
 ---
 
@@ -129,7 +130,7 @@ Props           → JSONツリー形式（jsonc）
         "nearest_line": "string",             // 路線名（フリーテキスト）
         "status": "string",                   // proposable | interviewing | not_proposable
         "available_from": "date(YYYY-MM-DD)", // 稼働可能日
-        "available_label": "string",          // 表示用ラベル（即日〜 / YYYY/MM/DD〜など）
+        "available_label": "string",          // 表示用ラベル
                                               // available_from が null → "未定"
                                               // available_from に日付あり → "YYYY/MM/DD〜"
                                               // Controller内で生成する
@@ -214,13 +215,19 @@ Props           → JSONツリー形式（jsonc）
   // フロントはこの値を参照してフィールドの必須バッジ表示・バリデーションを制御する
   // is_required: true = 現在の設定で必須 / false = 任意
   // ※ システム固定必須（name / name_kana）はここに含めない（常にrequired固定のため）
+  // ※ キー名は form_field_settings テーブルの field_key カラムと1対1で対応する
   "fieldSettings": {
     "birth_date":          { "is_required": "bool" },
     "nearest_station":     { "is_required": "bool" },
     "nearest_line":        { "is_required": "bool" },
     "available_from":      { "is_required": "bool" },
     "skills":              { "is_required": "bool" },
-    "proc_experience":     { "is_required": "bool" }, // proc_* 6項目まとめて1設定
+    "proc_requirements":   { "is_required": "bool" }, // 要件定義経験
+    "proc_basic_design":   { "is_required": "bool" }, // 基本設計経験
+    "proc_detail_design":  { "is_required": "bool" }, // 詳細設計経験
+    "proc_development":    { "is_required": "bool" }, // 開発経験
+    "proc_testing":        { "is_required": "bool" }, // テスト経験
+    "proc_maintenance":    { "is_required": "bool" }, // 保守運用経験
     "has_negotiation_exp": { "is_required": "bool" },
     "appeal_note":         { "is_required": "bool" },
     "desired_rate":        { "is_required": "bool" },
@@ -259,14 +266,12 @@ Props           → JSONツリー形式（jsonc）
     "id": "int",
     "name": "string",                              // 氏名
     "name_kana": "string",                         // カナ
-    "age": "int",                                  // 年齢
-                                                   // 一覧Propsの age と同じ生成ルール
+    "age": "int",                                  // 年齢（一覧Propsの age と同じ生成ルール）
     "status": "string",                            // proposable | interviewing | not_proposable
     "nearest_station": "string",                   // 最寄駅（フリーテキスト）
     "nearest_line": "string",                      // 路線名（フリーテキスト）
     "available_from": "date(YYYY-MM-DD)",          // 稼働可能日
-    "available_label": "string",                   // 表示用ラベル（即日〜など）
-                                                   // 一覧Propsの available_label と同じ生成ルール
+    "available_label": "string",                   // 表示用ラベル（一覧Propsの available_label と同じ生成ルール）
     "users": {
       "main": { "id": "int", "name": "string" },
       "sub":  { "id": "int", "name": "string" }   // null許容
@@ -285,17 +290,17 @@ Props           → JSONツリー形式（jsonc）
       }
     ],
     "work_styles": [
-      { 
+      {
         "key": "string",                          // onsite | hybrid | remote
         "name": "string"                          // 表示名
       }
     ],
     "has_negotiation_exp": "bool",                 // 顧客折衝経験
-    "appeal_note": "string | null",                // アピールポイント
-    "desired_rate": "int | null",                  // 希望単価月額（単位：万円）
-    "remarks": "string | null",                    // 特記事項
-    "ai_summary": "string | null",                 // AI職務要約テキスト（未生成時はnull）
-    "ai_summary_generated_at": "datetime(ISO8601) | null", // 最終生成日時（WF_05「最終生成：YYYY-MM-DD」表示用）
+    "appeal_note": "string",                       // アピールポイント
+    "desired_rate": "int",                         // 希望単価月額（単位：万円）
+    "remarks": "string",                           // 特記事項
+    "ai_summary": "string",                        // AI職務要約テキスト（未生成時はnull）
+    "ai_summary_generated_at": "datetime(ISO8601)", // 最終生成日時（WF_05「最終生成：YYYY-MM-DD」表示用）
     "updated_at": "datetime(ISO8601)"
   }
 }
@@ -307,12 +312,12 @@ Props           → JSONツリー形式（jsonc）
 
 ```jsonc
 {
-  "engineer": { /* GET /engineers/{id} の engineer と同構造 */ },
+  "engineer":    { /* GET /engineers/{id} の engineer と同構造 */ },
   "fieldSettings": { /* GET /engineers/create の fieldSettings と同構造 */ },
-  "phases":     [ /* GET /engineers/create の phases と同構造 */ ],
+  "phases":      [ /* GET /engineers/create の phases と同構造 */ ],
   "work_styles": [ /* GET /engineers/create の work_styles と同構造 */ ],
-  "statuses":   [ /* GET /engineers/create の statuses と同構造 */ ],
-  "users":      [ /* GET /engineers/create の users と同構造 */ ]
+  "statuses":    [ /* GET /engineers/create の statuses と同構造 */ ],
+  "users":       [ /* GET /engineers/create の users と同構造 */ ]
 }
 ```
 
@@ -324,12 +329,11 @@ Props           → JSONツリー形式（jsonc）
 > **PATCHについて**：部分更新（PATCH）は使用しない。ステータスのみ変更する場合も PUT で全フィールドを送信すること。  
 > **bool値の変換**：`proc_*` / `has_negotiation_exp` の bool 値はEloquentモデルに `boolean` キャストを定義し、DB側の `TINYINT(1)`（1:true / 0:false）へ変換すること。
 
-> **勤務形態の変換方針：**
-> フロントは選択中の勤務形態キーを string[] で送信する。
-> Controller が以下のようにDBカラムへ変換する。
-> - work_styles に "onsite"  が含まれる → work_style_onsite  = true
-> - work_styles に "hybrid"  が含まれる → work_style_hybrid  = true
-> - work_styles に "remote"  が含まれる → work_style_remote  = true
+> **勤務形態の変換方針：**  
+> フロントは選択中の勤務形態キーを string[] で送信する。Controller が以下のようにDBカラムへ変換する。
+> - work_styles に "onsite" が含まれる → work_style_onsite = true
+> - work_styles に "hybrid" が含まれる → work_style_hybrid = true
+> - work_styles に "remote" が含まれる → work_style_remote = true
 > - 配列に含まれない値 → 対応カラム = false
 
 | フィールド名 | 型 | 必須 | 備考 |
@@ -340,7 +344,7 @@ Props           → JSONツリー形式（jsonc）
 | nearest_station | string | 任意 | 最寄駅（フリーテキスト・form_field_settings制御） |
 | nearest_line | string | 任意 | 路線名（フリーテキスト・form_field_settings制御） |
 | available_from | date | 任意 | 稼働可能日（form_field_settings制御） |
-| skills[]       | array  | 任意 | スキル配列。空配列 [] または省略で全削除。PUT時は送信された配列で全件洗い替え（既存レコードを全削除後に再挿入）。件数の必須制御は form_field_settings に従いアプリ層で行う。 |
+| skills[] | array | 任意 | スキル配列。空配列 [] または省略で全削除。PUT時は送信された配列で全件洗い替え（既存レコードを全削除後に再挿入）。件数の必須制御は form_field_settings に従いアプリ層で行う |
 | skills[].label | string | 任意 | スキルラベル（最大15文字） |
 | skills[].detail | string | 任意 | スキル詳細（最大500文字） |
 | proc_requirements | bool | 任意 | 要件定義経験（true:有・form_field_settings制御） |
@@ -350,12 +354,12 @@ Props           → JSONツリー形式（jsonc）
 | proc_testing | bool | 任意 | テスト経験（form_field_settings制御） |
 | proc_maintenance | bool | 任意 | 保守運用経験（form_field_settings制御） |
 | has_negotiation_exp | bool | 任意 | 顧客折衝経験（true:有・form_field_settings制御） |
-| appeal_note | string | 任意 | アピールポイント |
-| desired_rate | int | 任意 | 希望単価月額（単位：万円） |
-| work_styles | string[] | 任意 | 勤務形態。選択値を配列で送る（onsite / hybrid / remote）。未選択の場合は空配列 [] または省略。Controller内で work_style_onsite / work_style_hybrid / work_style_remote の各カラムに変換する。|
-| remarks | string | 任意 | 特記事項 |
-| status | string | 任意 | ステータス（proposable / interviewing / not_proposable） |
-| main_user_id | int | 任意 | 主担当ユーザーID |
+| appeal_note | string | 任意 | アピールポイント（form_field_settings制御） |
+| desired_rate | int | 任意 | 希望単価月額（単位：万円・form_field_settings制御） |
+| work_styles | string[] | 任意 | 勤務形態。選択値を配列で送る（onsite / hybrid / remote）。未選択の場合は空配列 [] または省略。Controller内で work_style_* カラムに変換する（form_field_settings制御） |
+| remarks | string | 任意 | 特記事項（form_field_settings制御） |
+| status | string | 任意 | ステータス（proposable / interviewing / not_proposable・form_field_settings制御） |
+| main_user_id | int | 任意 | 主担当ユーザーID（form_field_settings制御） |
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |
 
 ---
@@ -407,7 +411,7 @@ Props           → JSONツリー形式（jsonc）
 | 1 | POST | /saved-searches | SavedSearchController@store | 管理者 / 一般営業 | WF_03 / WF_06 |
 | 2 | DELETE | /saved-searches/{id} | SavedSearchController@destroy | 管理者 / 一般営業 | WF_03 / WF_06 |
 
-> `user_id` はセッションのログインユーザーから取得する。クライアントから送信しないこと（DB設計書 §4 / QA #81確定）  
+> `user_id` はセッションのログインユーザーから取得する。クライアントから送信しないこと（DB設計書 §4 / QA #81確定）
 
 ---
 
