@@ -3,7 +3,7 @@
 > 技術方針：Laravel + Inertia.js + React  
 > ルーティング定義：`routes/web.php`  
 > 認証方式：Laravel Breeze（セッション認証）  
-> 最終更新：2026-05-22
+> 最終更新：2026-05-24
 
 ---
 
@@ -12,7 +12,7 @@
 - **認証**：Laravel Breezeを使用。`/login` / `/logout` はBreeze自動生成のため本一覧に記載しない。`/register` / `/forgot-password` / `/reset-password` は無効化する
 - **認可（ロール別制御）**：ロールは **管理者 / 一般営業** の2階層（QA #17確定）。詳細な操作権限は権限・ロール設計書に記載する
 - **バリデーション**：各フィールドの詳細ルールは「バリデーション・エラー表示設計書」を参照すること
-- **必須/任意の制御**：システム固定必須（DBレベルでNOT NULL）は `name` / `name_kana` のみ。それ以外のフィールドはDBレベルでNULL許容であり、必須/任意の制御は `form_field_settings` テーブルをアプリ層で参照して行う（DB設計書 §1-2 / QA #65確定）
+- **必須/任意の制御**：システム固定必須（DBレベルでNOT NULL）は `name` / `name_kana` / `status` / `main_user_id` のみ。それ以外のフィールドはDBレベルでNULL許容であり、必須/任意の制御は `form_field_settings` テーブルをアプリ層で参照して行う（DB設計書 §1-2 / QA #65確定）
 - **SharedProps**：全ページに `HandleInertiaRequests` ミドルウェアで以下を共有する。詳細は権限・ロール設計書を参照すること
   - `auth.user`：ログインユーザー情報（id / name / role）
   - `flash.success`：成功フラッシュメッセージ（`string | null`）
@@ -44,7 +44,7 @@ Propsの構造はJSONツリー形式で記述する。型は値の位置に文�
 | `"datetime(ISO8601)"` | 日時文字列 |
 | `[{ ... }]` | オブジェクトの配列 |
 
-> **Propsのnull許容**：システム固定必須（`name` / `name_kana`）以外のフィールドはnullを返す場合がある。各フィールドの型表記では `| null` を省略する。
+> **Propsのnull許容**：システム固定必須（`name` / `name_kana` / `status` / `main_user_id`）以外のフィールドはnullを返す場合がある。各フィールドの型表記では `| null` を省略する。
 
 ---
 
@@ -214,7 +214,7 @@ Props           → JSONツリー形式（jsonc）
   // フォームフィールドの必須/任意設定（form_field_settings テーブルの値）
   // フロントはこの値を参照してフィールドの必須バッジ表示・バリデーションを制御する
   // is_required: true = 現在の設定で必須 / false = 任意
-  // ※ システム固定必須（name / name_kana）はここに含めない（常にrequired固定のため）
+  // ※ システム固定必須（name / name_kana / status / main_user_id）はここに含めない（常にrequired固定のため）
   // ※ キー名は form_field_settings テーブルの field_key カラムと1対1で対応する
   "fieldSettings": {
     "birth_date":          { "is_required": "bool" },
@@ -232,9 +232,7 @@ Props           → JSONツリー形式（jsonc）
     "appeal_note":         { "is_required": "bool" },
     "desired_rate":        { "is_required": "bool" },
     "work_styles":         { "is_required": "bool" },
-    "remarks":             { "is_required": "bool" },
-    "status":              { "is_required": "bool" },
-    "main_user_id":        { "is_required": "bool" }
+    "remarks":             { "is_required": "bool" }
   },
 
   // ※ スキルはフリーテキスト入力のため skillTags[] は不要（WF_04 v2.0確定）
@@ -325,7 +323,7 @@ Props           → JSONツリー形式（jsonc）
 
 ### POST /engineers ・ PUT /engineers/{id}　送信データ（#3 / #6 共通）
 
-> **必須/任意について**：システム固定必須（DBレベルでNOT NULL）は `name` / `name_kana` のみ。その他のフィールドはDBレベルでNULL許容であり、実際の必須/任意制御は `form_field_settings` をアプリ層で参照して行う（DB設計書 §1-2 / QA #65確定）。  
+> **必須/任意について**：システム固定必須（DBレベルでNOT NULL）は `name` / `name_kana` / `status` / `main_user_id` のみ。その他のフィールドはDBレベルでNULL許容であり、実際の必須/任意制御は `form_field_settings` をアプリ層で参照して行う（DB設計書 §1-2 / QA #65確定）。  
 > **PATCHについて**：部分更新（PATCH）は使用しない。ステータスのみ変更する場合も PUT で全フィールドを送信すること。  
 > **bool値の変換**：`proc_*` / `has_negotiation_exp` の bool 値はEloquentモデルに `boolean` キャストを定義し、DB側の `TINYINT(1)`（1:true / 0:false）へ変換すること。
 
@@ -358,8 +356,8 @@ Props           → JSONツリー形式（jsonc）
 | desired_rate | int | 任意 | 希望単価月額（単位：万円・form_field_settings制御） |
 | work_styles | string[] | 任意 | 勤務形態。選択値を配列で送る（onsite / hybrid / remote）。未選択の場合は空配列 [] または省略。Controller内で work_style_* カラムに変換する（form_field_settings制御） |
 | remarks | string | 任意 | 特記事項（form_field_settings制御） |
-| status | string | 任意 | ステータス（proposable / interviewing / not_proposable・form_field_settings制御） |
-| main_user_id | int | 任意 | 主担当ユーザーID（form_field_settings制御） |
+| status | string | ✓ | ステータス（システム固定必須・proposable / interviewing / not_proposable・form_field_settings制御） |
+| main_user_id | int | ✓ | 主担当ユーザーID（システム固定必須・form_field_settings制御） |
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |
 
 ---
