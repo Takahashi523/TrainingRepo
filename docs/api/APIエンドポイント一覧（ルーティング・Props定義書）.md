@@ -3,7 +3,7 @@
 > 技術方針：Laravel + Inertia.js + React  
 > ルーティング定義：`routes/web.php`  
 > 認証方式：Laravel Breeze（セッション認証）  
-> 最終更新：2026-05-24
+> 最終更新：2026-05-27
 
 ---
 
@@ -222,12 +222,11 @@ Props           → JSONツリー形式（jsonc）
     "nearest_line":        { "is_required": "bool" },
     "available_from":      { "is_required": "bool" },
     "skills":              { "is_required": "bool" },
-    "proc_requirements":   { "is_required": "bool" }, // 要件定義経験
-    "proc_basic_design":   { "is_required": "bool" }, // 基本設計経験
-    "proc_detail_design":  { "is_required": "bool" }, // 詳細設計経験
-    "proc_development":    { "is_required": "bool" }, // 開発経験
-    "proc_testing":        { "is_required": "bool" }, // テスト経験
-    "proc_maintenance":    { "is_required": "bool" }, // 保守運用経験
+    // 工程経験6項目（proc_requirements 〜 proc_maintenance）はまとめて1設定として管理する。
+    // form_field_settings の field_key = "proc_experience" で1レコード管理。
+    // WF_12のフォーム設定タブでも「経験工程」として1つのトグルで管理する。
+    // is_required: true の場合、フロントは工程経験チェックボックスグループ全体を必須として扱う。
+    "proc_experience":     { "is_required": "bool" },
     "has_negotiation_exp": { "is_required": "bool" },
     "appeal_note":         { "is_required": "bool" },
     "desired_rate":        { "is_required": "bool" },
@@ -325,7 +324,7 @@ Props           → JSONツリー形式（jsonc）
 
 > **必須/任意について**：システム固定必須（DBレベルでNOT NULL）は `name` / `name_kana` / `status` / `main_user_id` のみ。その他のフィールドはDBレベルでNULL許容であり、実際の必須/任意制御は `form_field_settings` をアプリ層で参照して行う（DB設計書 §1-2 / QA #65確定）。  
 > **PATCHについて**：部分更新（PATCH）は使用しない。ステータスのみ変更する場合も PUT で全フィールドを送信すること。  
-> **bool値の変換**：`proc_*` / `has_negotiation_exp` の bool 値はEloquentモデルに `boolean` キャストを定義し、DB側の `TINYINT(1)`（1:true / 0:false）へ変換すること。
+> **bool値の変換**：`proc_requirements` 〜 `proc_maintenance` / `has_negotiation_exp` の bool 値はEloquentモデルに `boolean` キャストを定義し、DB側の `TINYINT(1)`（1:true / 0:false）へ変換すること。
 
 > **勤務形態の変換方針：**  
 > フロントは選択中の勤務形態キーを string[] で送信する。Controller が以下のようにDBカラムへ変換する。
@@ -345,12 +344,12 @@ Props           → JSONツリー形式（jsonc）
 | skills[] | array | 任意 | スキル配列。空配列 [] または省略で全削除。PUT時は送信された配列で全件洗い替え（既存レコードを全削除後に再挿入）。件数の必須制御は form_field_settings に従いアプリ層で行う |
 | skills[].label | string | 任意 | スキルラベル（最大15文字） |
 | skills[].detail | string | 任意 | スキル詳細（最大500文字） |
-| proc_requirements | bool | 任意 | 要件定義経験（true:有・form_field_settings制御） |
-| proc_basic_design | bool | 任意 | 基本設計経験（form_field_settings制御） |
-| proc_detail_design | bool | 任意 | 詳細設計経験（form_field_settings制御） |
-| proc_development | bool | 任意 | 開発経験（form_field_settings制御） |
-| proc_testing | bool | 任意 | テスト経験（form_field_settings制御） |
-| proc_maintenance | bool | 任意 | 保守運用経験（form_field_settings制御） |
+| proc_requirements | bool | 任意 | 要件定義経験（true:有）。proc_experience の is_required 設定で制御 |
+| proc_basic_design | bool | 任意 | 基本設計経験（true:有）。proc_experience の is_required 設定で制御 |
+| proc_detail_design | bool | 任意 | 詳細設計経験（true:有）。proc_experience の is_required 設定で制御 |
+| proc_development | bool | 任意 | 開発経験（true:有）。proc_experience の is_required 設定で制御 |
+| proc_testing | bool | 任意 | テスト経験（true:有）。proc_experience の is_required 設定で制御 |
+| proc_maintenance | bool | 任意 | 保守運用経験（true:有）。proc_experience の is_required 設定で制御 |
 | has_negotiation_exp | bool | 任意 | 顧客折衝経験（true:有・form_field_settings制御） |
 | appeal_note | string | 任意 | アピールポイント（form_field_settings制御） |
 | desired_rate | int | 任意 | 希望単価月額（単位：万円・form_field_settings制御） |
