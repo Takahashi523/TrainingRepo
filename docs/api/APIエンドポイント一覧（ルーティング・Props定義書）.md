@@ -356,8 +356,8 @@ Props           → JSONツリー形式（jsonc）
 | desired_rate | int | 任意 | 希望単価月額（単位：万円・form_field_settings制御） |
 | work_styles | string[] | 任意 | 勤務形態。選択値を配列で送る（onsite / hybrid / remote）。未選択の場合は空配列 [] または省略。Controller内で work_style_* カラムに変換する（form_field_settings制御） |
 | remarks | string | 任意 | 特記事項（form_field_settings制御） |
-| status | string | ✓ | ステータス（システム固定必須・proposable / interviewing / not_proposable・form_field_settings制御） |
-| main_user_id | int | ✓ | 主担当ユーザーID（システム固定必須・form_field_settings制御） |
+| status | string | ✓ | ステータス（システム固定必須・proposable / interviewing / not_proposable） |
+| main_user_id | int | ✓ | 主担当ユーザーID（システム固定必須） |
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |
 
 ---
