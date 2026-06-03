@@ -11,7 +11,10 @@ export default defineConfig({
         react(),
     ],
     server: {
-        host: '0.0.0.0',    // コンテナ外（ホスト OS）からアクセス可能にする
+        host: '0.0.0.0',
         port: 5173,
+        hmr: {
+            host: 'localhost',
+        },
     },
 });

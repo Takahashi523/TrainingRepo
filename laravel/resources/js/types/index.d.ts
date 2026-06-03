@@ -2,7 +2,7 @@ export interface User {
     id: number;
     name: string;
     email: string;
-    email_verified_at?: string;
+    role: 'admin' | 'general';
 }
 
 export type PageProps<
@@ -10,5 +10,9 @@ export type PageProps<
 > = T & {
     auth: {
         user: User;
+    };
+    flash: {
+        success: string | null;
+        error: string | null;
     };
 };
