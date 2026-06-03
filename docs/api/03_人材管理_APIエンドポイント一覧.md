@@ -1,8 +1,8 @@
 # 人材管理（Engineer）APIエンドポイント一覧
 
-> 技術方針：Laravel + Inertia.js + React
-> 最終更新：2026-05-27
-> 前提・凡例・SharedProps・共通HTTPレスポンスは `00_共通仕様_APIエンドポイント一覧.md` を参照すること。
+> 技術方針：Laravel + Inertia.js + React  
+> 最終更新：2026-05-27  
+> 前提・凡例・SharedProps・共通HTTPレスポンスは `00_共通仕様_APIエンドポイント一覧.md` を参照すること。  
 
 ---
 
