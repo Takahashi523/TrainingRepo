@@ -12,6 +12,7 @@ from app.services.matching_service import (
     EngineerNotFoundError,
     EngineerSkill,
     MatchCandidate,
+    NoActiveCandidateError,
     ProjectData,
     ProjectSkill,
     _cascade_sort,
@@ -504,6 +505,7 @@ class TestCalculateMatching:
         assert result.matches[0].match_score == 90   # 最高スコアが先頭
         assert result.matches[0].project_id == 5
         assert result.matches[4].match_score == 55   # 5位
+        assert result.total_hits == 6                # limit 前の全候補件数
         assert mock_invoke.call_count == 6            # 6件全てに AI 呼び出し
 
     def test_excludes_pipeline_registered_projects(self, mocker):
@@ -522,6 +524,7 @@ class TestCalculateMatching:
         result = calculate_matching(MagicMock(), engineer_id=1, project_ids=None)
 
         assert mock_invoke.call_count == 2  # project_id=1 は除外されるため2件
+        assert result.total_hits == 2
         project_ids_scored = {call.args[1].id for call in mock_invoke.call_args_list}
         assert 1 not in project_ids_scored
 
@@ -538,9 +541,10 @@ class TestCalculateMatching:
             side_effect=[_make_ai_result(50 + i) for i in range(30)],
         )
 
-        calculate_matching(MagicMock(), engineer_id=1, project_ids=None)
+        result = calculate_matching(MagicMock(), engineer_id=1, project_ids=None)
 
         assert mock_invoke.call_count == 30  # 35件 → カスケードソートで30件に絞込
+        assert result.total_hits == 30
 
     def test_engineer_not_found_propagates(self, mocker):
         """fetch_engineer が EngineerNotFoundError を送出した場合、そのまま伝播すること。"""
@@ -554,8 +558,8 @@ class TestCalculateMatching:
 
         assert exc_info.value.engineer_id == 999
 
-    def test_empty_candidates_returns_empty_matches(self, mocker):
-        """全案件がパイプライン除外後に0件になった場合、AI を呼ばず空配列を返すこと。"""
+    def test_empty_candidates_raises_no_active_candidate_error(self, mocker):
+        """全案件がパイプライン除外後に0件になった場合、NoActiveCandidateError を送出すること。"""
         engineer = _make_engineer()
         projects = [_make_project(1), _make_project(2)]
 
@@ -565,22 +569,30 @@ class TestCalculateMatching:
                      return_value={1, 2})
         mock_invoke = mocker.patch("app.services.bedrock_service.invoke_matching")
 
-        result = calculate_matching(MagicMock(), engineer_id=1, project_ids=None)
+        with pytest.raises(NoActiveCandidateError) as exc_info:
+            calculate_matching(MagicMock(), engineer_id=1, project_ids=None)
 
-        assert result.matches == []
+        assert exc_info.value.engineer_id == 1
         mock_invoke.assert_not_called()
 
     def test_non_proposable_engineer_continues_without_error(self, mocker):
         """status='not_proposable' のエンジニアでも例外を送出せずマッチングを実行すること。"""
         engineer = _make_engineer(status="not_proposable")
+        # 候補が0件だと NoActiveCandidateError になるため、1件は候補として残す
+        projects = [_make_project(1)]
 
         mocker.patch("app.services.matching_service.fetch_engineer", return_value=engineer)
-        mocker.patch("app.services.matching_service.fetch_active_projects", return_value=[])
+        mocker.patch("app.services.matching_service.fetch_active_projects", return_value=projects)
         mocker.patch("app.services.matching_service.fetch_registered_project_ids", return_value=set())
+        mocker.patch(
+            "app.services.bedrock_service.invoke_matching",
+            return_value=_make_ai_result(70),
+        )
 
         result = calculate_matching(MagicMock(), engineer_id=1, project_ids=None)
 
-        assert result.matches == []  # 案件なしで正常終了
+        assert len(result.matches) == 1
+        assert result.total_hits == 1
 
     def test_fewer_than_5_candidates_returns_all(self, mocker):
         """候補が5件未満の場合、全件返すこと。"""
@@ -598,4 +610,68 @@ class TestCalculateMatching:
         result = calculate_matching(MagicMock(), engineer_id=1, project_ids=None)
 
         assert len(result.matches) == 3
+        assert result.total_hits == 3
         assert result.engineer_id == 1
+
+    def test_limit_restricts_returned_matches(self, mocker):
+        """limit=2 指定時、matches が2件に絞られ total_hits は元の件数を保持すること。"""
+        engineer = _make_engineer()
+        projects = [_make_project(i) for i in range(1, 5)]  # 4件
+
+        mocker.patch("app.services.matching_service.fetch_engineer", return_value=engineer)
+        mocker.patch("app.services.matching_service.fetch_active_projects", return_value=projects)
+        mocker.patch("app.services.matching_service.fetch_registered_project_ids", return_value=set())
+        mocker.patch(
+            "app.services.bedrock_service.invoke_matching",
+            side_effect=[_make_ai_result(s) for s in [90, 80, 70, 60]],
+        )
+
+        result = calculate_matching(MagicMock(), engineer_id=1, project_ids=None, limit=2)
+
+        assert len(result.matches) == 2
+        assert result.total_hits == 4          # limit 前の件数が保持される
+        assert result.matches[0].match_score == 90
+
+    def test_rank_filter_removes_unmatched_ranks(self, mocker):
+        """rank_filter=['A'] 指定時、Aランク以外が除外され total_hits もフィルタ後件数になること。"""
+        engineer = _make_engineer()
+        projects = [_make_project(i) for i in range(1, 5)]  # 4件
+
+        mocker.patch("app.services.matching_service.fetch_engineer", return_value=engineer)
+        mocker.patch("app.services.matching_service.fetch_active_projects", return_value=projects)
+        mocker.patch("app.services.matching_service.fetch_registered_project_ids", return_value=set())
+        # スコア: 90(A), 70(B), 55(C), 40(D)
+        mocker.patch(
+            "app.services.bedrock_service.invoke_matching",
+            side_effect=[_make_ai_result(s) for s in [90, 70, 55, 40]],
+        )
+
+        result = calculate_matching(
+            MagicMock(), engineer_id=1, project_ids=None, rank_filter=["A"]
+        )
+
+        assert result.total_hits == 1
+        assert len(result.matches) == 1
+        assert result.matches[0].match_rank == "A"
+
+    def test_rank_filter_multiple_ranks(self, mocker):
+        """rank_filter=['A','B'] 指定時、A・B ランクのみ返ること。"""
+        engineer = _make_engineer()
+        projects = [_make_project(i) for i in range(1, 5)]  # 4件
+
+        mocker.patch("app.services.matching_service.fetch_engineer", return_value=engineer)
+        mocker.patch("app.services.matching_service.fetch_active_projects", return_value=projects)
+        mocker.patch("app.services.matching_service.fetch_registered_project_ids", return_value=set())
+        # スコア: 90(A), 70(B), 55(C), 40(D)
+        mocker.patch(
+            "app.services.bedrock_service.invoke_matching",
+            side_effect=[_make_ai_result(s) for s in [90, 70, 55, 40]],
+        )
+
+        result = calculate_matching(
+            MagicMock(), engineer_id=1, project_ids=None, rank_filter=["A", "B"]
+        )
+
+        assert result.total_hits == 2
+        assert len(result.matches) == 2
+        assert {m.match_rank for m in result.matches} == {"A", "B"}

@@ -15,6 +15,7 @@ from app.services.matching_service import (
     EngineerNotFoundError,
     MatchCandidate,
     MatchingOutput,
+    NoActiveCandidateError,
 )
 
 
@@ -50,6 +51,7 @@ def _make_output(engineer_id: int = 1, num_matches: int = 2) -> MatchingOutput:
     return MatchingOutput(
         engineer_id=engineer_id,
         generated_at=datetime(2026, 6, 8, 10, 0, 0, tzinfo=timezone.utc),
+        total_hits=num_matches,
         matches=matches,
     )
 
@@ -86,6 +88,7 @@ class TestMatchingCalculate:
         assert response.status_code == 200
         body = response.json()
         assert body["engineer_id"] == 1
+        assert body["total_hits"] == 2
         assert len(body["matches"]) == 2
         assert body["matches"][0]["match_score"] == 75
         assert body["matches"][0]["match_rank"] == "B"
@@ -152,11 +155,11 @@ class TestMatchingCalculate:
         assert body["error_code"] == "ENGINEER_NOT_FOUND"
         assert "message" in body
 
-    def test_returns_502_on_bedrock_error(self, mocker):
-        """Bedrock 呼び出し失敗の場合、502 と EXTERNAL_API_ERROR を返すこと。"""
+    def test_returns_504_on_bedrock_timeout(self, mocker):
+        """Bedrock タイムアウト（リトライ後も失敗）の場合、504 と UPSTREAM_TIMEOUT を返すこと。"""
         mocker.patch(
             "app.routers.matching.run_matching",
-            side_effect=BedrockError("Bedrock 呼び出し失敗"),
+            side_effect=BedrockError("Bedrock タイムアウト"),
         )
 
         response = client.post(
@@ -164,9 +167,26 @@ class TestMatchingCalculate:
             json={"engineer_id": 1},
         )
 
-        assert response.status_code == 502
+        assert response.status_code == 504
         body = response.json()
-        assert body["error_code"] == "EXTERNAL_API_ERROR"
+        assert body["error_code"] == "UPSTREAM_TIMEOUT"
+        assert "message" in body
+
+    def test_returns_422_for_no_active_project(self, mocker):
+        """パイプライン除外後に候補ゼロの場合、422 と NO_ACTIVE_PROJECT を返すこと。"""
+        mocker.patch(
+            "app.routers.matching.run_matching",
+            side_effect=NoActiveCandidateError(1),
+        )
+
+        response = client.post(
+            "/api/v1/matching/calculate",
+            json={"engineer_id": 1},
+        )
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["error_code"] == "NO_ACTIVE_PROJECT"
         assert "message" in body
 
     def test_returns_422_for_missing_engineer_id(self):

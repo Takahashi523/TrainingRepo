@@ -13,6 +13,8 @@ class HealthResponse(BaseModel):
 class MatchingRequest(BaseModel):
     engineer_id: int
     project_ids: Optional[list[int]] = None
+    limit: Optional[int] = 5            # 返却件数上限（デフォルト5, QA#33・QA#50確定）
+    rank_filter: Optional[list[str]] = None  # 返却ランク絞り込み（A/B/C/D）
 
 
 class MatchResult(BaseModel):
@@ -27,6 +29,7 @@ class MatchResult(BaseModel):
 class MatchingResponse(BaseModel):
     engineer_id: int
     generated_at: str       # ISO8601
+    total_hits: int         # limit適用前の候補件数（スコアリングロジック設計書 §4.2）
     matches: list[MatchResult]
 
 

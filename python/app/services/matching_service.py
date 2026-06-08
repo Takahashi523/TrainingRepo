@@ -21,6 +21,13 @@ class EngineerNotFoundError(Exception):
         super().__init__(f"engineer_id={engineer_id} not found")
 
 
+class NoActiveCandidateError(Exception):
+    """パイプライン除外後に候補が0件になった場合に送出する（スコアリングロジック設計書 §4.2 422 NO_ACTIVE_PROJECT）。"""
+    def __init__(self, engineer_id: int) -> None:
+        self.engineer_id = engineer_id
+        super().__init__(f"No active candidates for engineer_id={engineer_id}")
+
+
 # ---------------------------------------------------------------------------
 # 内部データクラス
 # Pydantic は API の入出力型定義に使用する。DB→サービス層の内部構造は
@@ -98,6 +105,7 @@ class MatchingOutput:
     """calculate_matching の戻り値。"""
     engineer_id: int
     generated_at: datetime
+    total_hits: int          # limit 適用前の候補件数
     matches: list[MatchCandidate]
 
 
@@ -315,6 +323,8 @@ def calculate_matching(
     db: Session,
     engineer_id: int,
     project_ids: Optional[list[int]],
+    limit: int = 5,
+    rank_filter: Optional[list[str]] = None,
 ) -> MatchingOutput:
     """E1 マッチング計算のメインフロー（AIプロンプト設計書 v0.3 / スコアリングロジック設計書 v0.6 準拠）。
     bedrock_service は循環インポート回避のためローカルインポートする。
@@ -339,6 +349,10 @@ def calculate_matching(
     registered_ids = fetch_registered_project_ids(db, engineer_id)
     candidates = [p for p in projects if p.id not in registered_ids]
 
+    # 候補0件は 422 NO_ACTIVE_PROJECT（スコアリングロジック設計書 §4.2）
+    if not candidates:
+        raise NoActiveCandidateError(engineer_id)
+
     # Step 3.6: 候補 >30 件ならカスケードソートで上位 30 件に絞込
     if len(candidates) > 30:
         candidates = _cascade_sort(candidates, engineer)[:30]
@@ -357,12 +371,15 @@ def calculate_matching(
             ai_missing=ai_result.ai_missing,
         ))
 
-    # Step 3.11: スコア降順ソート → 上位5件
+    # Step 3.11: スコア降順ソート → rank_filter 適用 → total_hits 確定 → limit 件数絞込
     results.sort(key=lambda r: r.match_score, reverse=True)
-    top5 = results[:5]
+    if rank_filter:
+        results = [r for r in results if r.match_rank in rank_filter]
+    total_hits = len(results)
 
     return MatchingOutput(
         engineer_id=engineer_id,
         generated_at=datetime.now(timezone.utc),
-        matches=top5,
+        total_hits=total_hits,
+        matches=results[:limit],
     )

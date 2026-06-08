@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 
 from app.routers import matching, profile
 from app.services.bedrock_service import BedrockError
-from app.services.matching_service import EngineerNotFoundError
+from app.services.matching_service import EngineerNotFoundError, NoActiveCandidateError
 
 app = FastAPI(
     title="Nexus Matching Engine",
@@ -23,9 +23,18 @@ async def engineer_not_found_handler(request: Request, exc: EngineerNotFoundErro
     )
 
 
+@app.exception_handler(NoActiveCandidateError)
+async def no_active_candidate_handler(request: Request, exc: NoActiveCandidateError):
+    return JSONResponse(
+        status_code=422,
+        content={"error_code": "NO_ACTIVE_PROJECT", "message": str(exc)},
+    )
+
+
 @app.exception_handler(BedrockError)
 async def bedrock_error_handler(request: Request, exc: BedrockError):
+    # Bedrock タイムアウト（リトライ後も失敗）は 504 UPSTREAM_TIMEOUT（スコアリングロジック設計書 §4.2）
     return JSONResponse(
-        status_code=502,
-        content={"error_code": "EXTERNAL_API_ERROR", "message": str(exc)},
+        status_code=504,
+        content={"error_code": "UPSTREAM_TIMEOUT", "message": str(exc)},
     )

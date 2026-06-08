@@ -73,6 +73,18 @@
 - [x] ✅ 2026-06-08 TestClient による E1 エンドポイントテスト（8件・カバレッジ100%）
 - [x] ✅ 2026-06-08 コミット
 
+## Step 5.5: E1 仕様適合修正（スコアリングロジック設計書 v0.6 §4.2 準拠）
+
+- [x] ✅ 2026-06-08 schemas.py: MatchingRequest に `limit`（default 5）・`rank_filter` を追加
+- [x] ✅ 2026-06-08 schemas.py: MatchingResponse に `total_hits` を追加
+- [x] ✅ 2026-06-08 matching_service.py: `NoActiveCandidateError` 追加（候補0件 → 422 NO_ACTIVE_PROJECT）
+- [x] ✅ 2026-06-08 matching_service.py: `MatchingOutput.total_hits` 追加
+- [x] ✅ 2026-06-08 matching_service.py: `calculate_matching` に `limit`・`rank_filter` パラメータ追加
+- [x] ✅ 2026-06-08 routers/matching.py: `limit`・`rank_filter` を run_matching に渡す・`total_hits` を返す
+- [x] ✅ 2026-06-08 main.py: `NoActiveCandidateError` ハンドラ追加（422）・`BedrockError` を 504 UPSTREAM_TIMEOUT に修正
+- [x] ✅ 2026-06-08 test_matching_service.py: 候補0件テストを `NoActiveCandidateError` 期待に変更・`total_hits` アサーション追加・`limit`/`rank_filter` テスト追加（78件・カバレッジ98%）
+- [x] ✅ 2026-06-08 test_routers.py: `total_hits` フィールド追加・504 UPSTREAM_TIMEOUT テストに修正・422 NO_ACTIVE_PROJECT テスト追加
+
 ---
 
 ## Step 6: Google Maps クライアント
