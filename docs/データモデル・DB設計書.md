@@ -272,6 +272,7 @@ erDiagram
 | パスワード（ハッシュ） | password | VARCHAR(255) | NOT NULL | | なし（要指定） | bcrypt等でハッシュ化 |
 | ロール | role | ENUM('admin','general') | NOT NULL | | `general` | admin / general。QA #17 確定。→ §6-5 |
 | ログイン状態保持トークン | remember_token | VARCHAR(100) | NULL | | NULL | WF_01「ログイン情報を保存する」チェックボックス対応。Laravel Breeze の `$table->rememberToken()` で生成。未チェック時は NULL。 |
+| 最終ログイン日時 | last_login_at | DATETIME | NULL | | NULL | ログイン成功時にイベント/リスナー（Loginイベント）で自動更新。新規ユーザー追加直後・未ログイン時は NULL。 |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 

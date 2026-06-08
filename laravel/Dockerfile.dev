@@ -1,0 +1,19 @@
+FROM php:8.3.30-fpm-alpine
+
+# 必要ライブラリのインストール
+# nodejs/npm は Alpine パッケージから取得（開発環境用）
+RUN apk add --no-cache bash nodejs npm git \
+    && docker-php-ext-install pdo pdo_mysql
+
+# Composer 2.8 のインストール（バージョン固定）
+COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www
+
+EXPOSE 8000
+EXPOSE 5173
+
+# 開発時は php artisan serve で起動（Nginx 不要）
+# Laravel インストール前はコンテナ起動に失敗するため、
+# インストール後に docker-compose restart laravel を実行すること
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
