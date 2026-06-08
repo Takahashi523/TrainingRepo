@@ -44,45 +44,38 @@
 - [x] ✅ 2026-06-08 bedrock_service.py 作成
 - [x] ✅ 2026-06-08 boto3 bedrock-runtime クライアント初期化（遅延シングルトン）
 - [x] ✅ 2026-06-08 invoke_model 呼び出しラッパー実装（指数バックオフ・最大3回リトライ）
-- [x] ✅ 2026-06-08 AIプロンプト設計書 §3.3 準拠のプロンプト組み立て
-- [x] ✅ 2026-06-08 レスポンス JSON パース・コードフェンス除去（ai_score_reason / ai_comment / ai_missing）
-- [x] ✅ 2026-06-08 BedrockError 例外・JSON パース失敗時リトライ（§3.6.1 専用プロンプト）
+- [x] ✅ 2026-06-08 AIプロンプト設計書 v0.3 準拠のプロンプト組み立て（8観点を AI に指示）
+- [x] ✅ 2026-06-08 レスポンス JSON パース・コードフェンス除去（match_score / ai_score_reason / ai_comment / ai_missing）
+- [x] ✅ 2026-06-08 BedrockError 例外・JSON パース失敗時リトライ（v0.3 §3.6.1 専用プロンプト）
 - [x] ✅ 2026-06-08 アプリ層クランプ処理（max(0, raw_score)）・ランク検算
 - [x] ✅ 2026-06-08 テスト作成（tests/test_bedrock_service.py・32件・カバレッジ97%）
-- [ ] コミット
+- [x] ✅ 2026-06-08 コミット
 
 ---
 
-## Step 4: スコアリングロジック単体
+## Step 4: マッチング計算フロー（E1 骨格）
 
-- [ ] 8次元スコア計算関数実装（S1〜S8）
-- [ ] クランプ処理実装（match_score = max(0, raw_score)）
-- [ ] match_rank 算定実装（A/B/C/D）
-- [ ] テスト作成（各次元・クランプ・ランク境界値）
-- [ ] コミット
-
----
-
-## Step 5: マッチング計算フロー
-
-- [ ] パイプライン除外ロジック実装（Step 3.5）
-- [ ] カスケードソート実装（候補 >30 件時、Step 3.6）
-- [ ] E1 フロー全体を matching_service.py に統合（Step 3.0〜3.12）
-- [ ] テスト作成（フロー統合テスト）
-- [ ] コミット
+- [x] ✅ 2026-06-08 エンジニア status='proposable' チェック実装（Step 3.4）
+- [x] ✅ 2026-06-08 パイプライン除外ロジック実装（Step 3.5）
+- [x] ✅ 2026-06-08 カスケードソート実装（候補 >30 件時、Step 3.6）
+      （工程経験重複数 → 単価 → 勤務形態 → 開始時期 → 登録日）
+- [x] ✅ 2026-06-08 E1 フロー全体を matching_service.py に統合（Step 3.0〜3.12）
+- [x] ✅ 2026-06-08 上位5件絞込・ソート実装（Step 3.11）
+- [x] ✅ 2026-06-08 テスト作成（フロー統合テスト・35件・カバレッジ100%）
+- [-] 🏃 コミット
 
 ---
 
-## Step 6: E1 エンドポイント完成
+## Step 5: E1 エンドポイント完成
 
 - [ ] routers/matching.py の E1 スタブを実装に差し替え
-- [ ] HTTPException によるエラーレスポンス整形
+- [ ] HTTPException によるエラーレスポンス整形（ENGINEER_NOT_FOUND / EXTERNAL_API_ERROR）
 - [ ] TestClient による E1 エンドポイントテスト
 - [ ] コミット
 
 ---
 
-## Step 7: Google Maps クライアント
+## Step 6: Google Maps クライアント
 
 - [ ] gmaps_service.py 作成
 - [ ] SSM Parameter Store から API キー取得（Nexus-google-maps-key）
@@ -95,9 +88,9 @@
 
 ---
 
-## Step 8: E2 エンドポイント（プロフィール要約）
+## Step 7: E2 エンドポイント（プロフィール要約）
 
-- [ ] プロフィール要約フロー実装（matching_service.py に追加）
+- [ ] プロフィール要約フロー実装（AIプロンプト設計書 v0.3 §2 準拠）
 - [ ] engineers テーブルへの ai_summary / ai_summary_generated_at UPSERT 実装
 - [ ] routers/profile.py の E2 スタブを実装に差し替え
 - [ ] テスト作成

@@ -41,19 +41,32 @@ Pydantic は API の入出力型定義（schemas.py）に使用する。DB→サ
 テスト時にモック差し込みが容易になるため。起動時に初期化すると `import` 時点で AWS 接続が走り、CI 環境で失敗する。`_get_client()` を経由する設計にすることで `mocker.patch.object(svc, "_get_client", ...)` でテスト内に差し込める。
 
 ### アプリ層でランクを検算する理由（AI 出力を使わない）
-設計書 §5.1 の「アプリ層でも検算する（AI が誤った match_rank を返した場合の保険）」に準拠。AI が match_score=85 でも match_rank="C" を返すことがある。アプリ層で `_determine_rank(score)` を実行し、AI 出力のランクは無視する。
+`docs/02_design/backend/AIプロンプト設計書.md`（v0.3）§5.1 の「match_rank の閾値判定はアプリ層でも検算する（AI が誤った match_rank を返した場合の保険）」に準拠。AI が match_score=85 でも match_rank="C" を返すことがある。アプリ層で `_determine_rank(score)` を実行し、AI 出力のランクは無視する。
 
 ### JSON パース失敗時に別プロンプトでリトライする理由
-設計書 §3.6.1 の指定。同じプロンプトで再呼び出しすると同じ形式で失敗する可能性が高い。専用の「JSON のみ出力せよ」指示プロンプトに切り替えることで成功率を上げる。
+`docs/02_design/backend/AIプロンプト設計書.md`（v0.3）§3.6.1 の指定。同じプロンプトで再呼び出しすると同じ形式で失敗する可能性が高い。専用の「JSON のみ出力せよ」指示プロンプトに切り替えることで成功率を上げる。
 
 ### time.sleep をモジュールレベルで参照する理由
 テストで `mocker.patch("app.services.bedrock_service.time.sleep")` によってスリープをスキップできるため。関数内で `import time` を行うとパスが変わりモックが効かなくなる。
 
 ---
 
-## Step 4: スコアリングロジック単体
+## Step 4: マッチング計算フロー（E1 骨格）
 
-（実装時に追記）
+### 旧 Step 4「8次元スコア計算関数（S1〜S8）」を削除した理由
+データモデル・DB設計書 v1.7 にて「ルールベース8項目からAI総合判定に変更」が確定。Python コードが S1〜S8 の計算式を実装する旧仕様は廃止され、AI が 8 観点をプロンプトで指示された上で総合判定する。Python が担う計算はクランプとランク検算のみ（Step 3 で実装済み）。
+
+### カスケードソートで使う3指標を関数に分離した理由
+`_proc_overlap_count` / `_rate_in_range` / `_work_style_match` を個別関数として切り出すことで、`_cascade_sort` の sort_key が読みやすくなり、各指標を独立してテストできる。単一責任の原則（SRP）に従い、ソートキーの組み立てとカスケードロジックを分離した。
+
+### proposable 以外エンジニアでもフローを続行する理由
+エラーレスポンスの仕様（スコアリングロジック設計書 v0.6）に「エンジニアが proposable でない場合のエラーコード」が定義されていない。UI でもマッチングボタンはステータスに関係なく表示される（画面一覧・遷移図 WF_03/WF_05 確認済み）。ログ警告を記録するにとどめ、フローは正常続行する。
+
+### bedrock_service をローカルインポートする理由
+`bedrock_service.py` が `matching_service.py` の `EngineerData` / `ProjectData` をインポートしている。`matching_service.py` のトップレベルで `bedrock_service` をインポートすると循環インポートになる。`calculate_matching` 関数内でローカルインポートすることで解決する（Python のモジュールキャッシュにより実行時コストは初回のみ）。
+
+### _get_commute_time_minutes をスタブとして残す理由
+Step 6（Google Maps クライアント）が未実装のため、暫定的に `None` を返すスタブを配置する。呼び出し箇所は `calculate_matching` の1か所のみなので、Step 6 実装時に差し替えコストが最小化される。`invoke_matching` は `commute_time_minutes=None` を受け付けプロンプトに「NULL（算出失敗）」と出力するため、スタブのままでも AI 判定は機能する。
 
 ---
 

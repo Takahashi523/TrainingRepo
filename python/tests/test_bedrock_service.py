@@ -44,6 +44,7 @@ def reset_bedrock_client():
 def _make_engineer(**overrides) -> EngineerData:
     defaults = dict(
         id=1,
+        status="proposable",
         appeal_note="Java 10年・Spring Boot 経験豊富。顧客折衝経験あり。",
         has_negotiation_exp=1,
         available_from=date(2026, 7, 1),

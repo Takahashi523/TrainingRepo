@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -32,6 +36,7 @@ class EngineerSkill:
 @dataclass
 class EngineerData:
     id: int
+    status: Optional[str]            # proposable / interviewing / not_proposable
     appeal_note: Optional[str]
     has_negotiation_exp: Optional[int]
     available_from: Optional[object]   # datetime.date or None
@@ -77,13 +82,32 @@ class ProjectData:
     skills: list[ProjectSkill] = field(default_factory=list)
 
 
+@dataclass
+class MatchCandidate:
+    """AI 総合判定結果（1案件分）。"""
+    project_id: int
+    match_score: int    # 0〜100（クランプ済み）
+    match_rank: str     # A / B / C / D（アプリ層で検算済み）
+    ai_score_reason: str
+    ai_comment: str
+    ai_missing: str
+
+
+@dataclass
+class MatchingOutput:
+    """calculate_matching の戻り値。"""
+    engineer_id: int
+    generated_at: datetime
+    matches: list[MatchCandidate]
+
+
 # ---------------------------------------------------------------------------
 # 定数
 # ---------------------------------------------------------------------------
 
 # SELECT * を避け、AIマッチングに必要なカラムのみを明示的に指定する
 _ENGINEER_COLUMNS = (
-    "id, appeal_note, has_negotiation_exp, available_from,"
+    "id, status, appeal_note, has_negotiation_exp, available_from,"
     " desired_rate, nearest_station,"
     " proc_requirements, proc_basic_design, proc_detail_design,"
     " proc_development, proc_testing, proc_maintenance,"
@@ -97,6 +121,14 @@ _PROJECT_COLUMNS = (
     " proc_development, proc_testing, proc_maintenance,"
     " created_at"
 )
+
+_PROC_FIELDS = [
+    "proc_requirements", "proc_basic_design", "proc_detail_design",
+    "proc_development", "proc_testing", "proc_maintenance",
+]
+
+_DATE_MAX = date.max
+_DATETIME_MAX = datetime.max
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +154,7 @@ def fetch_engineer(db: Session, engineer_id: int) -> EngineerData:
 
     return EngineerData(
         id=row.id,
+        status=row.status,
         appeal_note=row.appeal_note,
         has_negotiation_exp=row.has_negotiation_exp,
         available_from=row.available_from,
@@ -215,3 +248,121 @@ def fetch_registered_project_ids(db: Session, engineer_id: int) -> set[int]:
         {"engineer_id": engineer_id},
     ).fetchall()
     return {r.project_id for r in rows}
+
+
+# ---------------------------------------------------------------------------
+# カスケードソートヘルパー（Step 3.6）
+# ---------------------------------------------------------------------------
+
+def _proc_overlap_count(engineer: EngineerData, project: ProjectData) -> int:
+    """エンジニアと案件の工程経験重複数を返す。"""
+    return sum(
+        1 for f in _PROC_FIELDS
+        if getattr(engineer, f) == 1 and getattr(project, f) == 1
+    )
+
+
+def _rate_in_range(engineer: EngineerData, project: ProjectData) -> bool:
+    """エンジニアの希望単価が案件の単価レンジ内かを返す。"""
+    if engineer.desired_rate is None or project.rate_min is None or project.rate_max is None:
+        return False
+    return project.rate_min <= engineer.desired_rate <= project.rate_max
+
+
+def _work_style_match(engineer: EngineerData, project: ProjectData) -> bool:
+    """エンジニアの勤務形態希望と案件の稼働形態が適合するかを返す。"""
+    return (
+        (project.work_style == "onsite" and engineer.work_style_onsite == 1)
+        or (project.work_style == "hybrid" and engineer.work_style_hybrid == 1)
+        or (project.work_style == "remote" and engineer.work_style_remote == 1)
+    )
+
+
+def _cascade_sort(
+    candidates: list[ProjectData],
+    engineer: EngineerData,
+) -> list[ProjectData]:
+    """候補 >30 件時の絞込ソート（スコアリングロジック設計書 v0.6 §3.6 準拠）。
+    工程経験重複数(降順) → 単価適合(降順) → 勤務形態適合(降順) → 開始時期(昇順) → 登録日(昇順)
+    """
+    def sort_key(p: ProjectData) -> tuple:
+        return (
+            -_proc_overlap_count(engineer, p),
+            0 if _rate_in_range(engineer, p) else 1,
+            0 if _work_style_match(engineer, p) else 1,
+            p.start_date or _DATE_MAX,
+            p.created_at or _DATETIME_MAX,
+        )
+    return sorted(candidates, key=sort_key)
+
+
+# ---------------------------------------------------------------------------
+# 通勤時間スタブ（Step 6 で gmaps_service に差し替え）
+# ---------------------------------------------------------------------------
+
+def _get_commute_time_minutes(
+    engineer: EngineerData,
+    project: ProjectData,
+) -> Optional[int]:
+    return None
+
+
+# ---------------------------------------------------------------------------
+# E1 マッチング計算フロー（Step 3.0〜3.12）
+# ---------------------------------------------------------------------------
+
+def calculate_matching(
+    db: Session,
+    engineer_id: int,
+    project_ids: Optional[list[int]],
+) -> MatchingOutput:
+    """E1 マッチング計算のメインフロー（AIプロンプト設計書 v0.3 / スコアリングロジック設計書 v0.6 準拠）。
+    bedrock_service は循環インポート回避のためローカルインポートする。
+    """
+    from app.services.bedrock_service import invoke_matching
+
+    # Step 3.1: エンジニア情報取得（存在しない場合は EngineerNotFoundError を送出）
+    engineer = fetch_engineer(db, engineer_id)
+
+    # Step 3.4: proposable 以外でもマッチング実行可能だが警告を記録
+    if engineer.status != "proposable":
+        logger.warning(
+            "engineer_id=%d status=%s で calculate_matching を実行",
+            engineer_id,
+            engineer.status,
+        )
+
+    # Step 3.2 + 3.3: 全 open 案件取得（project_ids 指定時はフィルタ）
+    projects = fetch_active_projects(db, project_ids=project_ids)
+
+    # Step 3.5: パイプライン登録済み案件を除外（AI 呼び出し前に除外しコストを削減）
+    registered_ids = fetch_registered_project_ids(db, engineer_id)
+    candidates = [p for p in projects if p.id not in registered_ids]
+
+    # Step 3.6: 候補 >30 件ならカスケードソートで上位 30 件に絞込
+    if len(candidates) > 30:
+        candidates = _cascade_sort(candidates, engineer)[:30]
+
+    # Step 3.7〜3.10: 案件ごとに通勤時間取得 → Bedrock AI 総合判定 → クランプ・ランク検算
+    results: list[MatchCandidate] = []
+    for project in candidates:
+        commute_time = _get_commute_time_minutes(engineer, project)   # Step 3.7（スタブ）
+        ai_result = invoke_matching(engineer, project, commute_time)  # Step 3.8〜3.10
+        results.append(MatchCandidate(
+            project_id=project.id,
+            match_score=ai_result.match_score,
+            match_rank=ai_result.match_rank,
+            ai_score_reason=ai_result.ai_score_reason,
+            ai_comment=ai_result.ai_comment,
+            ai_missing=ai_result.ai_missing,
+        ))
+
+    # Step 3.11: スコア降順ソート → 上位5件
+    results.sort(key=lambda r: r.match_score, reverse=True)
+    top5 = results[:5]
+
+    return MatchingOutput(
+        engineer_id=engineer_id,
+        generated_at=datetime.now(timezone.utc),
+        matches=top5,
+    )
