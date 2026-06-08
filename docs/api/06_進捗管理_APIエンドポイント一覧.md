@@ -1,8 +1,8 @@
 # 進捗管理（Pipeline）APIエンドポイント一覧
 
 > 技術方針：Laravel + Inertia.js + React  
-> 最終更新：2026-05-27  
-> 前提・凡例・SharedProps・共通HTTPレスポンスは `00_共通仕様_APIエンドポイント一覧.md` を参照すること。
+> 最終更新：2026-06-08  
+> 前提・凡例・SharedProps・共通HTTPレスポンスは `00_共通仕様_APIエンドポイント一覧.md` を参照すること。  
 
 ---
 
@@ -181,9 +181,9 @@
 | keyword | string | 任意 | 人材名・案件名で部分一致検索 | |
 | status | string[] | 任意 | 終了ステータスフィルタ | rejected / closed / assign_declined / declined |
 | user_id | int | 任意 | 担当営業フィルタ | 未指定時は全員表示（WF_10の完了済みタブ仕様） |
-| ended_from | date | 任意 | 日付範囲フィルタ（開始） | ⚠ 絞り込み対象はTBD#5。現在は `pipelines.updated_at` で絞り込む暫定仕様 |
-| ended_to | date | 任意 | 日付範囲フィルタ（終了） | ⚠ 絞り込み対象はTBD#5。現在は `pipelines.updated_at` で絞り込む暫定仕様 |
-| sort | string | 任意 | ソート項目 | デフォルト：updated_at。有効値：updated_at / match_score / engineer_name / project_name |
+| ended_from | date | 任意 | 日付範囲フィルタ（開始） | `pipelines.ended_at` で絞り込む |
+| ended_to | date | 任意 | 日付範囲フィルタ（終了） | `pipelines.ended_at` で絞り込む |
+| sort | string | 任意 | ソート項目 | デフォルト：ended_at。有効値：ended_at / match_score |
 | order | string | 任意 | 並び順 | asc / desc（デフォルト：desc） |
 
 > 完了済みタブは進行中タブと異なり担当フィルタの初期値が「全員」（WF_10注記より）
@@ -201,8 +201,9 @@
       "status": "string",                   // 終了ステータス値（rejected / closed / assign_declined / declined）
       "status_label": "string",             // 表示名（不成立 / 募集終了 / アサイン辞退 / 辞退）
       "ng_reason": "string",                // NG理由・備考。null許容
-      "updated_at": "datetime(ISO8601)",    // 終了日として表示（WF_10のテーブル列「終了日」）
-                                            // ⚠ 終了専用の日付カラムはDBに存在しないため updated_at で代替（TBD#5）
+      "ended_at": "datetime(ISO8601)",      // 終了日
+                                            // 終了ステータスへ遷移したタイミングで記録（pipelines.ended_at）
+                                            // 未終了の場合はnull
       "engineer": {
         "id": "int",
         "name": "string",
@@ -224,9 +225,9 @@
     "keyword": "string",
     "status": ["string"],
     "user_id": "int",
-    "ended_from": "date",  // ⚠ 絞り込み対象はTBD#5。現在は updated_at で絞り込む暫定仕様
-    "ended_to": "date",    // ⚠ 絞り込み対象はTBD#5。現在は updated_at で絞り込む暫定仕様
-    "sort": "string",      // デフォルト：updated_at（WF_10の「終了日（新しい順）」に対応）
+    "ended_from": "date",  // pipelines.ended_at で絞り込む
+    "ended_to": "date",    // pipelines.ended_at で絞り込む
+    "sort": "string",      // デフォルト：ended_at（WF_10の「終了日（新しい順）」に対応）
     "order": "string"
   },
 
@@ -243,7 +244,7 @@
 ```
 
 > **実装注意（TEXT除外）**：`client_comment` / `ai_score_reason` / `ai_comment` / `ai_missing` はTEXTカラムのため完了済み一覧では取得しないこと  
-> **実装注意（updated_at）**：WF_10の「終了日」列は `pipelines.updated_at` を表示する。終了専用の日付カラムはDBに存在しない（TBD#5）
+> **実装注意（ended_at）**：WF_10の「終了日」列は `pipelines.ended_at` を表示する。終了ステータスへ遷移したタイミングでアプリ層から `ended_at = now()` を記録すること。未終了の場合はNULL  
 
 ---
 
@@ -257,7 +258,7 @@
   "pipeline": {
     "id": "int",
     "status": "string",                            // 現在のステータス値
-    "status_label": "string",                      // 表示名（不成立 / 募集終了 / アサイン辞退 / 辞退）
+    "status_label": "string",                      // 現在のステータスの表示名（例：上位提案 / 一次調整中 等）
     "match_score": "int",                          // マッチングスコア（追加時スナップショット）
     "match_rank": "string",                        // A | B | C | D
     "ai_score_reason": "string",                   // AIスコア算出理由（追加時スナップショット）
@@ -346,9 +347,7 @@
 
 ---
 
----
-
-## 3. 他機能との関連
+## 2. 他機能との関連
 
 ### マッチング画面との連携（POST /pipelines に相当する処理）
 
@@ -376,7 +375,7 @@
 
 ---
 
-## 4. 未確定事項（TBD）
+## 3. 未確定事項（TBD）
 
 | # | 項目 | QA# | 理由 |
 |---|------|-----|------|
@@ -384,4 +383,3 @@
 | 2 | `client_comment` / `ng_reason` の文字数上限 | - | DBがTEXT型のためDB上限なし。バリデーション上の制限値を設けるか確認が必要 |
 | 3 | ドロワーの実装方式（GET /pipelines/{id} の要否） | - | Inertia.js でドロワーを実装する場合、別途GETエンドポイントが必要かフロント側で一覧データを使い回すかは実装判断に委ねる。一覧PropsにTEXTカラム（ai_score_reason等）を含めるとパフォーマンス劣化のリスクがあるため、別途GETを推奨する |
 | 4 | 完了済みタブの件数上限・ページネーション要否 | - | WF_10に件数表示「14件」があるが、ページネーションの記載なし。件数が増加した場合の対応を確認すること |
-| 5 | 完了済みタブの日付範囲フィルタの絞り込み対象 | - | WF_10の完了済みタブに日付〜日付の入力枠があるが、何の日付で絞り込むか（終了日 / 参画開始時期 / 追加日等）がQA・DB設計書に明記されておらず未確定。**現在は「終了日 = `pipelines.updated_at`」として絞り込む仕様を暫定で記載している**（`ended_from` / `ended_to` パラメータ・`updated_at` での絞り込み）。確定後に本書のクエリパラメータ定義・バリデーション・Props定義・実装コメントを更新すること |
