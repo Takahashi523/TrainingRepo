@@ -53,9 +53,6 @@ Pydantic は API の入出力型定義（schemas.py）に使用する。DB→サ
 
 ## Step 4: マッチング計算フロー（E1 骨格）
 
-### 旧 Step 4「8次元スコア計算関数（S1〜S8）」を削除した理由
-データモデル・DB設計書 v1.7 にて「ルールベース8項目からAI総合判定に変更」が確定。Python コードが S1〜S8 の計算式を実装する旧仕様は廃止され、AI が 8 観点をプロンプトで指示された上で総合判定する。Python が担う計算はクランプとランク検算のみ（Step 3 で実装済み）。
-
 ### カスケードソートで使う3指標を関数に分離した理由
 `_proc_overlap_count` / `_rate_in_range` / `_work_style_match` を個別関数として切り出すことで、`_cascade_sort` の sort_key が読みやすくなり、各指標を独立してテストできる。単一責任の原則（SRP）に従い、ソートキーの組み立てとカスケードロジックを分離した。
 
@@ -70,9 +67,16 @@ Step 6（Google Maps クライアント）が未実装のため、暫定的に `
 
 ---
 
-## Step 5: マッチング計算フロー
+## Step 5: E1 エンドポイント完成
 
-（実装時に追記）
+### エラーハンドラーを main.py に集約した理由
+Router に try/except を書くと「HTTP ステータスへの変換ロジック」がルーター層に混入する。`@app.exception_handler` で main.py に集約することで、Router は薄く保たれ（ビジネスロジックなし）、エラーレスポンス形式の変更がファイル1か所で完結する。
+
+### run_matching としてインポートしエイリアスした理由
+Router 関数名を `matching_calculate` にすると `calculate_matching`（サービス層関数）と区別できる。エイリアスにより「呼び出し元（router）がどの関数を呼んでいるか」がテスト時の `mocker.patch("app.routers.matching.run_matching")` で明示される。
+
+### dependency_overrides で DB を差し替えた理由
+TestClient でエンドポイントを叩く際に実 DB に接続させないため。`app.dependency_overrides[get_db] = lambda: MagicMock()` により Depends(get_db) が差し替わり、テスト環境に MySQL が不要になる。
 
 ---
 

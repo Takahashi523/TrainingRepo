@@ -62,16 +62,16 @@
 - [x] ✅ 2026-06-08 E1 フロー全体を matching_service.py に統合（Step 3.0〜3.12）
 - [x] ✅ 2026-06-08 上位5件絞込・ソート実装（Step 3.11）
 - [x] ✅ 2026-06-08 テスト作成（フロー統合テスト・35件・カバレッジ100%）
-- [-] 🏃 コミット
+- [x] ✅ 2026-06-08 コミット
 
 ---
 
 ## Step 5: E1 エンドポイント完成
 
-- [ ] routers/matching.py の E1 スタブを実装に差し替え
-- [ ] HTTPException によるエラーレスポンス整形（ENGINEER_NOT_FOUND / EXTERNAL_API_ERROR）
-- [ ] TestClient による E1 エンドポイントテスト
-- [ ] コミット
+- [x] ✅ 2026-06-08 routers/matching.py の E1 スタブを実装に差し替え
+- [x] ✅ 2026-06-08 HTTPException によるエラーレスポンス整形（ENGINEER_NOT_FOUND / EXTERNAL_API_ERROR）
+- [x] ✅ 2026-06-08 TestClient による E1 エンドポイントテスト（8件・カバレッジ100%）
+- [x] ✅ 2026-06-08 コミット
 
 ---
 
