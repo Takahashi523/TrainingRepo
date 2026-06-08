@@ -37,7 +37,17 @@ Pydantic は API の入出力型定義（schemas.py）に使用する。DB→サ
 
 ## Step 3: Bedrock クライアント
 
-（実装時に追記）
+### Bedrock クライアントを遅延シングルトンにする理由
+テスト時にモック差し込みが容易になるため。起動時に初期化すると `import` 時点で AWS 接続が走り、CI 環境で失敗する。`_get_client()` を経由する設計にすることで `mocker.patch.object(svc, "_get_client", ...)` でテスト内に差し込める。
+
+### アプリ層でランクを検算する理由（AI 出力を使わない）
+設計書 §5.1 の「アプリ層でも検算する（AI が誤った match_rank を返した場合の保険）」に準拠。AI が match_score=85 でも match_rank="C" を返すことがある。アプリ層で `_determine_rank(score)` を実行し、AI 出力のランクは無視する。
+
+### JSON パース失敗時に別プロンプトでリトライする理由
+設計書 §3.6.1 の指定。同じプロンプトで再呼び出しすると同じ形式で失敗する可能性が高い。専用の「JSON のみ出力せよ」指示プロンプトに切り替えることで成功率を上げる。
+
+### time.sleep をモジュールレベルで参照する理由
+テストで `mocker.patch("app.services.bedrock_service.time.sleep")` によってスリープをスキップできるため。関数内で `import time` を行うとパスが変わりモックが効かなくなる。
 
 ---
 

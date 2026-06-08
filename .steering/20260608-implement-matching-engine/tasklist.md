@@ -35,19 +35,20 @@
 - [x] ✅ 2026-06-08 pipelines テーブルから既登録案件 ID 取得（パイプライン除外用）
 - [x] ✅ 2026-06-08 ENGINEER_NOT_FOUND エラーハンドリング実装
 - [x] ✅ 2026-06-08 テスト作成（tests/test_matching_service.py・13件・カバレッジ100%）
-- [ ] コミット
+- [x] ✅ 2026-06-08 コミット
 
 ---
 
 ## Step 3: Bedrock クライアント
 
-- [ ] bedrock_service.py 作成
-- [ ] boto3 bedrock-runtime クライアント初期化
-- [ ] invoke_model 呼び出しラッパー実装
-- [ ] AIプロンプト設計書 §2 準拠のプロンプト組み立て
-- [ ] レスポンス JSON パース（ai_score_reason / ai_comment / ai_missing）
-- [ ] EXTERNAL_API_ERROR エラーハンドリング実装
-- [ ] テスト作成（pytest-mock でモック化）
+- [x] ✅ 2026-06-08 bedrock_service.py 作成
+- [x] ✅ 2026-06-08 boto3 bedrock-runtime クライアント初期化（遅延シングルトン）
+- [x] ✅ 2026-06-08 invoke_model 呼び出しラッパー実装（指数バックオフ・最大3回リトライ）
+- [x] ✅ 2026-06-08 AIプロンプト設計書 §3.3 準拠のプロンプト組み立て
+- [x] ✅ 2026-06-08 レスポンス JSON パース・コードフェンス除去（ai_score_reason / ai_comment / ai_missing）
+- [x] ✅ 2026-06-08 BedrockError 例外・JSON パース失敗時リトライ（§3.6.1 専用プロンプト）
+- [x] ✅ 2026-06-08 アプリ層クランプ処理（max(0, raw_score)）・ランク検算
+- [x] ✅ 2026-06-08 テスト作成（tests/test_bedrock_service.py・32件・カバレッジ97%）
 - [ ] コミット
 
 ---
