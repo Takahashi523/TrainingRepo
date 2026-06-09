@@ -89,14 +89,14 @@
 
 ## Step 6: Google Maps クライアント
 
-- [ ] gmaps_service.py 作成
-- [ ] SSM Parameter Store から API キー取得（Nexus-google-maps-key）
-- [ ] Distance Matrix API 呼び出し実装
-- [ ] commute_time_minutes 算出（秒→分変換）
-- [ ] EXTERNAL_API_ERROR エラーハンドリング実装
-- [ ] テスト作成（pytest-mock でモック化）
-- [ ] E1 フローへの組み込み（Step 3.7）
-- [ ] コミット
+- [x] ✅ 2026-06-09 gmaps_service.py 作成
+- [x] ✅ 2026-06-09 SSM Parameter Store から API キー取得（Nexus-google-maps-key）
+- [x] ✅ 2026-06-09 Distance Matrix API 呼び出し実装
+- [x] ✅ 2026-06-09 commute_time_minutes 算出（秒→分変換）
+- [x] ✅ 2026-06-09 失敗時は None を返しマッチングフロー継続（API仕様に EXTERNAL_API_ERROR なし）
+- [x] ✅ 2026-06-09 テスト作成（pytest-mock でモック化・10件）
+- [x] ✅ 2026-06-09 E1 フローへの組み込み（Step 3.7）
+- [x] ✅ 2026-06-09 コミット
 
 ---
 

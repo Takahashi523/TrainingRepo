@@ -304,14 +304,18 @@ def _cascade_sort(
 
 
 # ---------------------------------------------------------------------------
-# 通勤時間スタブ（Step 6 で gmaps_service に差し替え）
+# 通勤時間取得（Google Maps Distance Matrix API）
 # ---------------------------------------------------------------------------
 
 def _get_commute_time_minutes(
     engineer: EngineerData,
     project: ProjectData,
 ) -> Optional[int]:
-    return None
+    from app.services.gmaps_service import get_commute_time_minutes
+    return get_commute_time_minutes(
+        origin=engineer.nearest_station or "",
+        destination=project.work_location_station or "",
+    )
 
 
 # ---------------------------------------------------------------------------
