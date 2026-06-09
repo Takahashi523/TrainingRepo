@@ -102,11 +102,11 @@
 
 ## Step 7: E2 エンドポイント（プロフィール要約）
 
-- [ ] プロフィール要約フロー実装（AIプロンプト設計書 v0.3 §2 準拠）
-- [ ] engineers テーブルへの ai_summary / ai_summary_generated_at UPSERT 実装
-- [ ] routers/profile.py の E2 スタブを実装に差し替え
-- [ ] テスト作成
-- [ ] コミット
+- [x] ✅ 2026-06-09 プロフィール要約フロー実装（AIプロンプト設計書 v0.3 §4 準拠）
+- [x] ✅ 2026-06-09 engineers テーブルへの ai_summary / ai_summary_generated_at UPDATE 実装
+- [x] ✅ 2026-06-09 routers/profile.py の E2 スタブを実装に差し替え
+- [x] ✅ 2026-06-09 テスト作成（サービス層5件・ルーター層5件）
+- [x] ✅ 2026-06-09 コミット
 
 ---
 

@@ -383,3 +383,46 @@ def calculate_matching(
         generated_at=datetime.now(timezone.utc),
         matches=results[:_MAX_MATCHES],
     )
+
+
+# ---------------------------------------------------------------------------
+# E2 プロフィール要約フロー（AIプロンプト設計書 v0.3 §4 準拠）
+# ---------------------------------------------------------------------------
+
+def generate_profile_summary(db: Session, engineer_id: int) -> tuple[str, datetime]:
+    """E2 プロフィール要約のメインフロー。
+
+    1. エンジニア情報取得（存在しない場合は EngineerNotFoundError）
+    2. Bedrock でプロフィール要約生成（appeal_note が空なら空文字を返す）
+    3. 要約テキストがある場合のみ engineers テーブルを UPDATE
+    4. (ai_summary, generated_at) を返す
+    """
+    from app.services.bedrock_service import invoke_profile_summary
+
+    # Step 8.1: エンジニア情報取得
+    engineer = fetch_engineer(db, engineer_id)
+
+    # Step 8.2: Bedrock でプロフィール要約生成
+    # appeal_note が空の場合は invoke_profile_summary が "" を返す
+    ai_summary = invoke_profile_summary(engineer.appeal_note or "")
+
+    generated_at = datetime.now(timezone.utc)
+
+    # Step 8.3: 要約テキストがある場合のみ DB を更新（AIプロンプト設計書 §4.6）
+    # 空出力時は ai_summary / ai_summary_generated_at を更新しない
+    if ai_summary:
+        db.execute(
+            text(
+                "UPDATE engineers"
+                " SET ai_summary = :ai_summary, ai_summary_generated_at = :generated_at"
+                " WHERE id = :engineer_id"
+            ),
+            {
+                "ai_summary": ai_summary,
+                "generated_at": generated_at,
+                "engineer_id": engineer_id,
+            },
+        )
+        db.commit()
+
+    return ai_summary, generated_at

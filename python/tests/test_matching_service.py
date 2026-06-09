@@ -23,6 +23,7 @@ from app.services.matching_service import (
     fetch_active_projects,
     fetch_engineer,
     fetch_registered_project_ids,
+    generate_profile_summary,
 )
 
 
@@ -607,3 +608,79 @@ class TestCalculateMatching:
 
         assert len(result.matches) == 3
         assert result.engineer_id == 1
+
+
+# ---------------------------------------------------------------------------
+# E2 プロフィール要約フロー
+# ---------------------------------------------------------------------------
+
+class TestGenerateProfileSummary:
+    def test_returns_summary_and_generated_at(self, mocker):
+        """正常系：ai_summary と generated_at を返すこと。"""
+        engineer = _make_engineer(appeal_note="Pythonエンジニアとして5年の経験があります。")
+        mocker.patch("app.services.matching_service.fetch_engineer", return_value=engineer)
+        mocker.patch(
+            "app.services.bedrock_service.invoke_profile_summary",
+            return_value="Pythonを中心に5年の経験を持つエンジニアです。",
+        )
+        mock_db = MagicMock()
+
+        ai_summary, generated_at = generate_profile_summary(mock_db, engineer_id=1)
+
+        assert ai_summary == "Pythonを中心に5年の経験を持つエンジニアです。"
+        assert generated_at is not None
+
+    def test_updates_db_when_summary_is_not_empty(self, mocker):
+        """要約テキストがある場合、engineers テーブルを UPDATE すること。"""
+        engineer = _make_engineer(appeal_note="アピールポイントあり")
+        mocker.patch("app.services.matching_service.fetch_engineer", return_value=engineer)
+        mocker.patch(
+            "app.services.bedrock_service.invoke_profile_summary",
+            return_value="要約テキスト",
+        )
+        mock_db = MagicMock()
+
+        generate_profile_summary(mock_db, engineer_id=1)
+
+        mock_db.execute.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_skips_db_update_when_summary_is_empty(self, mocker):
+        """appeal_note が空で要約テキストが空の場合、DB を更新しないこと（AIプロンプト設計書 §4.6）。"""
+        engineer = _make_engineer(appeal_note="")
+        mocker.patch("app.services.matching_service.fetch_engineer", return_value=engineer)
+        mocker.patch(
+            "app.services.bedrock_service.invoke_profile_summary",
+            return_value="",
+        )
+        mock_db = MagicMock()
+
+        ai_summary, _ = generate_profile_summary(mock_db, engineer_id=1)
+
+        assert ai_summary == ""
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_not_called()
+
+    def test_engineer_not_found_propagates(self, mocker):
+        """存在しない engineer_id の場合、EngineerNotFoundError が伝播すること。"""
+        mocker.patch(
+            "app.services.matching_service.fetch_engineer",
+            side_effect=EngineerNotFoundError(999),
+        )
+
+        with pytest.raises(EngineerNotFoundError):
+            generate_profile_summary(MagicMock(), engineer_id=999)
+
+    def test_bedrock_error_propagates(self, mocker):
+        """Bedrock 呼び出し失敗時、BedrockError が伝播すること（→ main.py で 504 に変換）。"""
+        from app.services.bedrock_service import BedrockError
+
+        engineer = _make_engineer(appeal_note="アピールあり")
+        mocker.patch("app.services.matching_service.fetch_engineer", return_value=engineer)
+        mocker.patch(
+            "app.services.bedrock_service.invoke_profile_summary",
+            side_effect=BedrockError("タイムアウト"),
+        )
+
+        with pytest.raises(BedrockError):
+            generate_profile_summary(MagicMock(), engineer_id=1)
