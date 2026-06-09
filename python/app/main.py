@@ -1,9 +1,14 @@
+import logging
+
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.routers import matching, profile
 from app.services.bedrock_service import BedrockError
 from app.services.matching_service import EngineerNotFoundError, NoActiveCandidateError
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Nexus Matching Engine",
@@ -13,6 +18,23 @@ app = FastAPI(
 
 app.include_router(matching.router)
 app.include_router(profile.router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={"error_code": "INVALID_PARAMETER", "message": str(exc)},
+    )
+
+
+@app.exception_handler(Exception)
+async def internal_error_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception", exc_info=exc)
+    return JSONResponse(
+        status_code=500,
+        content={"error_code": "INTERNAL_ERROR", "message": "内部エラーが発生しました"},
+    )
 
 
 @app.exception_handler(EngineerNotFoundError)

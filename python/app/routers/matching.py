@@ -18,17 +18,10 @@ def matching_calculate(request: MatchingRequest, db: Session = Depends(get_db)):
     """E1 マッチングスコア計算エンドポイント。
     エラーは main.py の exception_handler で各エラーコードに変換される。
     """
-    output = run_matching(
-        db,
-        request.engineer_id,
-        request.project_ids,
-        request.limit if request.limit is not None else 5,
-        request.rank_filter,
-    )
+    output = run_matching(db, request.engineer_id, request.project_ids)
     return MatchingResponse(
         engineer_id=output.engineer_id,
         generated_at=output.generated_at.isoformat(),
-        total_hits=output.total_hits,
         matches=[
             MatchResult(
                 project_id=m.project_id,

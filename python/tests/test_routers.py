@@ -51,7 +51,6 @@ def _make_output(engineer_id: int = 1, num_matches: int = 2) -> MatchingOutput:
     return MatchingOutput(
         engineer_id=engineer_id,
         generated_at=datetime(2026, 6, 8, 10, 0, 0, tzinfo=timezone.utc),
-        total_hits=num_matches,
         matches=matches,
     )
 
@@ -88,7 +87,6 @@ class TestMatchingCalculate:
         assert response.status_code == 200
         body = response.json()
         assert body["engineer_id"] == 1
-        assert body["total_hits"] == 2
         assert len(body["matches"]) == 2
         assert body["matches"][0]["match_score"] == 75
         assert body["matches"][0]["match_rank"] == "B"
@@ -189,11 +187,12 @@ class TestMatchingCalculate:
         assert body["error_code"] == "NO_ACTIVE_PROJECT"
         assert "message" in body
 
-    def test_returns_422_for_missing_engineer_id(self):
-        """engineer_id が未指定の場合、Pydantic バリデーションエラー 422 を返すこと。"""
+    def test_returns_400_for_missing_engineer_id(self):
+        """engineer_id が未指定の場合、400 INVALID_PARAMETER を返すこと（スコアリングロジック設計書 §4.2）。"""
         response = client.post(
             "/api/v1/matching/calculate",
             json={},
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
+        assert response.json()["error_code"] == "INVALID_PARAMETER"

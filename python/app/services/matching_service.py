@@ -105,7 +105,6 @@ class MatchingOutput:
     """calculate_matching の戻り値。"""
     engineer_id: int
     generated_at: datetime
-    total_hits: int          # limit 適用前の候補件数
     matches: list[MatchCandidate]
 
 
@@ -319,12 +318,13 @@ def _get_commute_time_minutes(
 # E1 マッチング計算フロー（Step 3.0〜3.12）
 # ---------------------------------------------------------------------------
 
+_MAX_MATCHES = 5  # QA#33・QA#50 確定値
+
+
 def calculate_matching(
     db: Session,
     engineer_id: int,
     project_ids: Optional[list[int]],
-    limit: int = 5,
-    rank_filter: Optional[list[str]] = None,
 ) -> MatchingOutput:
     """E1 マッチング計算のメインフロー（AIプロンプト設計書 v0.3 / スコアリングロジック設計書 v0.6 準拠）。
     bedrock_service は循環インポート回避のためローカルインポートする。
@@ -371,15 +371,11 @@ def calculate_matching(
             ai_missing=ai_result.ai_missing,
         ))
 
-    # Step 3.11: スコア降順ソート → rank_filter 適用 → total_hits 確定 → limit 件数絞込
+    # Step 3.11: スコア降順ソート → 上位5件に絞込（QA#33・QA#50 確定）
     results.sort(key=lambda r: r.match_score, reverse=True)
-    if rank_filter:
-        results = [r for r in results if r.match_rank in rank_filter]
-    total_hits = len(results)
 
     return MatchingOutput(
         engineer_id=engineer_id,
         generated_at=datetime.now(timezone.utc),
-        total_hits=total_hits,
-        matches=results[:limit],
+        matches=results[:_MAX_MATCHES],
     )

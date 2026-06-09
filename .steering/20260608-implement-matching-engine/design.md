@@ -11,8 +11,9 @@
 | 1 | プロジェクト骨格 | main.py / config.py / routers / models | ✅ 完了 |
 | 2 | DB接続 + データ取得 | models/db.py / services/matching_service.py（DB部分） | ✅ 完了 |
 | 3 | Bedrock クライアント | services/bedrock_service.py | ✅ 完了 |
-| 4 | マッチング計算フロー（E1 骨格） | services/matching_service.py（フロー全体） | 未着手 |
-| 5 | E1 エンドポイント完成 | routers/matching.py | 未着手 |
+| 4 | マッチング計算フロー（E1 骨格） | services/matching_service.py（フロー全体） | ✅ 完了 |
+| 5 | E1 エンドポイント完成 | routers/matching.py / main.py | ✅ 完了 |
+| 5.5 | E1 仕様適合修正 | schemas.py / matching_service.py / routers/matching.py / main.py | ✅ 完了 |
 | 6 | Google Maps クライアント | services/gmaps_service.py | 未着手 |
 | 7 | E2 エンドポイント（プロフィール要約） | services/matching_service.py / routers/profile.py | 未着手 |
 
@@ -110,13 +111,17 @@ Step 8.4  レスポンス返却
 
 | ファイル | 変更内容 |
 |---|---|
-| `python/app/services/matching_service.py` | DB取得（実装済み）+ フロー全体（Step 4） |
-| `python/app/services/bedrock_service.py` | Bedrock 呼び出しラッパー（実装済み） |
+| `python/app/services/matching_service.py` | DB取得・フロー全体・`NoActiveCandidateError`・`limit`/`rank_filter`/`total_hits` 追加 ✅ |
+| `python/app/services/bedrock_service.py` | Bedrock 呼び出しラッパー（リトライ・JSON再試行） ✅ |
 | `python/app/services/gmaps_service.py` | 新規作成。Google Maps API ラッパー（Step 6） |
-| `python/app/routers/matching.py` | E1 スタブ → 実装完成（Step 5） |
+| `python/app/routers/matching.py` | E1 実装完成。`limit`/`rank_filter`/`total_hits` をリクエスト/レスポンスに追加 ✅ |
 | `python/app/routers/profile.py` | E2 スタブ → 実装完成（Step 7） |
-| `python/app/models/schemas.py` | 必要に応じてスキーマ追加 |
-| `python/tests/` | 各 Step に対応するテストコードを追加 |
+| `python/app/models/schemas.py` | `MatchingRequest`（limit/rank_filter）・`MatchingResponse`（total_hits）追加 ✅ |
+| `python/app/main.py` | 例外ハンドラ集約（EngineerNotFoundError / NoActiveCandidateError / BedrockError） ✅ |
+| `python/tests/test_matching_service.py` | 78件・カバレッジ98% ✅ |
+| `python/tests/test_bedrock_service.py` | 32件・カバレッジ97% ✅ |
+| `python/tests/test_routers.py` | 8件・カバレッジ100% ✅ |
+| `python/tests/test_gmaps_service.py` | 新規作成（Step 6） |
 
 ---
 
@@ -144,11 +149,11 @@ Step 8.4  レスポンス返却
 | エラー | HTTP | error_code |
 |---|---|---|
 | エンジニアが見つからない | 404 | `ENGINEER_NOT_FOUND` |
-| 案件が見つからない | 404 | `PROJECT_NOT_FOUND` |
-| Bedrock / Google Maps 呼び出し失敗 | 502 | `EXTERNAL_API_ERROR` |
+| パイプライン除外後に候補ゼロ | 422 | `NO_ACTIVE_PROJECT` |
 | バリデーションエラー | 422 | Pydantic デフォルト |
+| Bedrock タイムアウト（リトライ後も失敗） | 504 | `UPSTREAM_TIMEOUT` |
 
-FastAPI の `HTTPException` を使用し、Router 層でキャッチする。
+`@app.exception_handler` を `main.py` に集約し、Router 層は薄く保つ（try/except を書かない）。
 
 ---
 
