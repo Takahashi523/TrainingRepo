@@ -108,7 +108,7 @@ export default function Show({ engineer }: Props) {
                         onClick={() => router.get(`/matching/${engineer.id}`)}
                     >
                         <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
-                        マッチング実行
+                        マッチング
                     </Button>
                     <Button
                         variant="outline"
