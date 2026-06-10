@@ -27,7 +27,7 @@ type FormData = {
     nearest_line: string;
     nearest_station: string;
     available_from: string;
-    skills: { label: string; detail: string }[];
+    skills: { label: string; detail: string | null }[];
     proc_requirements: boolean;
     proc_basic_design: boolean;
     proc_detail_design: boolean;
@@ -245,20 +245,20 @@ export default function Create({ fieldSettings, phases, work_styles, statuses, u
                 <FormRow
                     label="最寄駅 / 路線"
                     required={fieldSettings.nearest_station.is_required || fieldSettings.nearest_line.is_required}
-                    hint="出社が必要な案件との通勤条件の判定に使用します。路線名・駅名をそれぞれ自由入力（例：JR中央線 / 新宿）"
-                    error={errors.nearest_line || errors.nearest_station}
+                    hint="出社が必要な案件との通勤条件の判定に使用します。駅名・路線名をそれぞれ自由入力（例：新宿 / JR中央線）"
+                    error={errors.nearest_station || errors.nearest_line}
                 >
                     <div className="flex gap-2">
-                        <Input
-                            value={data.nearest_line}
-                            onChange={(e) => setData('nearest_line', e.target.value)}
-                            placeholder="路線名（例：JR中央線）"
-                            className="w-48"
-                        />
                         <Input
                             value={data.nearest_station}
                             onChange={(e) => setData('nearest_station', e.target.value)}
                             placeholder="駅名（例：新宿）"
+                            className="w-48"
+                        />
+                        <Input
+                            value={data.nearest_line}
+                            onChange={(e) => setData('nearest_line', e.target.value)}
+                            placeholder="路線名（例：JR中央線）"
                             className="w-48"
                         />
                     </div>

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\EngineerRequest;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\EngineerResource;
 use App\Models\Engineer;
 use App\Models\FormFieldSetting;
 use App\Models\User;
@@ -16,21 +16,6 @@ use Inertia\Response;
 class EngineerController extends Controller
 {
     public function __construct(private AiSummaryService $aiSummary) {}
-
-    private const PHASES = [
-        ['key' => 'proc_requirements',  'name' => '要件定義'],
-        ['key' => 'proc_basic_design',  'name' => '基本設計'],
-        ['key' => 'proc_detail_design', 'name' => '詳細設計'],
-        ['key' => 'proc_development',   'name' => '開発'],
-        ['key' => 'proc_testing',       'name' => 'テスト'],
-        ['key' => 'proc_maintenance',   'name' => '保守・運用'],
-    ];
-
-    private const WORK_STYLES = [
-        ['key' => 'onsite', 'name' => '常駐'],
-        ['key' => 'hybrid', 'name' => '一部リモート可'],
-        ['key' => 'remote', 'name' => 'フルリモート'],
-    ];
 
     private const STATUSES = [
         ['value' => 'proposable',     'label' => '提案可'],
@@ -55,10 +40,19 @@ class EngineerController extends Controller
 
         return Inertia::render('Engineers/Create', [
             'fieldSettings' => $fieldSettings,
-            'phases'        => self::PHASES,
-            'work_styles'   => self::WORK_STYLES,
+            'phases'        => Engineer::PHASES,
+            'work_styles'   => Engineer::WORK_STYLES,
             'statuses'      => self::STATUSES,
             'users'         => User::select('id', 'name')->orderBy('name')->get(),
+        ]);
+    }
+
+    public function show(Engineer $engineer): Response
+    {
+        $engineer->loadMissing(['skills', 'mainUser', 'subUser']);
+
+        return Inertia::render('Engineers/Show', [
+            'engineer' => EngineerResource::make($engineer),
         ]);
     }
 
@@ -80,7 +74,16 @@ class EngineerController extends Controller
             ]);
         }
 
-        return redirect('/engineers')->with('success', '人材情報を登録しました。');
+        return redirect()->route('engineers.show', $engineer)->with('success', '人材情報を登録しました。');
+    }
+
+    public function destroy(Engineer $engineer): RedirectResponse
+    {
+        $this->authorize('delete', $engineer);
+
+        $engineer->delete();
+
+        return redirect('/engineers')->with('success', '人材情報を削除しました。');
     }
 
     /**

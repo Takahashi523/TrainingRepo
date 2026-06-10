@@ -128,7 +128,8 @@ class EngineerControllerTest extends TestCase
 
         $response = $this->actingAs($user)->post('/engineers', $this->validPayload($user->id));
 
-        $response->assertRedirect('/engineers');
+        $engineer = Engineer::where('name', '山田太郎')->first();
+        $response->assertRedirect("/engineers/{$engineer->id}");
         $this->assertDatabaseHas('engineers', [
             'name'         => '山田太郎',
             'name_kana'    => 'ヤマダタロウ',
@@ -585,5 +586,267 @@ class EngineerControllerTest extends TestCase
         $engineer = Engineer::where('name', '山田太郎')->first();
         $this->assertNull($engineer->ai_summary);
         $this->assertNull($engineer->ai_summary_generated_at);
+    }
+
+    // -------------------------------------------------------
+    // show: GET /engineers/{id}
+    // -------------------------------------------------------
+
+    public function test_guest_is_redirected_to_login_from_show_page(): void
+    {
+        $engineer = Engineer::factory()->create();
+
+        $response = $this->get("/engineers/{$engineer->id}");
+
+        $response->assertRedirect('/login');
+    }
+
+    public function test_authenticated_user_can_view_show_page(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->component('Engineers/Show'));
+    }
+
+    public function test_show_page_returns_404_for_non_existent_engineer(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/engineers/99999');
+
+        $response->assertNotFound();
+    }
+
+    public function test_show_props_contain_engineer_key(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page->has('engineer'));
+    }
+
+    public function test_show_props_contain_correct_engineer_data(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'name'         => '田中花子',
+            'name_kana'    => 'タナカハナコ',
+            'status'       => 'interviewing',
+            'main_user_id' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.name', '田中花子')
+            ->where('engineer.name_kana', 'タナカハナコ')
+            ->where('engineer.status', 'interviewing')
+            ->where('engineer.users.main.id', $user->id)
+        );
+    }
+
+    public function test_show_props_available_label_is_未定_when_available_from_is_null(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id'  => $user->id,
+            'available_from' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.available_label', '未定')
+        );
+    }
+
+    public function test_show_props_available_label_is_formatted_date_when_available_from_is_set(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id'   => $user->id,
+            'available_from' => '2026-08-01',
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.available_label', '2026/08/01〜')
+        );
+    }
+
+    public function test_show_props_age_is_null_when_birth_date_is_null(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'birth_date'   => null,
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.age', null)
+        );
+    }
+
+    public function test_show_props_age_is_calculated_from_birth_date(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'birth_date'   => now()->subYears(30)->toDateString(),
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.age', 30)
+        );
+    }
+
+    public function test_show_props_skills_include_detail(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $engineer->skills()->create(['label' => 'PHP', 'detail' => 'Laravel 5年']);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.skills.0.label', 'PHP')
+            ->where('engineer.skills.0.detail', 'Laravel 5年')
+        );
+    }
+
+    public function test_show_props_phases_contain_all_six_entries(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id'       => $user->id,
+            'proc_requirements'  => true,
+            'proc_development'   => true,
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineer.phases', 6)
+            ->where('engineer.phases.0.key', 'proc_requirements')
+            ->where('engineer.phases.0.has_experience', true)
+            ->where('engineer.phases.1.has_experience', false)
+        );
+    }
+
+    public function test_show_props_work_styles_returns_only_selected(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id'      => $user->id,
+            'work_style_onsite' => true,
+            'work_style_hybrid' => false,
+            'work_style_remote' => true,
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineer.work_styles', 2)
+            ->where('engineer.work_styles.0.key', 'onsite')
+            ->where('engineer.work_styles.1.key', 'remote')
+        );
+    }
+
+    public function test_show_props_sub_user_is_null_when_not_set(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'sub_user_id'  => null,
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.users.sub', null)
+        );
+    }
+
+    public function test_show_props_sub_user_is_returned_when_set(): void
+    {
+        $mainUser = User::factory()->create();
+        $subUser  = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $mainUser->id,
+            'sub_user_id'  => $subUser->id,
+        ]);
+
+        $response = $this->actingAs($mainUser)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.users.sub.id', $subUser->id)
+            ->where('engineer.users.sub.name', $subUser->name)
+        );
+    }
+
+    // -------------------------------------------------------
+    // destroy: DELETE /engineers/{id}
+    // -------------------------------------------------------
+
+    public function test_guest_cannot_delete_engineer(): void
+    {
+        $engineer = Engineer::factory()->create();
+
+        $response = $this->delete("/engineers/{$engineer->id}");
+
+        $response->assertRedirect('/login');
+        $this->assertDatabaseHas('engineers', ['id' => $engineer->id]);
+    }
+
+    public function test_admin_can_delete_engineer(): void
+    {
+        $admin    = User::factory()->create(['role' => 'admin']);
+        $engineer = Engineer::factory()->create(['main_user_id' => $admin->id]);
+
+        $response = $this->actingAs($admin)->delete("/engineers/{$engineer->id}");
+
+        $response->assertRedirect('/engineers');
+        $this->assertDatabaseMissing('engineers', ['id' => $engineer->id]);
+    }
+
+    public function test_destroy_sets_success_flash_message(): void
+    {
+        $admin    = User::factory()->create(['role' => 'admin']);
+        $engineer = Engineer::factory()->create(['main_user_id' => $admin->id]);
+
+        $response = $this->actingAs($admin)->delete("/engineers/{$engineer->id}");
+
+        $response->assertSessionHas('success', '人材情報を削除しました。');
+    }
+
+    public function test_general_user_cannot_delete_engineer(): void
+    {
+        $user     = User::factory()->create(['role' => 'general']);
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->delete("/engineers/{$engineer->id}");
+
+        $response->assertForbidden();
+        $this->assertDatabaseHas('engineers', ['id' => $engineer->id]);
+    }
+
+    public function test_destroy_returns_404_for_non_existent_engineer(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $response = $this->actingAs($admin)->delete('/engineers/99999');
+
+        $response->assertNotFound();
     }
 }

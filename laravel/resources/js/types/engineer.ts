@@ -20,7 +20,7 @@ export interface UserOption {
 
 export interface Skill {
     label: string;
-    detail: string;
+    detail: string | null;
 }
 
 export interface Engineer {
@@ -71,4 +71,8 @@ export type EngineerCreatePageProps = {
     work_styles: WorkTypeOption[];
     statuses: StatusOption[];
     users: UserOption[];
+};
+
+export type EngineerShowPageProps = {
+    engineer: Engineer;
 };

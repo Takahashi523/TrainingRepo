@@ -52,7 +52,7 @@ export default function SkillInput({ skills, onChange, error }: Props) {
 
                     <Input
                         type="text"
-                        value={skill.detail}
+                        value={skill.detail ?? ''}
                         maxLength={500}
                         placeholder="詳細・条件（任意）"
                         onChange={(e) => update(index, 'detail', e.target.value)}
