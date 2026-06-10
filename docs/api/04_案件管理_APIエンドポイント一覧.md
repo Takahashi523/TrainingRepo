@@ -1,7 +1,7 @@
 # 案件管理（Project）APIエンドポイント一覧
 
 > 技術方針：Laravel + Inertia.js + React  
-> 最終更新：2026-05-27  
+> 最終更新：2026-06-10  
 > 前提・凡例・SharedProps・共通HTTPレスポンスは `00_共通仕様_APIエンドポイント一覧.md` を参照すること。
 
 ---
@@ -165,12 +165,11 @@
     "interview_count":      { "is_required": "bool" },
     "required_skills":      { "is_required": "bool" },
     "preferred_skills":     { "is_required": "bool" },
-    "proc_requirements":    { "is_required": "bool" }, // 要件定義（対象工程）
-    "proc_basic_design":    { "is_required": "bool" }, // 基本設計（対象工程）
-    "proc_detail_design":   { "is_required": "bool" }, // 詳細設計（対象工程）
-    "proc_development":     { "is_required": "bool" }, // 開発（対象工程）
-    "proc_testing":         { "is_required": "bool" }, // テスト（対象工程）
-    "proc_maintenance":     { "is_required": "bool" }, // 保守運用（対象工程）
+    // 対象工程6項目（proc_requirements 〜 proc_maintenance）はまとめて1設定として管理する。
+    // form_field_settings の field_key = "proc_experience" で1レコード管理。
+    // WF_12のフォーム設定タブでも「対象工程」として1つのトグルで管理する。
+    // is_required: true の場合、フロントは対象工程チェックボックスグループ全体を必須として扱う。
+    "proc_experience":      { "is_required": "bool" },
     "negotiation_required": { "is_required": "bool" },
     "description":          { "is_required": "bool" },
     "work_env":             { "is_required": "bool" },
@@ -279,7 +278,7 @@
 
 > **必須/任意について**：システム固定必須（DBレベルでNOT NULL）は `name` / `status` / `main_user_id` のみ。その他のフィールドはDBレベルでNULL許容であり、実際の必須/任意制御は `form_field_settings` をアプリ層で参照して行う（DB設計書 §1-2 / QA #82確定）。  
 > **PATCHについて**：部分更新（PATCH）は使用しない。ステータスのみ変更する場合も PUT で全フィールドを送信すること。  
-> **bool値の変換**：`proc_*` / `negotiation_required` の bool 値はEloquentモデルに `boolean` キャストを定義し、DB側の `TINYINT(1)`（1:true / 0:false）へ変換すること。  
+> **bool値の変換**：`proc_requirements` 〜 `proc_maintenance` / `negotiation_required` の bool 値はEloquentモデルに `boolean` キャストを定義し、DB側の `TINYINT(1)`（1:true / 0:false）へ変換すること。
 > **単価の扱い**：`rate_is_negotiable`（スキル見合いフラグ）が `true` の場合は `rate_min` / `rate_max` を null として扱い、`rate_note` に "スキル見合い" 等のテキストを保存する（QA #14確定）。  
 > **勤務地の扱い**：`work_style` が `remote`（フルリモート）の場合は `work_location_line` / `work_location_station` を null として扱う。フロント側で `work_style` 変更時に勤務地フィールドをクリアすること（WF_07確定）。  
 > **スキルの更新処理**：PUT時に `required_skills[]` / `preferred_skills[]` を送信した場合、既存レコードを全件削除後に再挿入する（人材スキルと同方針）。空配列または省略の場合は全件削除として扱う。  
@@ -305,12 +304,12 @@
 | preferred_skills[] | array | 任意 | 尚可スキル配列。空配列 [] または省略で全削除。PUT時は全件洗い替え |
 | preferred_skills[].label | string | 任意 | 尚可スキルラベル（最大15文字） |
 | preferred_skills[].detail | string | 任意 | 尚可スキル詳細（最大500文字） |
-| proc_requirements | bool | 任意 | 要件定義（対象工程・form_field_settings制御） |
-| proc_basic_design | bool | 任意 | 基本設計（対象工程・form_field_settings制御） |
-| proc_detail_design | bool | 任意 | 詳細設計（対象工程・form_field_settings制御） |
-| proc_development | bool | 任意 | 開発（対象工程・form_field_settings制御） |
-| proc_testing | bool | 任意 | テスト（対象工程・form_field_settings制御） |
-| proc_maintenance | bool | 任意 | 保守運用（対象工程・form_field_settings制御） |
+| proc_requirements | bool | 任意 | 要件定義（true:対象）。proc_experience の is_required 設定で制御 |
+| proc_basic_design | bool | 任意 | 基本設計（true:対象）。proc_experience の is_required 設定で制御 |
+| proc_detail_design | bool | 任意 | 詳細設計（true:対象）。proc_experience の is_required 設定で制御 |
+| proc_development | bool | 任意 | 開発（true:対象）。proc_experience の is_required 設定で制御 |
+| proc_testing | bool | 任意 | テスト（true:対象）。proc_experience の is_required 設定で制御 |
+| proc_maintenance | bool | 任意 | 保守運用（true:対象）。proc_experience の is_required 設定で制御 |
 | negotiation_required | bool | 任意 | 顧客折衝経験要否（form_field_settings制御）。true=要 / false=不問 |
 | description | string | 任意 | 業務内容詳細（form_field_settings制御） |
 | work_env | string | 任意 | 稼働環境（form_field_settings制御） |
