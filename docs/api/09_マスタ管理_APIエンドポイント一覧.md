@@ -1,7 +1,7 @@
 # マスタ管理（Master）APIエンドポイント一覧
 
 > 技術方針：Laravel + Inertia.js + React  
-> 最終更新：2026-06-08  
+> 最終更新：2026-06-10  
 > 前提・凡例・SharedProps・共通HTTPレスポンスは `00_共通仕様_APIエンドポイント一覧.md` を参照すること。  
 
 ---
@@ -240,7 +240,7 @@
 | headcount | 募集人数 | false | 任意 |
 | work_env | 稼働環境 | false | 任意 |
 | billing_range | 精算幅 | false | 任意 |
-| proc_experience | 経験工程 | false | 任意 |
+| proc_experience | 対象工程 | false | 任意 |
 | negotiation_required | 顧客折衝経験 | false | 必須 |
 | description | 業務内容詳細 | false | 任意 |
 | remarks | 特記事項 | false | 任意 |
