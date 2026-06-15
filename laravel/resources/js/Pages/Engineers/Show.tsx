@@ -236,7 +236,7 @@ export default function Show({ engineer }: Props) {
                         {engineer.skills.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {engineer.skills.map((skill, i) => (
-                                    <SkillTag key={i} label={skill.label} detail={skill.detail} />
+                                    <SkillTag key={i} label={skill.label ?? ''} detail={skill.detail} />
                                 ))}
                             </div>
                         ) : (

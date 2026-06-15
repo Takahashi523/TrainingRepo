@@ -414,6 +414,53 @@ class EngineerControllerTest extends TestCase
         $response->assertSessionHasErrors('skills');
     }
 
+    public function test_skill_label_is_required_when_skills_required_and_row_is_empty(): void
+    {
+        // skills 必須時に空ラベル行を送ると、配列件数は満たすが label が null/'' で
+        // 旧実装ではすり抜けて DB に空スキル行が登録され、再編集時にクラッシュしていた回帰防止
+        $this->seedFormFieldSettings(['skills' => true]);
+        $user = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'skills' => [['label' => '', 'detail' => '']],
+        ]);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionHasErrors('skills.0.label');
+    }
+
+    public function test_skill_with_label_passes_when_skills_required(): void
+    {
+        $this->seedFormFieldSettings(['skills' => true]);
+        $user = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'skills' => [['label' => 'PHP', 'detail' => null]],
+        ]);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionHasNoErrors();
+    }
+
+    public function test_empty_skill_row_is_filtered_on_insert_when_not_required(): void
+    {
+        // skills 必須でないとき、空行（label/detail とも null）は DB に挿入されない
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'skills' => [
+                ['label' => 'PHP', 'detail' => null],
+                ['label' => '',    'detail' => ''],
+            ],
+        ]);
+
+        $this->actingAs($user)->post('/engineers', $payload);
+
+        $engineer = Engineer::where('name', '山田太郎')->first();
+        $this->assertCount(1, $engineer->skills);
+        $this->assertSame('PHP', $engineer->skills->first()->label);
+    }
+
     public function test_skill_label_max_length_validation(): void
     {
         $this->seedFormFieldSettings();
@@ -534,6 +581,20 @@ class EngineerControllerTest extends TestCase
         $user    = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'skills' => [['label' => null, 'detail' => 'Laravel 10年']],
+        ]);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionHasErrors('skills.0.label');
+    }
+
+    public function test_skill_label_is_required_when_detail_is_present_with_empty_string_label(): void
+    {
+        // フロントは空入力を null ではなく空文字 "" として送るため、null だけでなく "" のケースも回帰防止する
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'skills' => [['label' => '', 'detail' => 'Laravel 10年']],
         ]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -846,6 +907,250 @@ class EngineerControllerTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
 
         $response = $this->actingAs($admin)->delete('/engineers/99999');
+
+        $response->assertNotFound();
+    }
+
+    // -------------------------------------------------------
+    // edit: GET /engineers/{id}/edit
+    // -------------------------------------------------------
+
+    public function test_guest_is_redirected_to_login_from_edit_page(): void
+    {
+        $engineer = Engineer::factory()->create();
+
+        $response = $this->get("/engineers/{$engineer->id}/edit");
+
+        $response->assertRedirect('/login');
+    }
+
+    public function test_authenticated_user_can_view_edit_page(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/edit");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->component('Engineers/Edit'));
+    }
+
+    public function test_edit_page_props_contain_required_keys(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/edit");
+
+        $response->assertInertia(fn ($page) => $page
+            ->component('Engineers/Edit')
+            ->has('engineer')
+            ->has('fieldSettings')
+            ->has('phases')
+            ->has('work_styles')
+            ->has('statuses')
+            ->has('users')
+        );
+    }
+
+    public function test_edit_page_props_engineer_contains_existing_values(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'name'         => '佐藤花子',
+            'name_kana'    => 'サトウハナコ',
+            'main_user_id' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/edit");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.name', '佐藤花子')
+            ->where('engineer.name_kana', 'サトウハナコ')
+            ->where('engineer.users.main.id', $user->id)
+        );
+    }
+
+    public function test_edit_page_returns_404_for_non_existent_engineer(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/engineers/99999/edit');
+
+        $response->assertNotFound();
+    }
+
+    // -------------------------------------------------------
+    // update: PUT /engineers/{id} — 正常系
+    // -------------------------------------------------------
+
+    public function test_guest_cannot_put_to_update(): void
+    {
+        $engineer = Engineer::factory()->create();
+
+        $response = $this->put("/engineers/{$engineer->id}", []);
+
+        $response->assertRedirect('/login');
+    }
+
+    public function test_engineer_is_updated_with_valid_payload(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'name'         => '旧氏名',
+            'main_user_id' => $user->id,
+        ]);
+
+        $payload = array_merge($this->validPayload($user->id), ['name' => '新氏名']);
+
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response->assertRedirect("/engineers/{$engineer->id}");
+        $this->assertDatabaseHas('engineers', ['id' => $engineer->id, 'name' => '新氏名']);
+    }
+
+    public function test_update_sets_success_flash_message(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $this->validPayload($user->id));
+
+        $response->assertSessionHas('success', '人材情報を更新しました。');
+    }
+
+    public function test_update_replaces_skills_with_submitted_list(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $engineer->skills()->createMany([
+            ['label' => 'PHP',  'detail' => null],
+            ['label' => 'Vue',  'detail' => null],
+            ['label' => 'Java', 'detail' => null],
+        ]);
+        $this->assertCount(3, $engineer->fresh()->skills);
+
+        $payload = array_merge($this->validPayload($user->id), [
+            'skills' => [['label' => 'Go', 'detail' => 'gRPC経験あり']],
+        ]);
+
+        $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $engineer = $engineer->fresh();
+        $this->assertCount(1, $engineer->skills);
+        $this->assertSame('Go', $engineer->skills->first()->label);
+        $this->assertDatabaseMissing('engineer_skills', ['engineer_id' => $engineer->id, 'label' => 'PHP']);
+    }
+
+    public function test_update_deletes_all_skills_when_empty_array_submitted(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $engineer->skills()->createMany([
+            ['label' => 'PHP', 'detail' => null],
+            ['label' => 'Vue', 'detail' => null],
+        ]);
+
+        $payload = array_merge($this->validPayload($user->id), ['skills' => []]);
+
+        $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $this->assertCount(0, $engineer->fresh()->skills);
+    }
+
+    public function test_update_converts_work_styles_to_boolean_columns(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id'      => $user->id,
+            'work_style_onsite' => true,
+            'work_style_hybrid' => true,
+            'work_style_remote' => true,
+        ]);
+
+        $payload = array_merge($this->validPayload($user->id), ['work_styles' => ['hybrid']]);
+
+        $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $this->assertDatabaseHas('engineers', [
+            'id'                => $engineer->id,
+            'work_style_onsite' => false,
+            'work_style_hybrid' => true,
+            'work_style_remote' => false,
+        ]);
+    }
+
+    public function test_update_regenerates_ai_summary_when_appeal_note_changes(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note'  => '元のアピール',
+        ]);
+
+        $this->mock(AiSummaryService::class, function ($mock) {
+            $mock->shouldReceive('generate')->once()->andReturn('再生成された要約');
+        });
+
+        $payload = array_merge($this->validPayload($user->id), ['appeal_note' => '更新後のアピール']);
+
+        $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $engineer = $engineer->fresh();
+        $this->assertSame('再生成された要約', $engineer->ai_summary);
+        $this->assertNotNull($engineer->ai_summary_generated_at);
+    }
+
+    public function test_update_does_not_regenerate_ai_summary_when_appeal_note_unchanged(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note'  => 'そのままのアピール',
+        ]);
+
+        $this->mock(AiSummaryService::class, function ($mock) {
+            $mock->shouldNotReceive('generate');
+        });
+
+        $payload = array_merge($this->validPayload($user->id), ['appeal_note' => 'そのままのアピール']);
+
+        $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        // モック自体が generate を呼ばれないことを保証している
+        $this->assertSame('そのままのアピール', $engineer->fresh()->appeal_note);
+    }
+
+    public function test_update_validates_required_fields(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $payload = $this->validPayload($user->id);
+        unset($payload['name']);
+
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response->assertSessionHasErrors('name');
+    }
+
+    public function test_update_returns_404_for_non_existent_engineer(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->put('/engineers/99999', $this->validPayload($user->id));
 
         $response->assertNotFound();
     }
