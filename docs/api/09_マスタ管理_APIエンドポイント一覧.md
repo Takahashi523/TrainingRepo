@@ -228,7 +228,7 @@
 | name | 案件名 | true（変更不可） | 必須（固定） |
 | status | ステータス | true（変更不可） | 必須（固定） |
 | main_user_id | 担当営業 | true（変更不可） | 必須（固定） |
-| client_name | 顧客名 | false | 必須 |
+| client_name | 顧客名 | false | 任意 |
 | required_skills | 必須スキル | false | 必須 |
 | preferred_skills | 尚可スキル | false | 任意 |
 | rate | 単価（下限〜上限） | false | 必須 |
