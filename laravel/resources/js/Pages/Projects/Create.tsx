@@ -1,10 +1,11 @@
 import { useForm, Head, router } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Button } from "@/Components/ui/button";
-// import type { User } from "@/types";
 import React from "react";
 import { Loader2 } from "lucide-react";
 import { Input } from "@/Components/ui/input";
+import { Checkbox } from "@/Components/ui/checkbox";
+import { Label } from "@/Components/ui/label";
 import { Textarea } from "@/Components/ui/textarea";
 import {
     Select,
@@ -157,7 +158,7 @@ export default function Create({
 
         // 管理情報
         status: "open", // ステータス
-        main_user_id: "", // メイン担当営業
+        main_user_id: users.length > 0 ? String(users[0].id) : "", // メイン担当営業
         sub_user_id: "", // サブ担当営業
 
         // 就業条件
@@ -165,8 +166,7 @@ export default function Create({
         remarks: "", // 特記事項
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         post(route("projects.store"));
     };
 
@@ -179,37 +179,6 @@ export default function Create({
                 ? { rate_min: "", rate_max: "" } // ON → 数値欄をクリア
                 : { rate_note: "" }), // OFF → 備考欄をクリア
         }));
-    };
-
-    type SkillField = "required_skills" | "preferred_skills";
-
-    // 追加
-    const addSkill = (field: SkillField) => {
-        setData(field, [
-            ...data[field],
-            { id: crypto.randomUUID(), label: "", detail: "" },
-        ]);
-    };
-
-    // 削除
-    const removeSkill = (field: SkillField, id: string) => {
-        setData(
-            field,
-            data[field].filter((s) => s.id !== id),
-        );
-    };
-
-    // 更新
-    const updateSkill = (
-        field: SkillField,
-        id: string,
-        key: "label" | "detail",
-        value: string,
-    ) => {
-        setData(
-            field,
-            data[field].map((s) => (s.id === id ? { ...s, [key]: value } : s)),
-        );
     };
 
     const procValues: Record<string, boolean> = {
@@ -240,7 +209,7 @@ export default function Create({
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => router.get("/engineers")}
+                        onClick={() => router.get("/projects")}
                     >
                         キャンセル
                     </Button>
@@ -282,7 +251,7 @@ export default function Create({
                         value={data.client_name}
                         onChange={(e) => setData("client_name", e.target.value)}
                         placeholder="例：○○銀行"
-                        className={`w-48 ${errors.client_name ? "border-destructive" : ""}`}
+                        className={`w-64 ${errors.client_name ? "border-destructive" : ""}`}
                     />
                 </FormRow>
 
@@ -317,7 +286,6 @@ export default function Create({
                         type="date"
                         value={data.start_date}
                         onChange={(e) => setData("start_date", e.target.value)}
-                        placeholder="2"
                         className={`w-40 ${errors.start_date ? "border-destructive" : ""}`}
                     />
                 </FormRow>
@@ -334,21 +302,19 @@ export default function Create({
                 >
                     {/* スキル見合いチェックボックス */}
                     <div className="flex items-center gap-2 mb-2">
-                        <Input
-                            type="checkbox"
+                        <Checkbox
                             id="rate_is_negotiable"
                             checked={data.rate_is_negotiable}
-                            onChange={(e) =>
-                                handleRateNegotiableChange(e.target.checked)
+                            onCheckedChange={(checked) =>
+                                handleRateNegotiableChange(!!checked)
                             }
-                            className="h-4 w-4"
                         />
-                        <label
+                        <Label
                             htmlFor="rate_is_negotiable"
-                            className="text-sm curosr-pointers"
+                            className="text-sm font-normal cursor-pointer"
                         >
                             スキル見合い
-                        </label>
+                        </Label>
                     </div>
 
                     {/* チェックOFF → 下限〜上限の数値欄 */}
@@ -483,7 +449,7 @@ export default function Create({
                                     )
                                 }
                                 placeholder="駅名（例：大手町）"
-                                className={`w-40 ${errors.work_location_station ? "border-destructive" : ""}`}
+                                className={`w-48 ${errors.work_location_station ? "border-destructive" : ""}`}
                             />
                         </div>
                     </FormRow>
@@ -501,7 +467,7 @@ export default function Create({
                             onChange={(e) =>
                                 setData("interview_count", e.target.value)
                             }
-                            placeholder="2"
+                            placeholder="1"
                             className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
                         />
                         <span className="text-sm text-muted-foreground">
@@ -669,15 +635,23 @@ export default function Create({
                             サブ
                         </span>
                         <Select
-                            value={data.sub_user_id}
+                            value={
+                                data.sub_user_id === ""
+                                    ? "none"
+                                    : data.sub_user_id
+                            }
                             onValueChange={(value) =>
-                                setData("sub_user_id", value)
+                                setData(
+                                    "sub_user_id",
+                                    value === "none" ? "" : value,
+                                )
                             }
                         >
                             <SelectTrigger className="w-40">
                                 <SelectValue placeholder="（なし）" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="none">（なし）</SelectItem>
                                 {users.map((user) => (
                                     <SelectItem
                                         key={user.id}
