@@ -211,7 +211,7 @@
 | nearest_line | 路線 | false | 必須 |
 | available_from | 稼働可能時期 | false | 必須 |
 | skills | 経験スキル | false | 必須 |
-| proc_experience | 経験工程 | false | 任意 |
+| proc_experience | 経験工程 | false | 必須 |
 | has_negotiation_exp | 顧客折衝経験 | false | 必須 |
 | appeal_note | アピールポイント | false | 任意 |
 | desired_rate | 希望単価 | false | 任意 |
@@ -234,13 +234,13 @@
 | rate | 単価（下限〜上限） | false | 必須 |
 | start_date | 参画開始時期 | false | 必須 |
 | work_style | 稼働形態 | false | 必須 |
-| work_location | 勤務地 | false | 任意 |
-| commercial_flow | 商流 | false | 任意 |
+| work_location | 勤務地 | false | 必須 |
+| commercial_flow | 商流 | false | 必須 |
 | interview_count | 面談回数 | false | 任意 |
 | headcount | 募集人数 | false | 任意 |
 | work_env | 稼働環境 | false | 任意 |
 | billing_range | 精算幅 | false | 任意 |
-| proc_experience | 対象工程 | false | 任意 |
+| proc_experience | 対象工程 | false | 必須 |
 | negotiation_required | 顧客折衝経験 | false | 必須 |
 | description | 業務内容詳細 | false | 必須 |
 | remarks | 特記事項 | false | 任意 |
