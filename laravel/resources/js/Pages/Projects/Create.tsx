@@ -31,12 +31,7 @@ type FieldSettings = {
     interview_count: FieldSetting;
     required_skills: FieldSetting;
     preferred_skills: FieldSetting;
-    proc_requirements: FieldSetting;
-    proc_basic_design: FieldSetting;
-    proc_detail_design: FieldSetting;
-    proc_development: FieldSetting;
-    proc_testing: FieldSetting;
-    proc_maintenance: FieldSetting;
+    proc_experience: FieldSetting;
     negotiation_required: FieldSetting;
     description: FieldSetting;
     work_env: FieldSetting;
@@ -278,6 +273,7 @@ export default function Create({
 
                 <FormRow
                     label="顧客名"
+                    required={fieldSettings.client_name.is_required}
                     error={errors.client_name}
                     hint="顧客ごとの傾向分析が必要な場合に活用できます"
                 >
@@ -290,7 +286,11 @@ export default function Create({
                     />
                 </FormRow>
 
-                <FormRow label="募集人数" error={errors.headcount}>
+                <FormRow
+                    label="募集人数"
+                    required={fieldSettings.headcount.is_required}
+                    error={errors.headcount}
+                >
                     <div className="flex items-center gap-2">
                         <Input
                             type="number"
@@ -309,7 +309,7 @@ export default function Create({
 
                 <FormRow
                     label="参画開始時期"
-                    required
+                    required={fieldSettings.start_date.is_required}
                     error={errors.start_date}
                     hint="稼働開始時期のマッチングスコアリングに使用します"
                 >
@@ -326,7 +326,7 @@ export default function Create({
 
                 <FormRow
                     label="単価（月額）"
-                    required
+                    required={fieldSettings.rate.is_required}
                     error={
                         errors.rate_min ?? errors.rate_max ?? errors.rate_note
                     }
@@ -395,7 +395,11 @@ export default function Create({
                     )}
                 </FormRow>
 
-                <FormRow label="商流" required error={errors.commercial_flow}>
+                <FormRow
+                    label="商流"
+                    required={fieldSettings.commercial_flow.is_required}
+                    error={errors.commercial_flow}
+                >
                     <Select
                         value={data.commercial_flow}
                         onValueChange={(value) =>
@@ -419,7 +423,7 @@ export default function Create({
 
                 <FormRow
                     label="稼働形態"
-                    required
+                    required={fieldSettings.work_style.is_required}
                     hint="人材の勤務形態希望とのマッチングスコアリングに使用します"
                     error={errors.work_style}
                 >
@@ -449,7 +453,7 @@ export default function Create({
                 {data.work_style !== "" && data.work_style !== "remote" && (
                     <FormRow
                         label="勤務地（最寄駅）"
-                        required
+                        required={fieldSettings.work_location.is_required}
                         hint="フリーテキスト入力。稼働形態が「常駐」または「一部リモート可」の場合は必須です"
                         error={
                             errors.work_location_line ??
@@ -485,7 +489,11 @@ export default function Create({
                     </FormRow>
                 )}
 
-                <FormRow label="面談回数" error={errors.interview_count}>
+                <FormRow
+                    label="面談回数"
+                    required={fieldSettings.interview_count.is_required}
+                    error={errors.interview_count}
+                >
                     <div className="flex items-center gap-2">
                         <Input
                             type="number"
@@ -506,7 +514,7 @@ export default function Create({
 
                 <FormRow
                     label="必須スキル"
-                    required
+                    required={fieldSettings.required_skills.is_required}
                     error={errors.required_skills as string | undefined}
                 >
                     <SkillInput
@@ -520,6 +528,7 @@ export default function Create({
 
                 <FormRow
                     label="尚可スキル"
+                    required={fieldSettings.preferred_skills.is_required}
                     error={errors.preferred_skills as string | undefined}
                 >
                     <SkillInput
@@ -533,7 +542,7 @@ export default function Create({
 
                 <FormRow
                     label="対象工程"
-                    required
+                    required={fieldSettings.proc_experience.is_required}
                     error={errors.proc_requirements as string | undefined}
                 >
                     <ProcessCheckboxGroup
@@ -547,7 +556,7 @@ export default function Create({
 
                 <FormRow
                     label="顧客折衝経験"
-                    required
+                    required={fieldSettings.negotiation_required.is_required}
                     error={errors.negotiation_required as string | undefined}
                 >
                     <Select
@@ -574,7 +583,7 @@ export default function Create({
 
                 <FormRow
                     label="業務内容詳細"
-                    required
+                    required={fieldSettings.description.is_required}
                     error={errors.description}
                     hint="AIが案件内容を理解してマッチング精度を向上させるために使用します"
                 >
@@ -588,6 +597,7 @@ export default function Create({
 
                 <FormRow
                     label="稼働環境"
+                    required={fieldSettings.work_env.is_required}
                     error={errors.work_env}
                     hint="OS・ツール・ミドルウェア等の技術環境をフリーテキストで記述してください"
                 >
@@ -600,6 +610,7 @@ export default function Create({
                 </FormRow>
 
                 <SectionHeading>管理情報</SectionHeading>
+
                 <FormRow label="ステータス" required error={errors.status}>
                     <Select
                         value={data.status}
@@ -684,6 +695,7 @@ export default function Create({
 
                 <FormRow
                     label="精算幅"
+                    required={fieldSettings.billing_range.is_required}
                     error={errors.billing_range}
                     hint="月の精算時間帯をフリーテキストで入力してください"
                 >
@@ -700,6 +712,7 @@ export default function Create({
 
                 <FormRow
                     label="特記事項"
+                    required={fieldSettings.remarks.is_required}
                     error={errors.remarks}
                     hint="スコア計算には使用しません。営業担当者が把握しておきたい就業条件を自由記述してください"
                 >
