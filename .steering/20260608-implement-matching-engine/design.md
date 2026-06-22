@@ -15,7 +15,7 @@
 | 5 | E1 エンドポイント完成 | routers/matching.py / main.py | ✅ 完了 |
 | 5.5 | E1 仕様適合修正 | schemas.py / matching_service.py / routers/matching.py / main.py | ✅ 完了 |
 | 6 | Google Maps クライアント | services/gmaps_service.py | 未着手 |
-| 7 | E2 エンドポイント（プロフィール要約） | services/matching_service.py / routers/profile.py | 未着手 |
+| 7 | E2 エンドポイント（プロフィール要約） | services/matching_service.py / routers/profile.py | ✅ 完了 |
 
 ---
 
@@ -47,7 +47,7 @@ Step 3.2  対象案件一覧取得（projects + project_skills, status='open'）
 Step 3.3  project_ids 指定がある場合はフィルタ
 Step 3.4  エンジニアが稼働中かチェック（status='proposable'）
 Step 3.5  パイプライン除外（pipelines テーブルで既登録の project_id を除外）
-Step 3.6  候補 >30 件なら カスケードソートで絞込
+Step 3.6  候補 >5 件なら カスケードソートで絞込
           （工程経験重複数 → 単価 → 勤務形態 → 開始時期 → 登録日）
 Step 3.7  Google Maps で commute_time_minutes 取得（案件ごと）
 Step 3.8  Bedrock AI 総合判定
