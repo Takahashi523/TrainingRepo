@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ProjectRequest;
 use App\Models\FormFieldSetting;
 use App\Models\User;
+use App\Models\Project;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 
 class ProjectController extends Controller
@@ -89,9 +93,57 @@ class ProjectController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(ProjectRequest $request): RedirectResponse
     {
-        //
+        $skills = [
+            'required'  => $request->input('required_skills', []),
+            'preferred' => $request->input('preferred_skills', []),
+        ];
+
+        DB::transaction(function () use ($request, $skills) {
+            $project = Project::create($this->projectAttributes($request));
+            $this->insertSkills($project, $skills);
+        });
+
+        return redirect('/dashboard')->with('success', '案件情報を登録しました。');
+    }
+
+    /**
+    * リクエストから Project の保存用属性配列を組み立てる
+    */
+    private function projectAttributes(ProjectRequest $request): array
+    {
+        return array_merge(
+            $request->safe()->except(['required_skills', 'preferred_skills']),
+            [
+                'headcount'        => $request->headcount !== null ? (int) $request->headcount : null,
+                'rate_min'         => $request->rate_min  !== null ? (int) $request->rate_min  : null,
+                'rate_max'         => $request->rate_max  !== null ? (int) $request->rate_max  : null,
+                'interview_count'  => $request->interview_count !== null ? (int) $request->interview_count : null,
+                'main_user_id'     => (int) $request->main_user_id,
+                'sub_user_id'      => $request->sub_user_id !== null ? (int) $request->sub_user_id : null,
+            ]
+        );
+    }
+
+    /**
+    * スキルを project_skills に保存する
+    */
+    private function insertSkills(Project $project, array $skills): void
+    {
+        foreach (['required', 'preferred'] as $type) {
+            if (empty($skills[$type])) {
+                continue;
+            }
+
+            $project->projectSkills()->createMany(
+                array_map(fn($s) => [
+                    'skill_type' => $type,
+                    'label'      => $s['label']  ?? null,
+                    'detail'     => $s['detail'] ?? null,
+                ], $skills[$type])
+            );
+        }
     }
 
     /**
