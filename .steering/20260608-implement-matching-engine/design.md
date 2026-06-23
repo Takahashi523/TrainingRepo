@@ -14,7 +14,7 @@
 | 4 | マッチング計算フロー（E1 骨格） | services/matching_service.py（フロー全体） | ✅ 完了 |
 | 5 | E1 エンドポイント完成 | routers/matching.py / main.py | ✅ 完了 |
 | 5.5 | E1 仕様適合修正 | schemas.py / matching_service.py / routers/matching.py / main.py | ✅ 完了 |
-| 6 | Google Maps クライアント | services/gmaps_service.py | 未着手 |
+| 6 | Google Maps クライアント | services/gmaps_service.py | ✅ 完了 |
 | 7 | E2 エンドポイント（プロフィール要約） | services/matching_service.py / routers/profile.py | ✅ 完了 |
 
 ---
