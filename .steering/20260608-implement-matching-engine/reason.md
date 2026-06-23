@@ -19,7 +19,7 @@ E1/E3（マッチング）と E2（プロフィール要約）は責務が異な
 ## Step 2: DB接続 + データ取得
 
 ### 内部データクラスに Pydantic を使わない理由
-Pydantic は API の入出力型定義（schemas.py）に使用する。DB→サービス層の内部構造は `dataclass` で表現し、バリデーションオーバーヘッドを避ける。ロジック層に Pydantic を混在させると「どこでバリデーションされるか」が曖昧になるため、責務を明確に分離する。
+Pydantic は API の入出力型定義（schemas.py）において外部データのバリデーションとスキーマ変換に特化させる。DBから取得した内部データのやり取りには、軽量な dataclass を採用することで、不要なバリデーションオーバーヘッドを排除し、データ構造の「器」としての責務を明確に分離する。
 
 ### project_skills を IN 句で一括取得する理由
 案件ごとに個別クエリを発行すると N+1 問題が発生し、30件案件の場合 30回の DB ラウンドトリップが生じる。`IN :ids` による一括取得で 1回に抑え、レスポンス時間要件（QA#30 の 5〜10 秒）に対応する。
@@ -30,8 +30,8 @@ Pydantic は API の入出力型定義（schemas.py）に使用する。DB→サ
 ### fetch_registered_project_ids が set を返す理由
 パイプライン除外チェック（Step 3.5）では `project_id in registered_ids` の判定を案件件数分繰り返す。list の O(n) に対し set の O(1) で高速化する。
 
-### テストに MagicMock を使用する理由
-`pytest-mock` は Bedrock / Google Maps など外部 API のモックに使用する（Steps 3・7）。SQLAlchemy Session の mock は標準ライブラリの `unittest.mock.MagicMock` で十分であり、依存を増やさない。
+### テストにおけるモックライブラリの使い分けの理由
+テストの迷いを排除し効率化するため。外部 API（Bedrock / Google Maps）は `pytest-mock` を使用して適切にモック化し、DBセッションのモックには標準ライブラリの `unittest.mock.MagicMock` を使用可とすることで、役割を明確に分けてテストの記述を簡潔にする。
 
 ---
 
@@ -53,17 +53,17 @@ Pydantic は API の入出力型定義（schemas.py）に使用する。DB→サ
 
 ## Step 4: マッチング計算フロー（E1 骨格）
 
-### カスケードソートで使う3指標を関数に分離した理由
-`_proc_overlap_count` / `_rate_in_range` / `_work_style_match` を個別関数として切り出すことで、`_cascade_sort` の sort_key が読みやすくなり、各指標を独立してテストできる。単一責任の原則（SRP）に従い、ソートキーの組み立てとカスケードロジックを分離した。
+### 内部データ構造を別ファイル（internal_types.py）に分離した理由
+`bedrock_service.py` と `matching_service.py` の間でデータ構造（`EngineerData` など）の参照による循環インポートが発生するため。データ構造定義を独立したファイルに切り出すことで、依存関係をクリーンにし、関数内でのローカルインポートというワークアラウンドを排除してテスト容易性を高めた。これにより、`pytest` や `mocker.patch` でのパス指定の複雑化を根本的に解消している。
+
+### カスケードソートの絞り込み閾値を「最大5件」とした理由
+案件1件あたりのAIの出力（理由やコメント）を日本語で丁寧に書かせると、短く見積もっても1件あたり1,000〜1,500文字（約1,500トークン）ほど消費する。30件を一括投入した場合、45,000トークンに達し、Claudeの最大出力制限（8,192トークン）を超えて出力が破綻（クラッシュ）する。そのため、AI呼び出し前の前段のステップ（Step 3.6）で最大5件にソート・厳選する仕様とした。
 
 ### proposable 以外エンジニアでもフローを続行する理由
 エラーレスポンスの仕様（スコアリングロジック設計書 v0.6）に「エンジニアが proposable でない場合のエラーコード」が定義されていない。UI でもマッチングボタンはステータスに関係なく表示される（画面一覧・遷移図 WF_03/WF_05 確認済み）。ログ警告を記録するにとどめ、フローは正常続行する。
 
-### bedrock_service をローカルインポートする理由
-`bedrock_service.py` が `matching_service.py` の `EngineerData` / `ProjectData` をインポートしている。`matching_service.py` のトップレベルで `bedrock_service` をインポートすると循環インポートになる。`calculate_matching` 関数内でローカルインポートすることで解決する（Python のモジュールキャッシュにより実行時コストは初回のみ）。
-
 ### _get_commute_time_minutes をスタブとして残す理由
-Step 6（Google Maps クライアント）が未実装のため、暫定的に `None` を返すスタブを配置する。呼び出し箇所は `calculate_matching` の1か所のみなので、Step 6 実装時に差し替えコストが最小化される。`invoke_matching` は `commute_time_minutes=None` を受け付けプロンプトに「NULL（算出失敗）」と出力するため、スタブのままでも AI 判定は機能する。
+Step 6（Google Maps クライアント）が未実装のため、暫定的に `None` を返すスタブを配置する。呼び出し箇所は `calculate_matching` の1か所のみなので、Step 6 実装時に差し替えコストが最小化される。
 
 ---
 
@@ -71,6 +71,9 @@ Step 6（Google Maps クライアント）が未実装のため、暫定的に `
 
 ### エラーハンドラーを main.py に集約した理由
 Router に try/except を書くと「HTTP ステータスへの変換ロジック」がルーター層に混入する。`@app.exception_handler` で main.py に集約することで、Router は薄く保たれ（ビジネスロジックなし）、エラーレスポンス形式の変更がファイル1か所で完結する。
+
+### BedrockError を 504 UPSTREAM_TIMEOUT として返却する理由
+インフラ層（AWS Bedrock）の接続エラーやリトライ超過によるタイムアウトは、外部API側が応答していない遅延状態を指すため、原因追及の容易性とシステム間APIの正確性を担保するため、従来の `502` ではなく `504 UPSTREAM_TIMEOUT` を正確に返却する。
 
 ### run_matching としてインポートしエイリアスした理由
 Router 関数名を `matching_calculate` にすると `calculate_matching`（サービス層関数）と区別できる。エイリアスにより「呼び出し元（router）がどの関数を呼んでいるか」がテスト時の `mocker.patch("app.routers.matching.run_matching")` で明示される。
@@ -88,20 +91,18 @@ E1 のリクエストパラメータはスコアリングロジック設計書 v
 ### 候補0件を `NoActiveCandidateError` で例外化した理由
 旧実装では候補0件を「空配列で正常終了」として扱っていたが、設計書 §4.2 のエラーコード定義に `422 NO_ACTIVE_PROJECT` が明記されている。呼び出し元が「空配列レスポンス」と「エラー状態」を区別できるようにするため、例外として明示的に送出する。
 
-### `total_hits` を `rank_filter` 適用後・`limit` 適用前に計算する理由
-設計書 §4.2 の `total_hits` 定義は「返却件数絞込前の候補件数」。これにより「Aランクが10件あるが limit=5 で5件返した」などをフロント側で表現できる。`rank_filter` 適用前に計算すると、絞り込みの意味が失われる。
-
-### `BedrockError` を 502 → 504 UPSTREAM_TIMEOUT に変更した理由
-502 Bad Gateway は「上流サーバーが不正なレスポンスを返した」意味。Bedrock のリトライ後タイムアウトは「上流が応答しない」ケースであり 504 Gateway Timeout が正確。設計書 §4.2 のエラーコード一覧も `504 UPSTREAM_TIMEOUT` と定義している。
+### total_hits をリミット適用前の総数とする理由
+設計書 §4.2 の total_hits 定義は「返却件数絞込前の候補件数」。これにより、「マッチした案件が全体で10件あるが、limit=5 のため今回は上位5件のみを返却している」という状態をフロント側で正しくハンドリングし、画面側に「全10件」と表示できるようにするため。
 
 ---
 
-## Step 7: Google Maps クライアント
+## Step 6: Google Maps クライアント
 
 （実装時に追記）
 
 ---
 
-## Step 8: E2 エンドポイント
+## Step 7: E2 エンドポイント
 
-（実装時に追記）
+### 画面入力の「アピールポイント」「フリースキル」を入力とする理由
+最新のAI活用方針（職務経歴書のアップロード廃止）に伴う画面仕様の変更に合わせるため。前任者の未着手（書きかけ）コードであった旧仕様（`engineer_id`のみ）を排し、画面から直接入力される `appeal_point` と `raw_skills` をBedrockによるプロフィール要約生成ロジックへと正しく引き渡す設計へ適合させた。
