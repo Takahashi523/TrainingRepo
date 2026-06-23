@@ -1,12 +1,24 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
+
+# 【トップレベルインポート化】循環インポートを解消し、先頭で綺麗にインポート
+from app.config import settings
+from app.models.internal_types import (
+    EngineerData,
+    EngineerSkill,
+    MatchCandidate,
+    MatchingOutput,
+    ProjectData,
+    ProjectSkill,
+)
+from app.services.bedrock_service import invoke_matching, invoke_profile_summary
+from app.services.gmaps_service import get_commute_time_minutes
 
 logger = logging.getLogger(__name__)
 
@@ -26,86 +38,6 @@ class NoActiveCandidateError(Exception):
     def __init__(self, engineer_id: int) -> None:
         self.engineer_id = engineer_id
         super().__init__(f"No active candidates for engineer_id={engineer_id}")
-
-
-# ---------------------------------------------------------------------------
-# 内部データクラス
-# Pydantic は API の入出力型定義に使用する。DB→サービス層の内部構造は
-# 軽量な dataclass で表現し、Pydantic のバリデーションオーバーヘッドを避ける。
-# ---------------------------------------------------------------------------
-
-@dataclass
-class EngineerSkill:
-    label: Optional[str]
-    detail: Optional[str]
-
-
-@dataclass
-class EngineerData:
-    id: int
-    status: Optional[str]            # proposable / interviewing / not_proposable
-    appeal_note: Optional[str]
-    has_negotiation_exp: Optional[int]
-    available_from: Optional[object]   # datetime.date or None
-    desired_rate: Optional[int]
-    nearest_station: Optional[str]
-    proc_requirements: Optional[int]
-    proc_basic_design: Optional[int]
-    proc_detail_design: Optional[int]
-    proc_development: Optional[int]
-    proc_testing: Optional[int]
-    proc_maintenance: Optional[int]
-    work_style_onsite: Optional[int]
-    work_style_hybrid: Optional[int]
-    work_style_remote: Optional[int]
-    skills: list[EngineerSkill] = field(default_factory=list)
-
-
-@dataclass
-class ProjectSkill:
-    skill_type: str   # 'required' or 'preferred'
-    label: Optional[str]
-    detail: Optional[str]
-
-
-@dataclass
-class ProjectData:
-    id: int
-    description: Optional[str]
-    negotiation_required: Optional[int]
-    start_date: Optional[object]       # datetime.date or None
-    rate_min: Optional[int]
-    rate_max: Optional[int]
-    rate_note: Optional[str]
-    work_style: Optional[str]
-    work_location_station: Optional[str]
-    proc_requirements: Optional[int]
-    proc_basic_design: Optional[int]
-    proc_detail_design: Optional[int]
-    proc_development: Optional[int]
-    proc_testing: Optional[int]
-    proc_maintenance: Optional[int]
-    created_at: Optional[object]       # datetime.datetime or None
-    skills: list[ProjectSkill] = field(default_factory=list)
-
-
-@dataclass
-class MatchCandidate:
-    """AI 総合判定結果（1案件分）。"""
-    project_id: int
-    match_score: int    # 0〜100（クランプ済み）
-    match_rank: str     # A / B / C / D（アプリ層で検算済み）
-    ai_score_reason: str
-    ai_comment: str
-    ai_missing: str通勤時間取得
-
-
-@dataclass
-class MatchingOutput:
-    """calculate_matching の戻り値。"""
-    engineer_id: int
-    generated_at: datetime
-    matches: list[MatchCandidate]
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +221,7 @@ def _cascade_sort(
     candidates: list[ProjectData],
     engineer: EngineerData,
 ) -> list[ProjectData]:
-    """候補 >30 件時の絞込ソート（スコアリングロジック設計書 v0.6 §3.6 準拠）。
+    """候補絞込ソート（スコアリングロジック設計書 v0.6 §3.6 準拠）。
     工程経験重複数(降順) → 単価適合(降順) → 勤務形態適合(降順) → 開始時期(昇順) → 登録日(昇順)
     """
     def sort_key(p: ProjectData) -> tuple:
@@ -311,7 +243,7 @@ def _get_commute_time_minutes(
     engineer: EngineerData,
     project: ProjectData,
 ) -> Optional[int]:
-    from app.services.gmaps_service import get_commute_time_minutes
+    # トップレベルインポート化した get_commute_time_minutes をそのまま利用
     return get_commute_time_minutes(
         origin=engineer.nearest_station or "",
         destination=project.work_location_station or "",
@@ -331,8 +263,6 @@ def calculate_matching(
     project_ids: Optional[list[int]],
 ) -> MatchingOutput:
     """E1 マッチング計算のメインフロー（AIプロンプト設計書 v0.3 / スコアリングロジック設計書 v0.6 準拠）。"""
-    from app.services.bedrock_service import invoke_matching
-    from app.config import settings  # 環境変数管理のMOCK_MODEをインポート
 
     # Step 3.1: エンジニア情報取得（存在しない場合は EngineerNotFoundError を送出）
     engineer = fetch_engineer(db, engineer_id)
@@ -356,9 +286,9 @@ def calculate_matching(
     if not candidates:
         raise NoActiveCandidateError(engineer_id)
 
-    # Step 3.6: 候補 >30 件ならカスケードソートで上位 30 件に絞込
-    if len(candidates) > 30:
-        candidates = _cascade_sort(candidates, engineer)[:30]
+    # 【仕様修正】Step 3.6: 候補 >5 件ならカスケードソートで上位 5 件に厳選絞込（Claudeの最大トークン制限・コスト最適化のため）
+    if len(candidates) > _MAX_MATCHES:
+        candidates = _cascade_sort(candidates, engineer)[:_MAX_MATCHES]
 
     # Step 3.7〜3.10: 案件ごとに通勤時間取得 → Bedrock AI 総合判定 → クランプ・ランク検算
     results: list[MatchCandidate] = []
@@ -431,8 +361,6 @@ def generate_profile_summary(
     最新のAI活用方針に準拠し、古い職務経歴書（appeal_note）を廃止。
     画面から入力されたアピールポイントとフリーテキストスキルをベースに肉付け文章を生成する。
     """
-    from app.services.bedrock_service import invoke_profile_summary
-    from app.config import settings
 
     # Step 8.1: エンジニア情報の存在チェック（存在しない場合は例外）
     engineer = fetch_engineer(db, engineer_id)
