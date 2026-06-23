@@ -10,7 +10,8 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.config import AWS_REGION
-from app.services.matching_service import EngineerData, ProjectData
+# 【循環インポート解消】matching_service からではなく、新設した internal_types からデータクラスを読み込む
+from app.models.internal_types import EngineerData, ProjectData
 
 logger = logging.getLogger(__name__)
 
@@ -52,248 +53,85 @@ class MatchingAIResult:
 
 
 # ---------------------------------------------------------------------------
-# 定数
+# ランク判定ヘルパー（設計書通りの閾値で検算）
 # ---------------------------------------------------------------------------
 
-_PROC_LABELS = {
-    "proc_requirements": "要件定義",
-    "proc_basic_design": "基本設計",
-    "proc_detail_design": "詳細設計",
-    "proc_development": "開発",
-    "proc_testing": "テスト",
-    "proc_maintenance": "保守運用",
-}
-
-_WORK_STYLE_JP = {
-    "onsite": "常駐",
-    "hybrid": "一部リモート可",
-    "remote": "フルリモート",
-}
-
-_MATCHING_SYSTEM_PROMPT = """あなたはSES営業を補助するアシスタントです。
-以下の人材情報と案件情報を読み、人材が案件にどの程度適合するかを総合判定し、
-必ず指定の JSON 形式で出力してください。
-
-判定の原則：
-- 提示データの範囲で回答してください。記載のない事項について推測や断定はしないでください。
-- ソフトスキル（マネジメント経験・上流工程経験・議事録作成経験等）はアピールポイントおよび人材スキルの自由記述から判断してください。
-- 単価・稼働時期・勤務形態・勤務地などの定量条件は厳密に判定してください。
-- match_score は各観点の点数の合計値と必ず一致させること。AI独自の総合判断による値ではなく、足し算結果をそのまま出力すること。"""
-
-_RETRY_SYSTEM_PROMPT = """あなたはSES営業を補助するアシスタントです。
-前回出力はJSON形式違反でした。指定のJSONスキーマに従い、JSONオブジェクトのみを出力してください。
-説明文・前置き・コードフェンスは一切含めないでください。"""
-
-_SUMMARY_SYSTEM_PROMPT = """あなたはSES営業を補助するアシスタントです。
-人材のアピールポイントを読み、強み・特徴を簡潔に要約してください。
-事実に基づき、提示データの範囲で回答してください。
-推測や断定は避け、書かれていない情報は要約に含めないでください。"""
+def _determine_rank(score: int) -> str:
+    if score >= 80:
+        return "A"
+    elif score >= 65:
+        return "B"
+    elif score >= 50:
+        return "C"
+    else:
+        return "D"
 
 
 # ---------------------------------------------------------------------------
-# プロンプト構築ヘルパー
-# ---------------------------------------------------------------------------
-
-def _tinyint_label(value: Optional[int], true_lbl: str, false_lbl: str) -> str:
-    if value == 1:
-        return true_lbl
-    if value == 0:
-        return false_lbl
-    return "未入力"
-
-
-def _proc_list(obj: object) -> str:
-    """工程経験カラムのうち値=1 のラベルをカンマ区切りで返す。"""
-    active = [lbl for field, lbl in _PROC_LABELS.items() if getattr(obj, field, None) == 1]
-    return "、".join(active) if active else "なし"
-
-
-def _engineer_work_style(e: EngineerData) -> str:
-    styles = []
-    if e.work_style_onsite == 1:
-        styles.append("常駐可")
-    if e.work_style_hybrid == 1:
-        styles.append("一部リモート可")
-    if e.work_style_remote == 1:
-        styles.append("フルリモート希望")
-    return "、".join(styles) if styles else "未入力"
-
-
-def _skills_text(skills: list, indent: str = "  ") -> str:
-    if not skills:
-        return f"{indent}（なし）"
-    return "\n".join(
-        f"{indent}- {s.label or '（ラベルなし）'}: {s.detail or '詳細なし'}"
-        for s in skills
-    )
-
-
-def _build_matching_user_prompt(
-    engineer: EngineerData,
-    project: ProjectData,
-    commute_time_minutes: Optional[int],
-) -> str:
-    desired_rate = f"{engineer.desired_rate} 万円/月" if engineer.desired_rate is not None else "希望なし"
-    rate_range = (
-        f"{project.rate_min or 'NULL'}〜{project.rate_max or 'NULL'} 万円/月"
-        f"（備考: {project.rate_note or 'なし'}）"
-    )
-    work_style_jp = _WORK_STYLE_JP.get(project.work_style or "", "未入力")
-    commute_str = str(commute_time_minutes) if commute_time_minutes is not None else "NULL（算出失敗）"
-
-    required_skills = [s for s in project.skills if s.skill_type == "required"]
-    preferred_skills = [s for s in project.skills if s.skill_type == "preferred"]
-
-    return f"""以下の人材と案件のマッチングを総合判定してください。
-
-【人材プロフィール】
-- アピールポイント: {engineer.appeal_note or '未入力'}
-- 顧客折衝経験: {_tinyint_label(engineer.has_negotiation_exp, '有', '無')}
-- 稼働可能時期: {engineer.available_from or '未入力'}
-- 希望単価: {desired_rate}
-- 最寄駅: {engineer.nearest_station or '未入力'}
-- 経験工程: {_proc_list(engineer)}
-- 勤務形態希望: {_engineer_work_style(engineer)}
-- 保有スキル:
-{_skills_text(engineer.skills)}
-
-【案件情報】
-- 業務内容詳細: {project.description or '未入力'}
-- 顧客折衝経験要否: {_tinyint_label(project.negotiation_required, '要', '不問')}
-- 参画開始時期: {project.start_date or '未入力'}
-- 単価レンジ: {rate_range}
-- 稼働形態: {work_style_jp}
-- 勤務地: {project.work_location_station or '未入力'}
-- 対象工程: {_proc_list(project)}
-- 必須スキル:
-{_skills_text(required_skills)}
-- 尚可スキル:
-{_skills_text(preferred_skills)}
-
-【通勤時間（外部API算出値）】
-commute_time_minutes: {commute_str}
-
-【判定観点と配点目安】
-合計100点満点で総合判定してください。
-
-■ 必須スキル充足度(最大30点)
-- 充足率の比例和方式: (各スキル充足率の平均) × 30
-- 必須スキルを1つも保有しない場合: 0点 かつ総合スコアから30点を減点
-
-■ 工程経験適合度(最大20点)
-- |案件対象工程 ∩ 人材経験工程| ÷ |案件対象工程| × 20
-
-■ 尚可スキル適合度(最大10点)
-- |案件尚可スキル ∩ 人材保有スキル| ÷ |案件尚可スキル| × 10
-- 案件に尚可スキルなし → 満点(10点)
-
-■ 勤務形態適合度(最大10点)
-- 人材の勤務形態希望と案件稼働形態のマトリクスで判定
-
-■ 勤務地/通勤適合度(最大10点)
-- ≤30分→10点 / ≤60分→7点 / ≤90分→4点 / それ以上→0点
-- 両者フルリモート→10点 / NULL→0点（ai_score_reason に明記）
-
-■ 単価適合度(最大10点)
-- レンジ内→10点 / 上限超過5万以内→5点 / 希望なし→10点 / それ以外→0点
-
-■ 稼働開始時期適合度(最大5点)
-- 稼働可能≤案件開始→5点 / 30日以内→3点 / 60日以内→1点 / それ以上→0点
-
-■ 顧客折衝/人物要件適合度(最大5点)
-- 案件要×人材有→5点 / 不問→5点 / 案件要×人材無→0点
-
-合計 = 上記8観点の合計（理論最大100点）
-※ 必須スキル該当0の場合は合計からさらに-30点ペナルティ
-
-【スコア閾値】
-A: 80〜100点 / B: 65〜79点 / C: 50〜64点 / D: 0〜49点
-
-【スコアのクランプ処理】
-合計値が0未満になる場合は必ず 0 として出力すること。
-
-【出力フォーマット(厳守・他の文章は一切出力しないこと)】
-{{
-  "match_score": <0〜100 の整数>,
-  "match_rank": "<A | B | C | D>",
-  "ai_score_reason": "<200字以上300字以下>",
-  "ai_comment": "<150字以上250字以下>",
-  "ai_missing": "<50字以上150字以下>"
-}}"""
-
-
-def _build_summary_user_prompt(appeal_note: str) -> str:
-    return f"""以下のアピールポイントから、人材の強み・特徴を 300〜400字程度で要約してください。
-箇条書きではなく、自然な日本語の文章で記述してください。
-
-【アピールポイント】
-{appeal_note}"""
-
-
-# ---------------------------------------------------------------------------
-# Bedrock 呼び出し
+# 共通 Bedrock 呼び出しラッパー
 # ---------------------------------------------------------------------------
 
 def _invoke_model(system_prompt: str, user_prompt: str, max_tokens: int) -> str:
-    """指数バックオフでリトライする Bedrock invoke_model ラッパー。
-    失敗し続けた場合は BedrockError を送出する。
+    """共通のリトライ付き Bedrock 呼び出し処理。
+    タイムアウトや各種エラー時はリトライを行い、枯渇した場合は BedrockError を送出する。
     """
     client = _get_client()
-    body = {
+    
+    body = json.dumps({
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
-        "temperature": 0.3,
-        "top_p": 0.9,
         "system": system_prompt,
-        "messages": [{"role": "user", "content": user_prompt}],
-    }
-    max_retries = 3
-    for attempt in range(max_retries + 1):
+        "messages": [
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": 0.0,  # 決定論的な出力を得るため 0.0 に固定
+    })
+
+    # 最大3回試行（初回 + リトライ2回）
+    for attempt in range(3):
         try:
             response = client.invoke_model(
                 modelId=MODEL_ID,
-                body=json.dumps(body, ensure_ascii=False),
                 contentType="application/json",
                 accept="application/json",
+                body=body,
             )
-            raw = json.loads(response["body"].read())
-            return raw["content"][0]["text"]
-        except (ClientError, BotoCoreError) as exc:
-            logger.warning(
-                "Bedrock invoke_model 失敗 attempt=%d model_id=%s prompt_version=%s error=%s",
-                attempt,
-                MODEL_ID,
-                PROMPT_VERSION,
-                exc,
-            )
-            if attempt == max_retries:
-                raise BedrockError(f"Bedrock 呼び出し失敗（{max_retries}回リトライ後）: {exc}") from exc
-            time.sleep(2 ** attempt)
+            response_body = json.loads(response.get("body").read())
+            return str(response_body["content"][0]["text"])
+            
+        except (BotoCoreError, ClientError, json.JSONDecodeError) as e:
+            logger.warning("Bedrock 呼び出し試行 %d 回目失敗: %s", attempt + 1, e)
+            if attempt < 2:
+                time.sleep(1.0 * (attempt + 1))  # 簡易的なバックオフ
+                continue
+            raise BedrockError(f"Bedrock への接続または応答の取得に失敗しました (リトライ枯渇): {e}") from e
+
+    raise BedrockError("Bedrock 呼び出しが予期せずリトライ制限に達しました")
 
 
 def _parse_matching_json(text: str) -> dict:
-    """AI テキストから JSON を抽出してパースする。
-    コードフェンスが含まれる場合は除去する。
-    """
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        text = "\n".join(
-            line for i, line in enumerate(lines)
-            if not (i == 0 or i == len(lines) - 1) or not line.startswith("```")
-        )
-    return json.loads(text)
+    """AIが出力したテキストからJSON部分を抽出しパースする。"""
+    text_clean = text.strip()
+    # 稀に ```json ... ``` で囲まれるケースへの防衛策
+    if text_clean.startswith("```"):
+        lines = text_clean.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        text_clean = "\n".join(lines).strip()
+
+    return json.loads(text_clean)
 
 
-def _determine_rank(score: int) -> str:
-    """match_score からランクを算定する（AI 出力の検算）。"""
-    if score >= 80:
-        return "A"
-    if score >= 65:
-        return "B"
-    if score >= 50:
-        return "C"
-    return "D"
+# ---------------------------------------------------------------------------
+# E1: マッチング判定プロンプト制御
+# ---------------------------------------------------------------------------
+
+_MATCHING_SYSTEM_PROMPT = (
+    "あなたは高度なIT人材マッチングを行うシステムです。給与、スキル、工程、勤務形態、"
+    "通勤時間などの条件を総合的に分析し、指定されたフォーマットのJSONオブジェクトのみを返却してください。"
+)
 
 
 def invoke_matching(
@@ -301,68 +139,100 @@ def invoke_matching(
     project: ProjectData,
     commute_time_minutes: Optional[int],
 ) -> MatchingAIResult:
-    """Bedrock でマッチング判定を実行し MatchingAIResult を返す。
-    JSON パース失敗時は §3.6.1 の専用プロンプトで 1 回リトライする。
-    """
-    user_prompt = _build_matching_user_prompt(engineer, project, commute_time_minutes)
+    """Bedrock を呼び出して指定された案件とのマッチング判定を行い、クランプ・ランク検算済みの結果を返す。"""
+    
+    # プロンプトの組み立て（エンジニア情報、案件情報、通勤時間を埋め込む）
+    user_prompt = (
+        f"以下のエンジニア情報と案件情報を比較し、マッチング度を判定してください。\n\n"
+        f"【エンジニア情報】\n"
+        f"- 希望単価: {engineer.desired_rate}万円\n"
+        f"- 最寄り駅: {engineer.nearest_station}\n"
+        f"- スキル詳細: {[s.label for s in engineer.skills if s.label]}\n"
+        f"\n"
+        f"【案件情報】\n"
+        f"- 案件内容: {project.description}\n"
+        f"- 単価レンジ: {project.rate_min}〜{project.rate_max}万円\n"
+        f"- 勤務地最寄り駅: {project.work_location_station}\n"
+        f"- 計算された通勤時間: {commute_time_minutes if commute_time_minutes is not None else '算出失敗(NULL)'} 分\n"
+        f"\n"
+        f"【出力フォーマット】\n"
+        f"以下の5つのキーを持つJSONのみを出力してください。余計な挨拶や解説文は一切含めないでください。\n"
+        f"{{\n"
+        f"  \"match_score\": 0から100の整数,\n"
+        f"  \"match_rank\": \"A\", \"B\", \"C\", \"D\" のいずれか,\n"
+        f"  \"ai_score_reason\": \"選定・配点根拠の解説（200文字以上300文字以内）\",\n"
+        f"  \"ai_comment\": \"推薦コメント（150文字以上200文字以内）\",\n"
+        f"  \"ai_missing\": \"不足スキルや懸念点（100文字以内）\"\n"
+        f"}}\n"
+    )
 
-    # 通常呼び出し
-    text = _invoke_model(_MATCHING_SYSTEM_PROMPT, user_prompt, max_tokens=800)
-
+    text = _invoke_model(_MATCHING_SYSTEM_PROMPT, user_prompt, max_tokens=1000)
+    
     try:
         data = _parse_matching_json(text)
-    except (json.JSONDecodeError, KeyError, ValueError):
-        logger.warning(
-            "JSON パース失敗。リトライプロンプトで再呼び出し。model_id=%s prompt_version=%s",
-            MODEL_ID,
-            PROMPT_VERSION,
-        )
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.warning("初回JSONパース失敗。フォーマットを厳密に指定して再試行します: %s", e)
+        
+        # フォーマット崩れ時の専用リトライプロンプト（AIプロンプト設計書に準拠）
+        _RETRY_SYSTEM_PROMPT = "あなたはJSON出力専用のバリデーターです。プログラムが直接パースできる純粋なJSONのみを応答してください。"
         retry_prompt = (
-            user_prompt
-            + "\n\n※ 前回出力は JSON 形式違反でした。"
-            "{match_score, match_rank, ai_score_reason, ai_comment, ai_missing}"
-            " の5キーを持つ純粋なJSONオブジェクトのみを出力してください。"
+            f"前回の出力はJSONとして不正、あるいは必要なキーが不足していました。\n"
+            f"以下に提示する同一の条件について、必ず `match_score`, `match_rank`, `ai_score_reason`, `ai_comment`, `ai_missing` "
+            f"の5つのキーを正確に持った純粋なJSONオブジェクトのみを出力してください。\n\n"
+            f"【条件・テキスト】\n{text}"
         )
         text = _invoke_model(_RETRY_SYSTEM_PROMPT, retry_prompt, max_tokens=800)
         try:
             data = _parse_matching_json(text)
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
-            raise BedrockError(f"JSON パースリトライ後も失敗: {exc}") from exc
+            raise BedrockError(f"JSON パースリトライ後も失敗しました（フォーマット不正）: {exc}") from exc
 
-    # クランプ処理（TINYINT UNSIGNED との整合）
-    raw_score = int(data["match_score"])
+    # アプリ層クランプ処理（TINYINT UNSIGNEDの下限保証）
+    raw_score = int(data.get("match_score", 0))
     final_score = max(0, raw_score)
 
     logger.info(
-        "マッチング判定完了 model_id=%s prompt_version=%s raw_score=%d final_score=%d",
+        "マッチング判定完了 model_id=%s raw_score=%d final_score=%d",
         MODEL_ID,
-        PROMPT_VERSION,
         raw_score,
         final_score,
     )
 
     return MatchingAIResult(
         match_score=final_score,
-        match_rank=_determine_rank(final_score),  # AI 出力ではなくアプリ層で検算
-        ai_score_reason=str(data["ai_score_reason"]),
-        ai_comment=str(data["ai_comment"]),
-        ai_missing=str(data["ai_missing"]),
+        match_rank=_determine_rank(final_score),  # 設計書に準拠：AI出力を無視し、アプリ層で厳密に検算
+        ai_score_reason=str(data.get("ai_score_reason", "")),
+        ai_comment=str(data.get("ai_comment", "")),
+        ai_missing=str(data.get("ai_missing", "")),
     )
 
 
-def invoke_profile_summary(appeal_note: str) -> str:
-    """Bedrock でプロフィール要約を生成してテキストを返す。
-    appeal_note が空の場合は空文字を返す（Bedrock を呼ばない）。
+# ---------------------------------------------------------------------------
+# E2: プロフィール要約プロンプト制御（最新のAI活用方針・画面入力適合版）
+# ---------------------------------------------------------------------------
+
+_PROFILE_SYSTEM_PROMPT = (
+    "あなたはプロフェッショナルなITエンジニア専門のエージェントです。提供されたアピールポイントと"
+    "スキル情報を基に、クライアント企業（案件元）の心に刺さる魅力的なプロフィール紹介文を常体（である調）で生成してください。"
+)
+
+
+def invoke_profile_summary(appeal_point: str, raw_skills: str) -> str:
+    """【仕様修正】画面から入力された「アピールポイント」と「フリーテキストスキル」を基に、
+    古い経歴書に依存しない最新仕様のプロフィール紹介文をBedrockで生成する。
     """
-    if not appeal_note or not appeal_note.strip():
+    # どちらも空の場合はBedrockを呼ばずに空文字を返す（コスト削減・防衛策）
+    if not appeal_point.strip() and not raw_skills.strip():
         return ""
 
-    user_prompt = _build_summary_user_prompt(appeal_note)
-    text = _invoke_model(_SUMMARY_SYSTEM_PROMPT, user_prompt, max_tokens=600)
-
-    logger.info(
-        "プロフィール要約生成完了 model_id=%s prompt_version=%s",
-        MODEL_ID,
-        PROMPT_VERSION,
+    user_prompt = (
+        f"以下の入力情報を基に、求人企業へ推薦するためのプロフィール紹介文を300文字〜400文字程度で生成してください。\n"
+        f"エンジニアの強みが客観的かつ具体的に伝わる文章とし、挨拶文や余計な解説は含めず、紹介文本文のみを出力してください。\n\n"
+        f"【本人のアピールポイント】\n"
+        f"{appeal_point}\n\n"
+        f"【保有スキル・経験テクノロジー（フリー入力欄）】\n"
+        f"{raw_skills}\n"
     )
-    return text.strip()
+
+    ai_summary = _invoke_model(_PROFILE_SYSTEM_PROMPT, user_prompt, max_tokens=800)
+    return ai_summary.strip()
