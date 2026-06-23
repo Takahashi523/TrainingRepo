@@ -32,9 +32,11 @@ Router（routers/）
            └─ Model（models/）
                 ├─ db.py        # SQLAlchemy engine / session
                 └─ schemas.py   # Pydantic 型定義
+                └─ internal_types.py # 内部データ構造定義（dataclass）
 ```
 
-Router は薄く保ち、ビジネスロジックは Service に集約する。
+- Router は薄く保ち、ビジネスロジックは Service に集約する。
+- 循環インポートを解消しテスト容易性を高めるため、サービス間で共有する内部データ構造（`EngineerData`等）は `models/internal_types.py` に切り出して独立させる。
 
 ---
 
@@ -48,14 +50,17 @@ Step 3.3  project_ids 指定がある場合はフィルタ
 Step 3.4  エンジニアが稼働中かチェック（status='proposable'）
 Step 3.5  パイプライン除外（pipelines テーブルで既登録の project_id を除外）
 Step 3.6  候補 >5 件なら カスケードソートで絞込
-          （工程経験重複数 → 単価 → 勤務形態 → 開始時期 → 登録日）
+（工程経験重複数 → 単価 → 勤務形態 → 開始時期 → 登録日）
+※Claudeの最大出力制限（8,192トークン）および消費コストの最適化のため
+一括投入する案件候補数は最大5件に厳選する。
 Step 3.7  Google Maps で commute_time_minutes 取得（案件ごと）
 Step 3.8  Bedrock AI 総合判定
-          （match_score / ai_score_reason / ai_comment / ai_missing を一括生成）
+（match_score / ai_score_reason / ai_comment / ai_missing を一括生成）
 Step 3.9  アプリ層クランプ（match_score = max(0, raw_score)）
 Step 3.10 アプリ層ランク検算（AI 出力の match_rank は無視し _determine_rank で確定）
 Step 3.11 上位5件にソート・絞込
 Step 3.12 レスポンス構築・返却
+
 ```
 
 ---
@@ -99,10 +104,12 @@ match_score = max(0, raw_score)  # TINYINT UNSIGNED の下限保証
 ## E2 プロフィール要約フロー（AIプロンプト設計書 v0.3 §2 準拠）
 
 ```
-Step 8.1  engineer_id でエンジニア情報取得
-Step 8.2  Bedrock でプロフィール要約生成（appeal_note を入力）
+
+Step 8.1  engineer_id でエンジニア情報の存在チェック
+Step 8.2  Bedrock でプロフィール要約生成（画面入力のアピールポイント、フリースキルを入力）
 Step 8.3  engineers.ai_summary / ai_summary_generated_at を UPSERT
 Step 8.4  レスポンス返却
+
 ```
 
 ---
@@ -111,13 +118,13 @@ Step 8.4  レスポンス返却
 
 | ファイル | 変更内容 |
 |---|---|
-| `python/app/services/matching_service.py` | DB取得・フロー全体・`NoActiveCandidateError`・`limit`/`rank_filter`/`total_hits` 追加 ✅ |
-| `python/app/services/bedrock_service.py` | Bedrock 呼び出しラッパー（リトライ・JSON再試行） ✅ |
+| `python/app/services/matching_service.py` | DB取得・フロー全体・`NoActiveCandidateError`/`limit`/`rank_filter`/`total_hits` 追加、カスケードソート閾値の最適化（最大5件）、トップレベルインポートへの移行。 ✅ |
+| `python/app/services/bedrock_service.py` | Bedrock 呼び出しラッパー（リトライ・JSON再試行）、internal_types.py からのデータクラス参照。 ✅ |
 | `python/app/services/gmaps_service.py` | 新規作成。Google Maps API ラッパー（Step 6） |
 | `python/app/routers/matching.py` | E1 実装完成。`limit`/`rank_filter`/`total_hits` をリクエスト/レスポンスに追加 ✅ |
-| `python/app/routers/profile.py` | E2 スタブ → 実装完成（Step 7） |
-| `python/app/models/schemas.py` | `MatchingRequest`（limit/rank_filter）・`MatchingResponse`（total_hits）追加 ✅ |
-| `python/app/main.py` | 例外ハンドラ集約（EngineerNotFoundError / NoActiveCandidateError / BedrockError） ✅ |
+| `python/app/routers/profile.py` | E2 新AI活用方針（アピールポイント・フリースキル入力）への適合および実装完成。 ✅ |
+| `python/app/models/schemas.py` | `MatchingRequest`/`MatchingResponse` 追加、最新E2スキーマの定義。 ✅ |
+| `python/app/main.py` | 例外ハンドラ集約（`EngineerNotFoundError` / `NoActiveCandidateError` / BedrockError の504変換対応） ✅ |
 | `python/tests/test_matching_service.py` | 78件・カバレッジ98% ✅ |
 | `python/tests/test_bedrock_service.py` | 32件・カバレッジ97% ✅ |
 | `python/tests/test_routers.py` | 8件・カバレッジ100% ✅ |
@@ -133,14 +140,14 @@ Step 8.4  レスポンス返却
 - 認証：IAM ロールベース（`boto3` が自動取得、APIキー直書き禁止）
 - モデル：`anthropic.claude-3-5-sonnet-20240620-v1:0`
 - 呼び出し：`invoke_model`（同期）
-- ローカルテスト時：`pytest-mock` でモック化
+- ローカルテスト時：`pytest-mock`を使用して適切にモック化すること（DBセッションのモックには標準の `MagicMock` を使用可）
 
 ### Google Maps Distance Matrix API
 
 - キー取得：boto3 SSM `get_parameter(Name="Nexus-google-maps-key", WithDecryption=True)`
 - エンドポイント：`https://maps.googleapis.com/maps/api/distancematrix/json`
 - 単位：commute_time_minutes（秒→分に変換）
-- ローカルテスト時：`pytest-mock` でモック化
+- ローカルテスト時：`pytest-mock` を使用して適切にモック化すること         
 
 ---
 
