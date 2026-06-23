@@ -1,48 +1,76 @@
-from dataclass import dataclass
+from dataclasses import dataclass  # モジュール名を正しく修正
 from typing import List, Optional
 
 @dataclass
-class SkillData:
-    """スキル情報を保持する内部データ構造"""
-    skill_id: int
-    name: str
+class EngineerSkill:
+    """エンジニアのスキルを保持するクラス"""
+    label: Optional[str]
+    detail: Optional[str]
+
+@dataclass
+class ProjectSkill:
+    """案件のスキルを保持するクラス"""
+    skill_type: str  # mandatory / preferred
+    label: Optional[str]
+    detail: Optional[str]
 
 @dataclass
 class EngineerData:
     """エンジニアの基本情報と保有スキル・工程経験を保持する内部データ構造"""
-    engineer_id: int
-    status: str
+    id: int
+    status: Optional[str]            # proposable / interviewing / not_proposable
+    appeal_note: Optional[str]
+    has_negotiation_exp: Optional[int]
+    available_from: Optional[str]     # YYYY-MM-DD 形式
     desired_rate: Optional[int]
-    work_style: str
-    available_from: Optional[str]  # YYYY-MM-DD 形式
-    skills: List[SkillData]
-    processes: List[str]          # 工程名（要件定義、基本設計など）のリスト
-    appeal_point: Optional[str] = None
-    raw_skills: Optional[str] = None
+    nearest_station: Optional[str]
+    proc_requirements: int
+    proc_basic_design: int
+    proc_detail_design: int
+    proc_development: int
+    proc_testing: int
+    proc_maintenance: int
+    work_style_onsite: int
+    work_style_hybrid: int
+    work_style_remote: int
+    skills: List[EngineerSkill]
+    appeal_point: Optional[str] = None  # E2新方針用
+    raw_skills: Optional[str] = None    # E2新方針用
 
 @dataclass
 class ProjectData:
     """案件の基本情報と必須・尚可スキル、工程経験を保持する内部データ構造"""
-    project_id: int
-    title: str
-    status: str
+    id: int
+    description: Optional[str]
+    negotiation_required: Optional[int]
+    start_date: Optional[str]        # YYYY-MM-DD 形式
+    rate_min: Optional[int]
     rate_max: Optional[int]
-    work_style: str
-    start_date: Optional[str]     # YYYY-MM-DD 形式
-    created_at: str               # カスケードソート（登録日）で使用
-    mandatory_skills: List[SkillData]
-    preferred_skills: List[SkillData]
-    processes: List[str]          # 案件が求める工程名のリスト
-    commute_time_minutes: Optional[int] = None  # Google Maps APIから取得する通勤時間
+    rate_note: Optional[str]
+    work_style: Optional[str]        # onsite / hybrid / remote
+    work_location_station: Optional[str]
+    proc_requirements: int
+    proc_basic_design: int
+    proc_detail_design: int
+    proc_development: int
+    proc_testing: int
+    proc_maintenance: int
+    created_at: Optional[str]        # カスケードソートで使用
+    skills: List[ProjectSkill]
 
 @dataclass
-class MatchResultInternal:
-    """AI総合判定に渡す前、および判定後にアプリ層で計算・保持する内部マッチング結果構造"""
+class MatchCandidate:
+    """APIレスポンスおよびAI総合判定を保持する内部マッチング結果構造"""
     project_id: int
-    title: str
     match_score: int
     match_rank: str
     ai_score_reason: Optional[str] = None
     ai_comment: Optional[str] = None
     ai_missing: Optional[str] = None
-    commute_time_minutes: Optional[int] = None
+
+@dataclass
+class MatchingOutput:
+    """E1全体の出力を保持する構造"""
+    engineer_id: int
+    generated_at: str  # ISO8601形式文字列、または datetime オブジェクト
+    matches: List[MatchCandidate]
