@@ -119,7 +119,7 @@ export default function Create({
     statuses,
     users,
 }: Props) {
-    const { data, setData, post, errors, processing } = useForm({
+    const { data, setData, post, transform, errors, processing } = useForm({
         // 基本情報
         name: "", // 案件名
         client_name: "", // 顧客名
@@ -167,6 +167,40 @@ export default function Create({
     });
 
     const handleSubmit = () => {
+        transform((data) => ({
+            ...data,
+            // 空文字を null に統一（nullable フィールド）
+            client_name: data.client_name || null,
+            start_date: data.start_date || null,
+            commercial_flow: data.commercial_flow || null,
+            work_style: data.work_style || null,
+            work_location_line: data.work_location_line || null,
+            work_location_station: data.work_location_station || null,
+            rate_note: data.rate_note || null,
+            description: data.description || null,
+            work_env: data.work_env || null,
+            billing_range: data.billing_range || null,
+            remarks: data.remarks || null,
+            sub_user_id: data.sub_user_id || null,
+
+            // 数値フィールドは整数または null に変換
+            headcount: data.headcount !== "" ? Number(data.headcount) : null,
+            rate_min: data.rate_min !== "" ? Number(data.rate_min) : null,
+            rate_max: data.rate_max !== "" ? Number(data.rate_max) : null,
+            interview_count:
+                data.interview_count !== ""
+                    ? Number(data.interview_count)
+                    : null,
+
+            // スキルの id はバックエンド不要なので除去
+            required_skills: data.required_skills
+                .filter((s) => s.label !== "" || s.detail !== "") // 空行を除去
+                .map(({ label, detail }) => ({ label, detail })),
+            preferred_skills: data.preferred_skills
+                .filter((s) => s.label !== "" || s.detail !== "")
+                .map(({ label, detail }) => ({ label, detail })),
+        }));
+
         post(route("projects.store"));
     };
 
@@ -372,7 +406,9 @@ export default function Create({
                             setData("commercial_flow", value)
                         }
                     >
-                        <SelectTrigger className="w-40">
+                        <SelectTrigger
+                            className={`w-40 ${errors.commercial_flow ? "border-destructive" : ""}`}
+                        >
                             <SelectValue placeholder="選択してください" />
                         </SelectTrigger>
                         <SelectContent>
@@ -403,7 +439,9 @@ export default function Create({
                             }
                         }}
                     >
-                        <SelectTrigger className="w-40">
+                        <SelectTrigger
+                            className={`w-40 ${errors.work_style ? "border-destructive" : ""}`}
+                        >
                             <SelectValue placeholder="選択してください" />
                         </SelectTrigger>
                         <SelectContent>
@@ -488,7 +526,6 @@ export default function Create({
                         onChange={(skills: SkillPair[]) =>
                             setData("required_skills", skills)
                         }
-                        error={errors.required_skills as string | undefined}
                     />
                 </FormRow>
 
@@ -601,7 +638,11 @@ export default function Create({
                 <FormRow
                     label="担当営業"
                     required
-                    error={errors.main_user_id as string | undefined}
+                    error={
+                        (errors.main_user_id ?? errors.sub_user_id) as
+                            | string
+                            | undefined
+                    }
                     hint="担当・サブともにユーザーマスタより選択します"
                 >
                     {/* 担当（メイン） */}
@@ -615,7 +656,9 @@ export default function Create({
                                 setData("main_user_id", value)
                             }
                         >
-                            <SelectTrigger className="w-40">
+                            <SelectTrigger
+                                className={`w-40 ${errors.main_user_id ? "border-destructive" : ""}`}
+                            >
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -647,7 +690,9 @@ export default function Create({
                                 )
                             }
                         >
-                            <SelectTrigger className="w-40">
+                            <SelectTrigger
+                                className={`w-40 ${errors.sub_user_id ? "border-destructive" : ""}`}
+                            >
                                 <SelectValue placeholder="（なし）" />
                             </SelectTrigger>
                             <SelectContent>
