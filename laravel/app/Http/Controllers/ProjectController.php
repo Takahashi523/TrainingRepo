@@ -6,6 +6,7 @@ use App\Http\Requests\ProjectRequest;
 use App\Models\FormFieldSetting;
 use App\Models\User;
 use App\Models\Project;
+use App\Services\ProjectService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -13,6 +14,10 @@ use Inertia\Inertia;
 
 class ProjectController extends Controller
 {
+    public function __construct(
+        private readonly ProjectService $projectService
+    ) {}
+
     private const PHASES = [
         ['key' => 'proc_requirements',  'name' => '要件定義'],
         ['key' => 'proc_basic_design',  'name' => '基本設計'],
@@ -95,17 +100,9 @@ class ProjectController extends Controller
      */
     public function store(ProjectRequest $request): RedirectResponse
     {
-        $skills = [
-            'required'  => $request->input('required_skills', []),
-            'preferred' => $request->input('preferred_skills', []),
-        ];
+        $project = $this->projectService->store($request);
 
-        DB::transaction(function () use ($request, $skills) {
-            $project = Project::create($this->projectAttributes($request));
-            $this->insertSkills($project, $skills);
-        });
-
-        return redirect('/dashboard')->with('success', '案件情報を登録しました。');
+        return redirect()->route('projects.show', $project)->with('success', '案件情報を登録しました。');
     }
 
     /**

@@ -60,7 +60,7 @@ class ProjectRequest extends FormRequest
             );
         }
 
-                // ----------------------------------------------------------------
+        // ----------------------------------------------------------------
         // 単価：rate フィールドキー1つで rate_min / rate_max / rate_note をまとめて制御する
         // rate_is_negotiable が true の場合は rate_min / rate_max をバリデーション対象外とする
         // ----------------------------------------------------------------
@@ -119,14 +119,14 @@ class ProjectRequest extends FormRequest
         $preferredSkillsRequired = FormFieldSetting::isRequired('project', 'preferred_skills');
  
         $rules['required_skills']           = [$requiredSkillsRequired ? 'required' : 'nullable', 'array'];
-        $rules['required_skills.*.label']   = ['string', 'max:15'];
+        $rules['required_skills.*.label']   = ['nullable', 'string', 'max:15'];
         $rules['required_skills.*.detail']  = ['nullable', 'string', 'max:500'];
  
         $rules['preferred_skills']          = [$preferredSkillsRequired ? 'required' : 'nullable', 'array'];
-        $rules['preferred_skills.*.label']  = ['string', 'max:15'];
+        $rules['preferred_skills.*.label']  = ['nullable', 'string', 'max:15'];
         $rules['preferred_skills.*.detail'] = ['nullable', 'string', 'max:500'];
 
-                // ----------------------------------------------------------------
+        // ----------------------------------------------------------------
         // 対象工程：proc_experience の1設定で proc_* 6フィールドをまとめて制御する
         // WF_12のフォーム設定タブでも「対象工程」として1つのトグルで管理する
         // ----------------------------------------------------------------
@@ -157,7 +157,6 @@ class ProjectRequest extends FormRequest
                         "required_skills.{$index}.label",
                         'スキル詳細を入力する場合はスキル名も入力してください。'
                     );
-                    dd($validator->errors()->all());
                 }
             }
 
@@ -178,8 +177,8 @@ class ProjectRequest extends FormRequest
         return [
             'name'                     => '案件名',
             'status'                   => 'ステータス',
-            'main_user_id'             => '主担当',
-            'sub_user_id'              => 'サブ担当',
+            'main_user_id'             => '主担当営業',
+            'sub_user_id'              => 'サブ担当営業',
             'client_name'              => '顧客名',
             'headcount'                => '募集人数',
             'start_date'               => '参画開始時期',
@@ -189,8 +188,8 @@ class ProjectRequest extends FormRequest
             'rate_note'                => '単価備考',
             'commercial_flow'          => '商流',
             'work_style'               => '稼働形態',
-            'work_location_line'       => '勤務地（路線）',
-            'work_location_station'    => '勤務地（最寄駅）',
+            'work_location_line'       => '路線名',
+            'work_location_station'    => '最寄駅',
             'interview_count'          => '面談回数',
             'negotiation_required'     => '顧客折衝経験要否',
             'description'              => '業務内容詳細',

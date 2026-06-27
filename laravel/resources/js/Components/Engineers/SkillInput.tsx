@@ -1,6 +1,6 @@
-import { Input } from "@/Components/ui/input";
-import { Skill } from "@/types/engineer";
-import { Plus, X } from "lucide-react";
+import { Input } from '@/Components/ui/input';
+import { Skill } from '@/types/engineer';
+import { Plus, X } from 'lucide-react';
 
 interface Props {
     skills: Skill[];
@@ -10,7 +10,7 @@ interface Props {
 
 export default function SkillInput({ skills, onChange, error }: Props) {
     const add = () => {
-        onChange([...skills, { label: "", detail: "" }]);
+        onChange([...skills, { label: '', detail: '' }]);
     };
 
     const remove = (index: number) => {
@@ -18,9 +18,7 @@ export default function SkillInput({ skills, onChange, error }: Props) {
     };
 
     const update = (index: number, field: keyof Skill, value: string) => {
-        onChange(
-            skills.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
-        );
+        onChange(skills.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
     };
 
     return (
@@ -44,9 +42,7 @@ export default function SkillInput({ skills, onChange, error }: Props) {
                             value={skill.label}
                             maxLength={15}
                             placeholder="ラベル（最大15文字）"
-                            onChange={(e) =>
-                                update(index, "label", e.target.value)
-                            }
+                            onChange={(e) => update(index, 'label', e.target.value)}
                             className="h-7 w-44 shrink-0 rounded-full border border-muted-foreground/60 bg-muted px-3 text-xs font-bold placeholder:font-normal placeholder:text-muted-foreground/60 focus:border-foreground focus:outline-none"
                         />
                         <span className="shrink-0 text-xs text-muted-foreground">
@@ -59,9 +55,7 @@ export default function SkillInput({ skills, onChange, error }: Props) {
                         value={skill.detail}
                         maxLength={500}
                         placeholder="詳細・条件（任意）"
-                        onChange={(e) =>
-                            update(index, "detail", e.target.value)
-                        }
+                        onChange={(e) => update(index, 'detail', e.target.value)}
                         className="h-8 text-xs"
                     />
                 </div>

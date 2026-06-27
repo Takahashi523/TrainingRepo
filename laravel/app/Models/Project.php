@@ -37,6 +37,16 @@ class Project extends Model
         'sub_user_id',
     ];
 
+    protected $casts = [
+        'proc_requirements'    => 'boolean',
+        'proc_basic_design'    => 'boolean',
+        'proc_detail_design'   => 'boolean',
+        'proc_development'     => 'boolean',
+        'proc_testing'         => 'boolean',
+        'proc_maintenance'     => 'boolean',
+        'negotiation_required' => 'boolean',
+    ];
+
     public function projectSkills(): HasMany
     {
         return $this->hasMany(ProjectSkill::class);
