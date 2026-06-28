@@ -1,0 +1,360 @@
+import { Button } from '@/Components/ui/button';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { EngineerShowPageProps } from '@/types/engineer';
+import { PageProps } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
+import { ArrowLeftRight, Check, Clock, Pencil, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+
+type Props = PageProps<EngineerShowPageProps>;
+
+const STATUS_MAP: Record<string, { label: string; className: string }> = {
+    proposable:    { label: '提案可',  className: 'border-green-600 text-green-700 bg-green-50' },
+    interviewing:  { label: '面談中',  className: 'border-amber-500 text-amber-700 bg-amber-50' },
+    not_proposable:{ label: '提案不可',className: 'border-gray-400 text-gray-600 bg-gray-50'   },
+};
+
+function StatusBadge({ status }: { status: string }) {
+    const s = STATUS_MAP[status] ?? { label: status, className: 'border-gray-400 text-gray-600' };
+    return (
+        <span className={`inline-block rounded-full border px-3 py-0.5 text-xs font-bold ${s.className}`}>
+            {s.label}
+        </span>
+    );
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div className="mb-4 overflow-visible rounded-md border border-border">
+            <div className="rounded-t-md border-b border-border bg-muted/50 px-4 py-2.5 text-xs font-bold text-foreground">
+                {title}
+            </div>
+            {children}
+        </div>
+    );
+}
+
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="flex items-start border-b border-border/50 px-4 py-2.5 last:border-b-0">
+            <div className="w-44 shrink-0 pr-4 pt-0.5 text-xs font-semibold text-muted-foreground">
+                {label}
+            </div>
+            <div className="min-w-0 flex-1 text-sm text-foreground">{children}</div>
+        </div>
+    );
+}
+
+function SkillTag({ label, detail }: { label: string; detail: string | null }) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <div className="relative inline-flex flex-col">
+            <span className="inline-flex items-center gap-1.5 rounded border border-border bg-white px-2 py-0.5 text-xs text-foreground">
+                {label}
+                {detail && (
+                    <button
+                        type="button"
+                        className="text-[10px] text-muted-foreground hover:text-foreground"
+                        onClick={() => setOpen((v) => !v)}
+                    >
+                        {open ? '▲' : '▼'}
+                    </button>
+                )}
+            </span>
+            {open && detail && (
+                <div className="absolute left-0 top-full z-10 mt-1 min-w-48 max-w-xs rounded border border-border bg-white p-2 text-xs leading-relaxed text-muted-foreground shadow-md">
+                    {detail}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default function Show({ engineer }: Props) {
+    const { auth } = usePage<Props>().props;
+    const isAdmin = auth.user.role === 'admin';
+
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = () => {
+        router.delete(`/engineers/${engineer.id}`, {
+            onStart:   () => setIsDeleting(true),
+            onFinish:  () => setIsDeleting(false),
+            onSuccess: () => setShowDeleteConfirm(false),
+        });
+    };
+
+    const aiGeneratedAt = engineer.ai_summary_generated_at
+        ? new Date(engineer.ai_summary_generated_at).toLocaleDateString('ja-JP', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+          })
+        : null;
+
+    return (
+        <AuthenticatedLayout>
+            <Head title="人材詳細" />
+            {/* Sticky page header */}
+            <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between border-b border-border bg-white px-10 py-4">
+                <div>
+                    <h1 className="text-lg font-bold text-foreground">人材詳細</h1>
+                    <p className="mt-0.5 text-xs text-muted-foreground">人材の登録情報を確認します</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        onClick={() => router.get(`/matching/${engineer.id}`)}
+                    >
+                        <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
+                        マッチング
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => router.get(`/engineers/${engineer.id}/edit`)}
+                    >
+                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                        編集する
+                    </Button>
+                    {isAdmin && (
+                        <div className="flex flex-col items-end gap-0.5">
+                            <Button
+                                variant="outline"
+                                className="border-destructive text-destructive hover:bg-destructive/5"
+                                onClick={() => setShowDeleteConfirm(true)}
+                            >
+                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                削除
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="max-w-3xl">
+
+                {/* Profile summary */}
+                <div className="mb-6 flex items-start gap-5 border-b border-border pb-6">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-2xl font-bold text-foreground">{engineer.name}</p>
+                        <p className="mt-0.5 text-xs">
+                            {engineer.name_kana}
+                            {engineer.age != null && (
+                                <span className="ml-2">　{engineer.age}歳</span>
+                            )}
+                        </p>
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                            <StatusBadge status={engineer.status} />
+                            <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
+                                <Clock className="mr-1 inline h-3 w-3" />{engineer.available_label}
+                            </span>
+                        </div>
+                        <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
+                            {(engineer.nearest_station || engineer.nearest_line) && (
+                                <span>
+                                    <span className="mr-1 font-semibold text-foreground/60">最寄駅</span>
+                                    {[engineer.nearest_station, engineer.nearest_line]
+                                        .filter(Boolean)
+                                        .join('（') + (engineer.nearest_line ? '）' : '')}
+                                </span>
+                            )}
+                            {(engineer.nearest_station || engineer.nearest_line) && (
+                                <span className="h-3.5 w-px bg-border" />
+                            )}
+                            <span>
+                                <span className="mr-1 font-semibold text-foreground/60">担当</span>
+                                {engineer.users.main.name}
+                                {engineer.users.sub && (
+                                    <>
+                                        <span className="mx-1 text-border">／</span>
+                                        <span className="mr-1 font-semibold text-foreground/60">サブ</span>
+                                        {engineer.users.sub.name}
+                                    </>
+                                )}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* AI summary */}
+                <div className="mb-4 rounded-md border border-border bg-muted/30 px-5 py-4">
+                    <div className="mb-2.5 flex items-center gap-2">
+                        <span className="rounded bg-purple-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                            AI
+                        </span>
+                        <span className="text-xs font-bold text-foreground">職務要約</span>
+                        {aiGeneratedAt && (
+                            <span className="ml-auto text-xs text-muted-foreground">
+                                最終生成：{aiGeneratedAt}
+                            </span>
+                        )}
+                    </div>
+                    {engineer.ai_summary ? (
+                        <p className="text-sm leading-relaxed text-foreground">
+                            {engineer.ai_summary}
+                        </p>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">AI要約は未生成です</p>
+                    )}
+                    <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+                        ※ AIがプロフィール情報（スキル・工程経験・アピールポイント等）をもとに自動生成した要約です。内容は参考情報としてご確認ください。
+                    </p>
+                </div>
+
+                {/* 基本情報 */}
+                <SectionCard title="基本情報">
+                    <DetailRow label="氏名 / カナ">
+                        {engineer.name}　／　{engineer.name_kana}
+                    </DetailRow>
+                    <DetailRow label="年齢（生年月日）">
+                        {engineer.age != null ? `${engineer.age}歳` : '—'}
+                        {engineer.birth_date && (
+                            <span className="ml-2 text-xs">
+                                （{new Date(engineer.birth_date).toLocaleDateString('ja-JP', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                })}生まれ）
+                            </span>
+                        )}
+                    </DetailRow>
+                    <DetailRow label="最寄駅 / 路線">
+                        {engineer.nearest_station || '—'}
+                        {engineer.nearest_line && (
+                            <span className="ml-1">　{engineer.nearest_line}</span>
+                        )}
+                    </DetailRow>
+                    <DetailRow label="稼働可能時期">
+                        {engineer.available_label}
+                    </DetailRow>
+                </SectionCard>
+
+                {/* スキル情報 */}
+                <SectionCard title="スキル情報">
+                    <DetailRow label="経験スキル">
+                        {engineer.skills.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                                {engineer.skills.map((skill, i) => (
+                                    <SkillTag key={i} label={skill.label ?? ''} detail={skill.detail} />
+                                ))}
+                            </div>
+                        ) : (
+                            <span className="text-muted-foreground">—</span>
+                        )}
+                    </DetailRow>
+                    <DetailRow label="経験工程">
+                        <div className="flex flex-wrap gap-3">
+                            {engineer.phases.map((phase) => (
+                                <span key={phase.key} className="flex items-center gap-1 text-sm">
+                                    <span
+                                        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border text-[9px] font-bold ${
+                                            phase.has_experience
+                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                : 'border-border bg-muted/50 text-transparent'
+                                        }`}
+                                    >
+                                        {phase.has_experience && <Check className="h-2.5 w-2.5" />}
+                                    </span>
+                                    <span className={phase.has_experience ? 'text-foreground' : 'text-muted-foreground'}>
+                                        {phase.name}
+                                    </span>
+                                </span>
+                            ))}
+                        </div>
+                    </DetailRow>
+                    <DetailRow label="顧客折衝経験">
+                        {engineer.has_negotiation_exp === true
+                            ? '有'
+                            : engineer.has_negotiation_exp === false
+                              ? '無'
+                              : '—'}
+                    </DetailRow>
+                </SectionCard>
+
+                {/* 経歴・PR */}
+                <SectionCard title="経歴・PR">
+                    <DetailRow label="アピールポイント">
+                        {engineer.appeal_note ? (
+                            <p className="whitespace-pre-wrap leading-relaxed">{engineer.appeal_note}</p>
+                        ) : (
+                            <span className="text-muted-foreground">—</span>
+                        )}
+                    </DetailRow>
+                </SectionCard>
+
+                {/* 希望条件 */}
+                <SectionCard title="希望条件">
+                    <DetailRow label="希望単価（月額）">
+                        {engineer.desired_rate != null ? `${engineer.desired_rate}万円` : '—'}
+                    </DetailRow>
+                    <DetailRow label="勤務形態">
+                        {engineer.work_styles.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                                {engineer.work_styles.map((wt) => (
+                                    <span
+                                        key={wt.key}
+                                        className="rounded border border-dashed border-border px-2 py-0.5 text-xs"
+                                    >
+                                        {wt.name}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : (
+                            <span className="text-muted-foreground">—</span>
+                        )}
+                    </DetailRow>
+                    <DetailRow label="特記事項">
+                        {engineer.remarks ? (
+                            <p className="whitespace-pre-wrap leading-relaxed">
+                                {engineer.remarks}
+                            </p>
+                        ) : (
+                            <span className="text-muted-foreground">—</span>
+                        )}
+                    </DetailRow>
+                </SectionCard>
+
+                {/* 管理情報 */}
+                <SectionCard title="管理情報">
+                    <DetailRow label="ステータス">
+                        <StatusBadge status={engineer.status} />
+                    </DetailRow>
+                    <DetailRow label="担当営業">
+                        <span>担当：{engineer.users.main.name}</span>
+                        {engineer.users.sub && (
+                            <span className="ml-3">
+                                ／　サブ：{engineer.users.sub.name}
+                            </span>
+                        )}
+                    </DetailRow>
+                </SectionCard>
+
+            </div>
+
+            {/* Delete confirmation dialog */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="w-full max-w-sm rounded-lg border border-border bg-white p-6 shadow-xl">
+                        <h2 className="mb-2 text-base font-bold text-foreground">人材情報を削除しますか？</h2>
+                        <p className="mb-5 text-sm text-muted-foreground">
+                            <strong>{engineer.name}</strong> の情報を物理削除します。この操作は取り消せません。
+                        </p>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                                キャンセル
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? '削除中...' : '削除する'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </AuthenticatedLayout>
+    );
+}

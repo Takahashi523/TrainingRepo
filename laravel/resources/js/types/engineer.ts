@@ -19,8 +19,8 @@ export interface UserOption {
 }
 
 export interface Skill {
-    label: string;
-    detail: string;
+    label: string | null;
+    detail: string | null;
 }
 
 export interface Engineer {
@@ -66,6 +66,19 @@ export type FieldSettings = {
 
 // type alias (not interface) to satisfy PageProps<T extends Record<string, unknown>>
 export type EngineerCreatePageProps = {
+    fieldSettings: FieldSettings;
+    phases: Phase[];
+    work_styles: WorkTypeOption[];
+    statuses: StatusOption[];
+    users: UserOption[];
+};
+
+export type EngineerShowPageProps = {
+    engineer: Engineer;
+};
+
+export type EngineerEditPageProps = {
+    engineer: Engineer;
     fieldSettings: FieldSettings;
     phases: Phase[];
     work_styles: WorkTypeOption[];

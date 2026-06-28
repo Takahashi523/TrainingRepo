@@ -2,7 +2,7 @@
 
 **システム名：** Nexus  
 **作成日：** 2026-05-10  
-**最終更新：** 2026-05-10  
+**最終更新：** 2026-06-08  
 **作成者：** 岡大貴  
 **ステータス：** 基本設計中
 
@@ -252,6 +252,7 @@ erDiagram
 | 顧客コメント | client_comment | TEXT | NULL | | NULL | QA #54 確定 |
 | NG理由 | ng_reason | TEXT | NULL | | NULL | QA #54 確定 |
 | 次回アクション予定日 | next_action_date | DATE | NULL | | NULL | アラート機能不要。QA #54 確定。QA #6 確定 |
+| 終了日時 | ended_at | DATETIME | NULL | | NULL | 終了ステータスへ遷移したタイミングでアプリ層から記録（`ended_at = now()`）。進行中ステータスの場合はNULL。完了済みタブの「終了日」列として表示する |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -271,6 +272,7 @@ erDiagram
 | パスワード（ハッシュ） | password | VARCHAR(255) | NOT NULL | | なし（要指定） | bcrypt等でハッシュ化 |
 | ロール | role | ENUM('admin','general') | NOT NULL | | `general` | admin / general。QA #17 確定。→ §6-5 |
 | ログイン状態保持トークン | remember_token | VARCHAR(100) | NULL | | NULL | WF_01「ログイン情報を保存する」チェックボックス対応。Laravel Breeze の `$table->rememberToken()` で生成。未チェック時は NULL。 |
+| 最終ログイン日時 | last_login_at | DATETIME | NULL | | NULL | ログイン成功時にイベント/リスナー（Loginイベント）で自動更新。新規ユーザー追加直後・未ログイン時は NULL。 |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
