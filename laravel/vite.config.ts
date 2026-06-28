@@ -16,9 +16,5 @@ export default defineConfig({
         hmr: {
             host: "localhost",
         },
-        watch: {
-            usePolling: true, // ← これを追加
-            interval: 1000, // ← 1秒ごとにファイル変更を確認
-        },
     },
 });
