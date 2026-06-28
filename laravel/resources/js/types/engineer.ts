@@ -85,3 +85,59 @@ export type EngineerEditPageProps = {
     statuses: StatusOption[];
     users: UserOption[];
 };
+
+// 一覧画面で扱う軽量スキル型（detail を持たない）
+export interface SkillListItem {
+    label: string | null;
+}
+
+// 一覧用 Engineer（appeal_note / ai_summary / remarks / skills[].detail を含まない）
+export interface EngineerListItem {
+    id: number;
+    name: string;
+    age: number | null;
+    nearest_station: string | null;
+    nearest_line: string | null;
+    status: string;
+    available_from: string | null;
+    available_label: string;
+    users: {
+        main: UserOption;
+        sub: UserOption | null;
+    };
+    skills: SkillListItem[];
+    phases: Array<Phase & { has_experience: boolean }>;
+    work_styles: WorkTypeOption[];
+    updated_at: string;
+}
+
+export interface EngineerFilters {
+    status: string[];
+    work_styles: string[];
+    phases: string[];
+    keyword: string;
+    sort: 'created_at' | 'available_from';
+    order: 'asc' | 'desc';
+    per_page: number;
+    page: number;
+}
+
+export interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+}
+
+export type EngineerListPageProps = {
+    engineers: {
+        data: EngineerListItem[];
+        meta: PaginationMeta;
+    };
+    filters: EngineerFilters;
+    statusOptions: StatusOption[];
+    workStyleOptions: WorkTypeOption[];
+    phaseOptions: Phase[];
+};

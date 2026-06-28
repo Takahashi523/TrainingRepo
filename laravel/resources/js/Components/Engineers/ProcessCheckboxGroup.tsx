@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Label } from '@/Components/ui/label';
 import { Phase } from '@/types/engineer';
@@ -7,17 +8,20 @@ interface Props {
     values: Record<string, boolean>;
     onChange?: (key: string, checked: boolean) => void;
     readOnly?: boolean;
+    className?: string;
 }
 
-export default function ProcessCheckboxGroup({ phases, values, onChange, readOnly = false }: Props) {
+export default function ProcessCheckboxGroup({ phases, values, onChange, readOnly = false, className }: Props) {
     return (
-        <div className="flex flex-wrap gap-x-6 gap-y-3">
+        <div className={cn('flex flex-wrap gap-x-6 gap-y-3', className)}>
             {phases.map((phase) => (
-                <div key={phase.key} className="flex items-center gap-2">
+                <div
+                    key={phase.key}
+                    className={`flex items-center gap-2 ${readOnly ? 'pointer-events-none' : ''}`}
+                >
                     <Checkbox
                         id={`phase-${phase.key}`}
                         checked={!!values[phase.key]}
-                        disabled={readOnly}
                         onCheckedChange={
                             !readOnly && onChange
                                 ? (checked) => onChange(phase.key, !!checked)

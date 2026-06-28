@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\EngineerRequest;
+use App\Http\Resources\EngineerListResource;
 use App\Http\Resources\EngineerResource;
 use App\Models\Engineer;
 use App\Models\FormFieldSetting;
 use App\Models\User;
 use App\Services\AiSummaryService;
+use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -22,6 +24,118 @@ class EngineerController extends Controller
         ['value' => 'interviewing',   'label' => '面談中'],
         ['value' => 'not_proposable', 'label' => '提案不可'],
     ];
+
+    private const ALLOWED_SORTS       = ['created_at', 'available_from'];
+    private const ALLOWED_ORDERS      = ['asc', 'desc'];
+    private const ALLOWED_STATUSES    = ['proposable', 'interviewing', 'not_proposable'];
+    private const ALLOWED_WORK_STYLES = ['onsite', 'hybrid', 'remote'];
+    private const PER_PAGE_DEFAULT    = 20;
+    private const PER_PAGE_MAX        = 100;
+
+    public function index(Request $request): Response
+    {
+        $allowedPhases = array_column(Engineer::PHASES, 'key');
+
+        $statuses   = array_values(array_intersect(
+            (array) $request->input('status', []), self::ALLOWED_STATUSES
+        ));
+        $workStyles = array_values(array_intersect(
+            (array) $request->input('work_styles', []), self::ALLOWED_WORK_STYLES
+        ));
+        $phases     = array_values(array_intersect(
+            (array) $request->input('phases', []), $allowedPhases
+        ));
+        $keyword    = trim((string) $request->input('keyword', ''));
+
+        $sort  = in_array($request->input('sort'), self::ALLOWED_SORTS, true)
+            ? $request->input('sort')
+            : 'created_at';
+        $order = in_array(strtolower((string) $request->input('order', '')), self::ALLOWED_ORDERS, true)
+            ? strtolower($request->input('order'))
+            : 'desc';
+
+        $perPage = (int) $request->input('per_page', self::PER_PAGE_DEFAULT);
+        $perPage = max(1, min(self::PER_PAGE_MAX, $perPage));
+
+        $query = Engineer::query()
+            ->select([
+                'id', 'name', 'birth_date', 'nearest_station', 'nearest_line',
+                'status', 'available_from', 'main_user_id', 'sub_user_id',
+                'proc_requirements', 'proc_basic_design', 'proc_detail_design',
+                'proc_development', 'proc_testing', 'proc_maintenance',
+                'work_style_onsite', 'work_style_hybrid', 'work_style_remote',
+                'updated_at', 'created_at',
+            ])
+            ->with([
+                'skills:id,engineer_id,label',
+                'mainUser:id,name',
+                'subUser:id,name',
+            ]);
+
+        if ($statuses) {
+            $query->whereIn('status', $statuses);
+        }
+
+        if ($workStyles) {
+            // 勤務形態は OR（いずれか1つでも該当すればヒット）
+            $query->where(function ($q) use ($workStyles) {
+                foreach ($workStyles as $ws) {
+                    $q->orWhere("work_style_{$ws}", true);
+                }
+            });
+        }
+
+        // 工程経験は AND（選択した全工程に経験あり）
+        foreach ($phases as $p) {
+            $query->where($p, true);
+        }
+
+        if ($keyword !== '') {
+            $like = '%' . str_replace(['%', '_'], ['\%', '\_'], $keyword) . '%';
+            $prefix = str_replace(['%', '_'], ['\%', '\_'], $keyword) . '%';
+            $query->where(function ($q) use ($like, $prefix) {
+                $q->where('name', 'like', $like)
+                  ->orWhereHas('skills', fn ($s) => $s->where('label', 'like', $prefix));
+            });
+        }
+
+        if ($sort === 'available_from') {
+            // NULL を末尾に置く（MySQL 互換: IS NULL は 0/1 を返す）
+            $query->orderByRaw('available_from IS NULL ASC')
+                  ->orderBy('available_from', $order);
+        } else {
+            $query->orderBy('created_at', $order);
+        }
+
+        $paginator = $query->paginate($perPage)->appends($request->query());
+
+        return Inertia::render('Engineers/Index', [
+            'engineers' => [
+                'data' => EngineerListResource::collection($paginator)->collection,
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page'    => $paginator->lastPage(),
+                    'per_page'     => $paginator->perPage(),
+                    'total'        => $paginator->total(),
+                    'from'         => $paginator->firstItem(),
+                    'to'           => $paginator->lastItem(),
+                ],
+            ],
+            'filters' => [
+                'status'      => $statuses,
+                'work_styles' => $workStyles,
+                'phases'      => $phases,
+                'keyword'     => $keyword,
+                'sort'        => $sort,
+                'order'       => $order,
+                'per_page'    => $perPage,
+                'page'        => $paginator->currentPage(),
+            ],
+            'statusOptions'    => self::STATUSES,
+            'workStyleOptions' => Engineer::WORK_STYLES,
+            'phaseOptions'     => Engineer::PHASES,
+        ]);
+    }
 
     public function create(): Response
     {

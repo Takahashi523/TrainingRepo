@@ -1154,4 +1154,304 @@ class EngineerControllerTest extends TestCase
 
         $response->assertNotFound();
     }
+
+    // -------------------------------------------------------
+    // index: GET /engineers
+    // -------------------------------------------------------
+
+    public function test_guest_is_redirected_to_login_from_index_page(): void
+    {
+        $response = $this->get('/engineers');
+
+        $response->assertRedirect('/login');
+    }
+
+    public function test_authenticated_user_can_view_index_page_with_default_props(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/engineers');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Engineers/Index')
+            ->has('engineers.data')
+            ->has('engineers.meta')
+            ->has('filters')
+            ->has('statusOptions')
+            ->has('workStyleOptions')
+            ->has('phaseOptions')
+        );
+    }
+
+    public function test_index_filters_by_status(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->create(['main_user_id' => $user->id, 'status' => 'proposable']);
+        Engineer::factory()->create(['main_user_id' => $user->id, 'status' => 'interviewing']);
+        Engineer::factory()->create(['main_user_id' => $user->id, 'status' => 'not_proposable']);
+
+        $response = $this->actingAs($user)->get('/engineers?status[]=proposable');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 1)
+            ->where('engineers.data.0.status', 'proposable')
+        );
+    }
+
+    public function test_index_filters_work_styles_with_or_logic(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->create([
+            'main_user_id'      => $user->id,
+            'work_style_onsite' => true,
+            'work_style_hybrid' => false,
+            'work_style_remote' => false,
+        ]);
+        Engineer::factory()->create([
+            'main_user_id'      => $user->id,
+            'work_style_onsite' => false,
+            'work_style_hybrid' => false,
+            'work_style_remote' => true,
+        ]);
+        Engineer::factory()->create([
+            'main_user_id'      => $user->id,
+            'work_style_onsite' => false,
+            'work_style_hybrid' => true,
+            'work_style_remote' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get('/engineers?work_styles[]=onsite&work_styles[]=remote');
+
+        // onsite OR remote の 2 件のみヒット（hybrid のみは除外）
+        $response->assertInertia(fn ($page) => $page->count('engineers.data', 2));
+    }
+
+    public function test_index_filters_phases_with_and_logic(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->create([
+            'main_user_id'      => $user->id,
+            'proc_development'  => true,
+            'proc_testing'      => true,
+        ]);
+        Engineer::factory()->create([
+            'main_user_id'      => $user->id,
+            'proc_development'  => true,
+            'proc_testing'      => false,
+        ]);
+        Engineer::factory()->create([
+            'main_user_id'      => $user->id,
+            'proc_development'  => false,
+            'proc_testing'      => true,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get('/engineers?phases[]=proc_development&phases[]=proc_testing');
+
+        // 両方 true の 1 件のみ
+        $response->assertInertia(fn ($page) => $page->count('engineers.data', 1));
+    }
+
+    public function test_index_searches_keyword_by_name(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '山田太郎']);
+        Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '佐藤花子']);
+
+        $response = $this->actingAs($user)->get('/engineers?keyword=山田');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 1)
+            ->where('engineers.data.0.name', '山田太郎')
+        );
+    }
+
+    public function test_index_searches_keyword_by_skill_prefix(): void
+    {
+        $user = User::factory()->create();
+        $e1 = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => 'Aさん']);
+        $e1->skills()->create(['label' => 'JavaScript', 'detail' => null]);
+
+        $e2 = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => 'Bさん']);
+        $e2->skills()->create(['label' => 'Python', 'detail' => null]);
+
+        $response = $this->actingAs($user)->get('/engineers?keyword=Java');
+
+        // スキル前方一致：JavaScript はヒット、Python は非ヒット
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 1)
+            ->where('engineers.data.0.name', 'Aさん')
+        );
+    }
+
+    public function test_index_does_not_search_keyword_by_appeal_note(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'name'         => 'Aさん',
+            'appeal_note'  => 'バックエンド開発が得意です',
+        ]);
+        Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'name'         => 'Bさん',
+            'appeal_note'  => 'デザインが得意です',
+        ]);
+
+        $response = $this->actingAs($user)->get('/engineers?keyword=バックエンド');
+
+        // アピールポイントは検索対象外のため0件
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 0)
+        );
+    }
+
+    public function test_index_default_sort_is_created_at_desc(): void
+    {
+        $user = User::factory()->create();
+        $old  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
+        $old->created_at = now()->subDays(5); $old->save();
+        $new  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
+        $new->created_at = now(); $new->save();
+
+        $response = $this->actingAs($user)->get('/engineers');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineers.data.0.name', '新しい')
+            ->where('engineers.data.1.name', '古い')
+        );
+    }
+
+    public function test_index_sort_by_available_from_places_nulls_last(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->create([
+            'main_user_id'   => $user->id,
+            'name'           => 'A',
+            'available_from' => '2026-08-01',
+        ]);
+        Engineer::factory()->create([
+            'main_user_id'   => $user->id,
+            'name'           => 'B',
+            'available_from' => null,
+        ]);
+        Engineer::factory()->create([
+            'main_user_id'   => $user->id,
+            'name'           => 'C',
+            'available_from' => '2026-07-01',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get('/engineers?sort=available_from&order=asc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineers.data.0.name', 'C')   // 2026-07-01
+            ->where('engineers.data.1.name', 'A')   // 2026-08-01
+            ->where('engineers.data.2.name', 'B')   // NULL は末尾
+        );
+    }
+
+    public function test_index_paginates_with_per_page(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->count(5)->create(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get('/engineers?per_page=2');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 2)
+            ->where('engineers.meta.total', 5)
+            ->where('engineers.meta.per_page', 2)
+            ->where('engineers.meta.last_page', 3)
+        );
+    }
+
+    public function test_index_clamps_per_page_to_max_100(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/engineers?per_page=500');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineers.meta.per_page', 100)
+            ->where('filters.per_page', 100)
+        );
+    }
+
+    public function test_index_returns_empty_when_no_match(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '山田']);
+
+        $response = $this->actingAs($user)->get('/engineers?keyword=該当なしのキーワード');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 0)
+            ->where('engineers.meta.total', 0)
+        );
+    }
+
+    public function test_index_echoes_query_params_into_filters(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(
+            '/engineers?status[]=proposable&work_styles[]=remote&phases[]=proc_development'
+            . '&keyword=Java&sort=available_from&order=asc&per_page=10&page=1'
+        );
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('filters.status', ['proposable'])
+            ->where('filters.work_styles', ['remote'])
+            ->where('filters.phases', ['proc_development'])
+            ->where('filters.keyword', 'Java')
+            ->where('filters.sort', 'available_from')
+            ->where('filters.order', 'asc')
+            ->where('filters.per_page', 10)
+        );
+    }
+
+    public function test_index_does_not_return_text_columns(): void
+    {
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note'  => 'これは表示されないはず',
+            'remarks'      => '特記事項も表示されないはず',
+            'ai_summary'   => 'AI要約も表示されないはず',
+        ]);
+        $engineer->skills()->create(['label' => 'PHP', 'detail' => 'Laravel 5年']);
+
+        $response = $this->actingAs($user)->get('/engineers');
+
+        $response->assertInertia(fn ($page) => $page
+            ->missing('engineers.data.0.appeal_note')
+            ->missing('engineers.data.0.remarks')
+            ->missing('engineers.data.0.ai_summary')
+            ->where('engineers.data.0.skills.0.label', 'PHP')
+            ->missing('engineers.data.0.skills.0.detail')
+        );
+    }
+
+    public function test_index_eager_loads_relations_to_avoid_n_plus_one(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->count(5)->create(['main_user_id' => $user->id])
+            ->each(function (Engineer $e) {
+                $e->skills()->create(['label' => 'PHP', 'detail' => null]);
+                $e->skills()->create(['label' => 'Vue', 'detail' => null]);
+            });
+
+        \DB::enableQueryLog();
+
+        $this->actingAs($user)->get('/engineers');
+
+        $queries = \DB::getQueryLog();
+        \DB::disableQueryLog();
+
+        // セッション・ユーザー・count・engineers 本体・skills・mainUser・subUser を含む。
+        // N+1 が起きた場合は 5件 × 2リレーション = 10+ 件追加されるので 20 件以内で十分検出できる
+        $this->assertLessThanOrEqual(20, count($queries));
+    }
 }
