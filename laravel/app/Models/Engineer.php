@@ -2,12 +2,30 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Engineer extends Model
 {
+    use HasFactory;
+
+    public const PHASES = [
+        ['key' => 'proc_requirements',  'name' => '要件定義'],
+        ['key' => 'proc_basic_design',  'name' => '基本設計'],
+        ['key' => 'proc_detail_design', 'name' => '詳細設計'],
+        ['key' => 'proc_development',   'name' => '開発'],
+        ['key' => 'proc_testing',       'name' => 'テスト'],
+        ['key' => 'proc_maintenance',   'name' => '保守・運用'],
+    ];
+
+    public const WORK_STYLES = [
+        ['key' => 'onsite', 'name' => '常駐'],
+        ['key' => 'hybrid', 'name' => '一部リモート可'],
+        ['key' => 'remote', 'name' => 'フルリモート'],
+    ];
+
     protected $fillable = [
         'name', 'name_kana', 'birth_date', 'nearest_station', 'nearest_line',
         'available_from', 'has_negotiation_exp', 'desired_rate', 'appeal_note',

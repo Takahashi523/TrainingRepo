@@ -1,10 +1,26 @@
+import { Toaster } from '@/Components/ui/toaster';
 import AppSidebar from '@/Components/Navigation/AppSidebar';
-import { PropsWithChildren, ReactNode } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { PageProps } from '@/types';
+import { usePage } from '@inertiajs/react';
+import { PropsWithChildren, ReactNode, useEffect } from 'react';
 
 export default function Authenticated({
     header,
     children,
 }: PropsWithChildren<{ header?: ReactNode }>) {
+    const { flash } = usePage<PageProps>().props;
+    const { toast } = useToast();
+
+    useEffect(() => {
+        if (flash.success) {
+            toast({ description: flash.success, variant: 'success', duration: 3000 });
+        }
+        if (flash.error) {
+            toast({ description: flash.error, variant: 'destructive', duration: 5000 });
+        }
+    }, [flash.success, flash.error]);
+
     return (
         // レイヤー① 最外殻: 100vh で固定し、外へ溢れさせない
         <div className="flex h-screen overflow-hidden bg-background">
@@ -35,6 +51,7 @@ export default function Authenticated({
                     <div className="p-6">{children}</div>
                 </main>
             </div>
+            <Toaster />
         </div>
     );
 }

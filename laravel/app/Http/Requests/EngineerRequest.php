@@ -63,7 +63,8 @@ class EngineerRequest extends FormRequest
         }
 
         if ((bool) $settings->get('skills', 0)) {
-            $rules['skills'] = ['required', 'array', 'min:1'];
+            $rules['skills']         = ['required', 'array', 'min:1'];
+            $rules['skills.*.label'] = ['required', 'string', 'max:15'];
         }
 
         return $rules;
