@@ -25,68 +25,55 @@ class ProjectRequest extends FormRequest
      */
     public function rules(): array
     {
-        // ----------------------------------------------------------------
-        // 第1層：システム固定必須（DBレベルでNOT NULL・ハードコード）
-        // ----------------------------------------------------------------
+        $settings = FormFieldSetting::where('form_type', 'project')
+            ->pluck('is_required', 'field_key');
+        
+        $isRequired = fn(string $key): bool => (bool) $settings->get($key, false);
+
+        // 第1層：システム固定必須
         $rules = [
             'name'         => ['required', 'string', 'max:255'],
             'status'       => ['required', 'in:open,closed,pending'],
             'main_user_id' => ['required', 'exists:users,id'],
         ];
 
-        // ----------------------------------------------------------------
-        // 第2層：form_field_settings を参照して動的に組み立て
-        // field_key は form_field_settings テーブルの field_key カラムと1対1で対応する
-        // ----------------------------------------------------------------
+        // 第2層：動的フィールド
         $dynamicFields = [
-            'client_name'       => ['string', 'max:100'],
-            'headcount'         => ['integer', 'min:0'],
-            'start_date'        => ['date'],
-            'commercial_flow'   => ['in:prime,secondary,tertiary,other'],
-            'work_style'        => ['in:onsite,hybrid,remote'],
-            'interview_count'   => ['integer', 'min:0'],
+            'client_name'          => ['string', 'max:100'],
+            'headcount'            => ['integer', 'min:0'],
+            'start_date'           => ['date'],
+            'commercial_flow'      => ['in:prime,secondary,tertiary,other'],
+            'work_style'           => ['in:onsite,hybrid,remote'],
+            'interview_count'      => ['integer', 'min:0'],
             'negotiation_required' => ['boolean'],
-            'description'       => ['string'],
-            'work_env'          => ['string'],
-            'billing_range'     => ['string', 'max:100'],
-            'remarks'           => ['string'],
+            'description'          => ['string'],
+            'work_env'             => ['string'],
+            'billing_range'        => ['string', 'max:100'],
+            'remarks'              => ['string'],
         ];
 
         foreach ($dynamicFields as $field => $fieldRules) {
-            $isRequired = FormFieldSetting::isRequired('project', $field);
-            $rules[$field] = array_merge(
-                [$isRequired ? 'required' : 'nullable'],
+           $rules[$field] = array_merge(
+                [$isRequired($field) ? 'required' : 'nullable'],
                 $fieldRules
             );
         }
-
+       
         // ----------------------------------------------------------------
         // 単価：rate フィールドキー1つで rate_min / rate_max / rate_note をまとめて制御する
         // rate_is_negotiable が true の場合は rate_min / rate_max をバリデーション対象外とする
-        // ----------------------------------------------------------------
+        // ---------------------------------------------------------------- 
         $rules['rate_is_negotiable'] = ['nullable', 'boolean'];
         $rules['rate_note']          = ['nullable', 'string', 'max:100'];
- 
-        $rateRequired = FormFieldSetting::isRequired('project', 'rate');
- 
+
+        $rateRequired = $isRequired('rate');
+
         if ($this->boolean('rate_is_negotiable')) {
-            // スキル見合いの場合：rate_min / rate_max は送信不要（null として扱う）
             $rules['rate_min'] = ['nullable', 'integer', 'min:0'];
             $rules['rate_max'] = ['nullable', 'integer', 'min:0'];
         } else {
-            // 通常の場合：rate の動的設定 + 上下限の大小関係バリデーション
-            $rules['rate_min'] = [
-                $rateRequired ? 'required' : 'nullable',
-                'integer',
-                'min:0',
-                'lte:rate_max',
-            ];
-            $rules['rate_max'] = [
-                $rateRequired ? 'required' : 'nullable',
-                'integer',
-                'min:0',
-                'gte:rate_min',
-            ];
+            $rules['rate_min'] = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'lte:rate_max'];
+            $rules['rate_max'] = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'gte:rate_min'];
         }
 
         // ----------------------------------------------------------------
@@ -95,34 +82,27 @@ class ProjectRequest extends FormRequest
         //   - work_style が onsite / hybrid の場合 → 必須
         //   - work_style が remote の場合         → バリデーション対象外
         // ----------------------------------------------------------------
-        $workLocationRequired = FormFieldSetting::isRequired('project', 'work_location');
- 
+        $workLocationRequired = $isRequired('work_location'); // DBアクセスなし
+
         $rules['work_location_line'] = [
             $workLocationRequired ? 'required' : 'nullable',
-            'string',
-            'max:100',
+            'string', 'max:100',
         ];
- 
+
         $workStyle = $this->input('work_style');
-        if (in_array($workStyle, ['onsite', 'hybrid'], true)) {
-            // 常駐・一部リモートの場合は最寄駅を業務ルールで必須とする
-            $rules['work_location_station'] = ['required', 'string', 'max:100'];
-        } else {
-            // remote または未選択の場合は nullable
-            $rules['work_location_station'] = ['nullable', 'string', 'max:100'];
-        }
+        $rules['work_location_station'] = in_array($workStyle, ['onsite', 'hybrid'], true)
+            ? ['required', 'string', 'max:100']
+            : ['nullable', 'string', 'max:100'];
 
         // ----------------------------------------------------------------
         // スキル：required_skills / preferred_skills フィールドキーで個別制御
         // ----------------------------------------------------------------
-        $requiredSkillsRequired  = FormFieldSetting::isRequired('project', 'required_skills');
-        $preferredSkillsRequired = FormFieldSetting::isRequired('project', 'preferred_skills');
- 
-        $rules['required_skills']           = [$requiredSkillsRequired ? 'required' : 'nullable', 'array'];
+        $rules['required_skills']  = [$isRequired('required_skills') ? 'required' : 'nullable', 'array'];
+        $rules['preferred_skills'] = [$isRequired('preferred_skills') ? 'required' : 'nullable', 'array'];
+
+        // ↓ required_with がワイルドカードに非対応のため nullable にし、withValidator() で補完
         $rules['required_skills.*.label']   = ['nullable', 'string', 'max:15'];
         $rules['required_skills.*.detail']  = ['nullable', 'string', 'max:500'];
- 
-        $rules['preferred_skills']          = [$preferredSkillsRequired ? 'required' : 'nullable', 'array'];
         $rules['preferred_skills.*.label']  = ['nullable', 'string', 'max:15'];
         $rules['preferred_skills.*.detail'] = ['nullable', 'string', 'max:500'];
 
@@ -130,12 +110,9 @@ class ProjectRequest extends FormRequest
         // 対象工程：proc_experience の1設定で proc_* 6フィールドをまとめて制御する
         // WF_12のフォーム設定タブでも「対象工程」として1つのトグルで管理する
         // ----------------------------------------------------------------
-        $procRequired = FormFieldSetting::isRequired('project', 'proc_experience');
-        $procFields   = [
-            'proc_requirements', 'proc_basic_design', 'proc_detail_design',
-            'proc_development',  'proc_testing',      'proc_maintenance',
-        ];
-        foreach ($procFields as $field) {
+        $procRequired = $isRequired('proc_experience');
+        foreach (['proc_requirements', 'proc_basic_design', 'proc_detail_design',
+            'proc_development', 'proc_testing', 'proc_maintenance'] as $field) {
             $rules[$field] = [$procRequired ? 'required' : 'nullable', 'boolean'];
         }
  

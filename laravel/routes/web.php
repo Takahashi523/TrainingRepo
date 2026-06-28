@@ -15,7 +15,7 @@ Route::get('/dashboard', function () {
 
 Route::middleware('auth')->group(function () {
     Route::resource('engineers', EngineerController::class)->only(['create', 'store']);
-    Route::resource('projects', ProjectController::class);
+    Route::resource('projects', ProjectController::class)->only(['create', 'store']);
 });
 
 require __DIR__.'/auth.php';

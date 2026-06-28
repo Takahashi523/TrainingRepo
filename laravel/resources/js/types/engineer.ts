@@ -51,17 +51,17 @@ export interface Engineer {
 }
 
 export type FieldSettings = {
-    birth_date:          { is_required: boolean };
-    nearest_station:     { is_required: boolean };
-    nearest_line:        { is_required: boolean };
-    available_from:      { is_required: boolean };
-    skills:              { is_required: boolean };
-    proc_experience:     { is_required: boolean };
+    birth_date: { is_required: boolean };
+    nearest_station: { is_required: boolean };
+    nearest_line: { is_required: boolean };
+    available_from: { is_required: boolean };
+    skills: { is_required: boolean };
+    proc_experience: { is_required: boolean };
     has_negotiation_exp: { is_required: boolean };
-    appeal_note:         { is_required: boolean };
-    desired_rate:        { is_required: boolean };
-    work_styles:         { is_required: boolean };
-    remarks:             { is_required: boolean };
+    appeal_note: { is_required: boolean };
+    desired_rate: { is_required: boolean };
+    work_styles: { is_required: boolean };
+    remarks: { is_required: boolean };
 };
 
 // type alias (not interface) to satisfy PageProps<T extends Record<string, unknown>>

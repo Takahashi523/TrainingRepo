@@ -37,6 +37,7 @@ type Props = PageProps<{
     commercial_flows: { value: string; label: string }[];
     statuses: { value: string; label: string }[];
     users: { id: number; name: string }[];
+    authUserId: number;
 }>;
 
 export default function Create({
@@ -46,6 +47,7 @@ export default function Create({
     commercial_flows,
     statuses,
     users,
+    authUserId,
 }: Props) {
     const form = useForm<ProjectFormData>({
         name: "",
@@ -73,7 +75,7 @@ export default function Create({
         description: "",
         work_env: "",
         status: "open",
-        main_user_id: users.length > 0 ? String(users[0].id) : "",
+        main_user_id: String(authUserId),
         sub_user_id: "",
         billing_range: "",
         remarks: "",

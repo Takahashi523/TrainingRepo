@@ -15,11 +15,4 @@ class FormFieldSetting extends Model
             'is_system_required' => 'boolean',
         ];
     }
-
-    public static function isRequired(string $formType, string $fieldKey)
-    {
-        return (bool) self::where('form_type', $formType)
-                            ->where('field_key', $fieldKey)
-                            ->value('is_required');
-    }
 }

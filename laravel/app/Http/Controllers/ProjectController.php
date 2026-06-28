@@ -92,6 +92,7 @@ class ProjectController extends Controller
             'commercial_flows' => self::COMMERCIAL_FLOWS,
             'statuses'         => self::STATUSES,
             'users'            => User::select('id', 'name')->orderBy('name')->get(),
+            'authUserId'       => auth()->id(),
         ]);
     }
 
@@ -103,44 +104,6 @@ class ProjectController extends Controller
         $project = $this->projectService->store($request);
 
         return redirect()->route('projects.show', $project)->with('success', '案件情報を登録しました。');
-    }
-
-    /**
-    * リクエストから Project の保存用属性配列を組み立てる
-    */
-    private function projectAttributes(ProjectRequest $request): array
-    {
-        return array_merge(
-            $request->safe()->except(['required_skills', 'preferred_skills']),
-            [
-                'headcount'        => $request->headcount !== null ? (int) $request->headcount : null,
-                'rate_min'         => $request->rate_min  !== null ? (int) $request->rate_min  : null,
-                'rate_max'         => $request->rate_max  !== null ? (int) $request->rate_max  : null,
-                'interview_count'  => $request->interview_count !== null ? (int) $request->interview_count : null,
-                'main_user_id'     => (int) $request->main_user_id,
-                'sub_user_id'      => $request->sub_user_id !== null ? (int) $request->sub_user_id : null,
-            ]
-        );
-    }
-
-    /**
-    * スキルを project_skills に保存する
-    */
-    private function insertSkills(Project $project, array $skills): void
-    {
-        foreach (['required', 'preferred'] as $type) {
-            if (empty($skills[$type])) {
-                continue;
-            }
-
-            $project->projectSkills()->createMany(
-                array_map(fn($s) => [
-                    'skill_type' => $type,
-                    'label'      => $s['label']  ?? null,
-                    'detail'     => $s['detail'] ?? null,
-                ], $skills[$type])
-            );
-        }
     }
 
     /**

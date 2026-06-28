@@ -87,7 +87,7 @@ return [
         'array'   => ':attributeは:max件以下にしてください。',
         'file'    => ':attributeのファイルサイズは:maxKB以内にしてください。',
         'numeric' => ':attributeには:max以下の値を入力してください。',
-        'string'  => ':attributeは:max文字以内で入力してください。。。',
+        'string'  => ':attributeは:max文字以内で入力してください。',
     ],
     'max_digits'           => ':attributeは:max桁以内で入力してください。',
     'mimes'                => ':attributeには:valuesのいずれかのファイルを選択してください。',
