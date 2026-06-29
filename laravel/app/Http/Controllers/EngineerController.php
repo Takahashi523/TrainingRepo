@@ -47,12 +47,17 @@ class EngineerController extends Controller
         ));
         $keyword    = trim((string) $request->input('keyword', ''));
 
-        $sort  = in_array($request->input('sort'), self::ALLOWED_SORTS, true)
-            ? $request->input('sort')
-            : 'created_at';
-        $order = in_array(strtolower((string) $request->input('order', '')), self::ALLOWED_ORDERS, true)
-            ? strtolower($request->input('order'))
-            : 'desc';
+        $sortInput  = $request->input('sort');
+        $orderInput = strtolower((string) $request->input('order', ''));
+
+        if (in_array($sortInput, self::ALLOWED_SORTS, true)) {
+            $sort  = $sortInput;
+            $order = in_array($orderInput, self::ALLOWED_ORDERS, true) ? $orderInput : 'desc';
+        } else {
+            // sort が無効ならデフォルト（created_at DESC）に統一フォールバック
+            $sort  = 'created_at';
+            $order = 'desc';
+        }
 
         $perPage = (int) $request->input('per_page', self::PER_PAGE_DEFAULT);
         $perPage = max(1, min(self::PER_PAGE_MAX, $perPage));

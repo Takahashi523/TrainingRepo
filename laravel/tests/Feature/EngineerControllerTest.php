@@ -1486,6 +1486,23 @@ class EngineerControllerTest extends TestCase
         );
     }
 
+    public function test_index_invalid_sort_key_with_asc_also_falls_back_to_desc(): void
+    {
+        $user = User::factory()->create();
+        $old  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
+        $old->created_at = now()->subDays(5); $old->saveQuietly();
+        $new  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
+
+        // sort が無効なら order=asc が指定されていても desc にリセットされる
+        $response = $this->actingAs($user)->get('/engineers?sort=invalid_key&order=asc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineers.data.0.name', '新しい')
+            ->where('filters.sort', 'created_at')
+            ->where('filters.order', 'desc')
+        );
+    }
+
     public function test_index_invalid_order_falls_back_to_desc(): void
     {
         $user = User::factory()->create();
