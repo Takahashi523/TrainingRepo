@@ -1434,6 +1434,69 @@ class EngineerControllerTest extends TestCase
         );
     }
 
+    public function test_index_sort_by_updated_at_desc(): void
+    {
+        $user = User::factory()->create();
+        $e1   = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い更新']);
+        $e1->updated_at = now()->subDays(3); $e1->saveQuietly();
+        $e2   = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい更新']);
+        $e2->updated_at = now(); $e2->saveQuietly();
+
+        $response = $this->actingAs($user)->get('/engineers?sort=updated_at&order=desc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineers.data.0.name', '新しい更新')
+            ->where('engineers.data.1.name', '古い更新')
+        );
+    }
+
+    public function test_index_tiebreak_by_id_asc_when_sort_key_is_equal(): void
+    {
+        $user = User::factory()->create();
+        $now  = now()->toDateTimeString();
+
+        // created_at を同値に揃えて id の昇順が効くことを確認する
+        $e1 = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '先に登録']);
+        $e2 = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '後に登録']);
+        \DB::table('engineers')->whereIn('id', [$e1->id, $e2->id])->update(['created_at' => $now]);
+
+        $response = $this->actingAs($user)->get('/engineers?sort=created_at&order=desc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineers.data.0.name', '先に登録')   // id が小さい方が先
+            ->where('engineers.data.1.name', '後に登録')
+        );
+    }
+
+    public function test_index_invalid_sort_key_falls_back_to_created_at_desc(): void
+    {
+        $user = User::factory()->create();
+        $old  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
+        $old->created_at = now()->subDays(5); $old->saveQuietly();
+        $new  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
+
+        // order は省略 → デフォルト desc が適用される
+        $response = $this->actingAs($user)->get('/engineers?sort=invalid_key');
+
+        // sort が無効なので created_at DESC にフォールバック → 新しい方が先
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineers.data.0.name', '新しい')
+            ->where('filters.sort', 'created_at')
+            ->where('filters.order', 'desc')
+        );
+    }
+
+    public function test_index_invalid_order_falls_back_to_desc(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/engineers?sort=created_at&order=INVALID');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('filters.order', 'desc')
+        );
+    }
+
     public function test_index_eager_loads_relations_to_avoid_n_plus_one(): void
     {
         $user = User::factory()->create();
