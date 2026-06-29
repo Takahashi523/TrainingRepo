@@ -395,6 +395,19 @@ class ProjectControllerTest extends TestCase
         $response->assertSessionDoesntHaveErrors('description');
     }
 
+    public function test_negotiation_required_rejects_invalid_value(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'negotiation_required' => 'invalid',
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('negotiation_required');
+    }
+
     public function test_rate_min_is_required_when_rate_setting_is_true_and_not_negotiable(): void
     {
         $this->seedFormFieldSettings(['rate' => true]);
