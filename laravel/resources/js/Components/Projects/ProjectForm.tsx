@@ -49,7 +49,7 @@ export type ProjectFormData = {
 type SkillPair = {
     id?: string;
     label: string;
-    detail: string;
+    detail: string | null;
 };
 
 type FieldSetting = {
@@ -408,38 +408,38 @@ export default function ProjectForm({
             <FormRow
                 label="必須スキル"
                 required={fieldSettings.required_skills.is_required}
+                error={errors.required_skills as string | undefined}
             >
                 <SkillInput
                     skills={data.required_skills}
                     onChange={(skills: SkillPair[]) =>
                         setData("required_skills", skills)
                     }
-                    error={
-                        (errors.required_skills as string | undefined) ??
-                        data.required_skills
-                            .map((_, i) => errors[`required_skills.${i}.label`])
-                            .find(Boolean)
-                    }
+                    errors={Object.fromEntries(
+                        Object.entries(errors).map(([k, v]) => [
+                            k.replace(/^required_skills\./, "skills."),
+                            v,
+                        ]),
+                    )}
                 />
             </FormRow>
 
             <FormRow
                 label="尚可スキル"
                 required={fieldSettings.preferred_skills.is_required}
+                error={errors.preferred_skills as string | undefined}
             >
                 <SkillInput
                     skills={data.preferred_skills}
                     onChange={(skills: SkillPair[]) =>
                         setData("preferred_skills", skills)
                     }
-                    error={
-                        (errors.preferred_skills as string | undefined) ??
-                        data.preferred_skills
-                            .map(
-                                (_, i) => errors[`preferred_skills.${i}.label`],
-                            )
-                            .find(Boolean)
-                    }
+                    errors={Object.fromEntries(
+                        Object.entries(errors).map(([k, v]) => [
+                            k.replace(/^preferred_skills\./, "skills."),
+                            v,
+                        ]),
+                    )}
                 />
             </FormRow>
 
