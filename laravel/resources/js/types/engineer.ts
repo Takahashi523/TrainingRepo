@@ -116,7 +116,7 @@ export interface EngineerFilters {
     work_styles: string[];
     phases: string[];
     keyword: string;
-    sort: 'created_at' | 'available_from';
+    sort: 'created_at' | 'updated_at' | 'available_from';
     order: 'asc' | 'desc';
     per_page: number;
     page: number;

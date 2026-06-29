@@ -25,7 +25,7 @@ class EngineerController extends Controller
         ['value' => 'not_proposable', 'label' => '提案不可'],
     ];
 
-    private const ALLOWED_SORTS       = ['created_at', 'available_from'];
+    private const ALLOWED_SORTS       = ['created_at', 'updated_at', 'available_from'];
     private const ALLOWED_ORDERS      = ['asc', 'desc'];
     private const ALLOWED_STATUSES    = ['proposable', 'interviewing', 'not_proposable'];
     private const ALLOWED_WORK_STYLES = ['onsite', 'hybrid', 'remote'];
@@ -104,8 +104,10 @@ class EngineerController extends Controller
             $query->orderByRaw('available_from IS NULL ASC')
                   ->orderBy('available_from', $order);
         } else {
-            $query->orderBy('created_at', $order);
+            $query->orderBy($sort, $order);
         }
+        // 同順のタイブレーク（DB設計書 §8 QA #85 確定）
+        $query->orderBy('id', 'asc');
 
         $paginator = $query->paginate($perPage)->appends($request->query());
 
