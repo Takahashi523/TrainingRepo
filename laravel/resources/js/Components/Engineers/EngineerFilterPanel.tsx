@@ -1,3 +1,4 @@
+import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
 import SortSelect, { SortOption } from '@/Components/Common/SortSelect';
 import { EngineerFilters, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
@@ -147,21 +148,5 @@ export default function EngineerFilterPanel({
                 </div>
             </div>
         </div>
-    );
-}
-
-function ActiveTag({ label, onRemove }: { label: string; onRemove: () => void }) {
-    return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-foreground/60 bg-muted px-2.5 py-0.5 text-[11px]">
-            {label}
-            <button
-                type="button"
-                onClick={onRemove}
-                className="text-muted-foreground hover:text-foreground"
-                aria-label={`${label} を解除`}
-            >
-                <X className="h-3 w-3" />
-            </button>
-        </span>
     );
 }
