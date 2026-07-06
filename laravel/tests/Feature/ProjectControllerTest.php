@@ -451,6 +451,20 @@ class ProjectControllerTest extends TestCase
         $response->assertSessionHasErrors('rate_min');
     }
 
+    public function test_rate_max_is_required_when_rate_min_is_filled(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'rate_min' => 50,
+            'rate_max' => null,
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('rate_max');
+    }
+
     public function test_work_location_station_is_required_when_work_style_is_onsite(): void
     {
         $this->seedFormFieldSettings();

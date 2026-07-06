@@ -71,11 +71,25 @@ class ProjectRequest extends FormRequest
         $rateRequired = $isRequired('rate');
 
         if ($this->boolean('rate_is_negotiable')) {
+            // スキル見合いの場合は rate_min / rate_max を完全に nullable にする
             $rules['rate_min'] = ['nullable', 'integer', 'min:0'];
             $rules['rate_max'] = ['nullable', 'integer', 'min:0'];
         } else {
-            $rules['rate_min'] = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'lte:rate_max'];
-            $rules['rate_max'] = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'gte:rate_min'];
+            // 通常の場合：下限・上限の相互必須チェック
+            $rateMinRules = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0'];
+            $rateMaxRules = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0'];
+
+            if ($this->filled('rate_min')) {
+                $rateMaxRules[] = 'required';
+                $rateMaxRules[] = 'gte:rate_min';
+            }
+            if ($this->filled('rate_max')) {
+                $rateMinRules[] = 'required';
+                $rateMinRules[] = 'lte:rate_max';
+            }
+
+            $rules['rate_min'] = $rateMinRules;
+            $rules['rate_max'] = $rateMaxRules;
         }
 
         // ----------------------------------------------------------------
