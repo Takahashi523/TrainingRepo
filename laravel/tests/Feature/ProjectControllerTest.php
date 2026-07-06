@@ -369,6 +369,17 @@ class ProjectControllerTest extends TestCase
         $response->assertSessionHasErrors('sub_user_id');
     }
 
+    public function test_sub_user_id_must_exist_in_users_table(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), ['sub_user_id' => 99999]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('sub_user_id');
+    }
+
     // -------------------------------------------------------
     // store: POST /projects — バリデーション（動的フィールド）
     // -------------------------------------------------------
@@ -406,6 +417,18 @@ class ProjectControllerTest extends TestCase
         $response = $this->actingAs($user)->post('/projects', $payload);
 
         $response->assertSessionHasErrors('negotiation_required');
+    }
+
+    public function test_proc_fields_are_required_when_proc_experience_setting_is_true(): void
+    {
+        $this->seedFormFieldSettings(['proc_experience' => true]);
+        $user    = User::factory()->create();
+        $payload = $this->validPayload($user->id);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('proc_requirements');
+        $response->assertSessionHasErrors('proc_development');
     }
 
     public function test_rate_min_is_required_when_rate_setting_is_true_and_not_negotiable(): void
@@ -449,6 +472,7 @@ class ProjectControllerTest extends TestCase
         $response = $this->actingAs($user)->post('/projects', $payload);
 
         $response->assertSessionHasErrors('rate_min');
+        $response->assertSessionHasErrors('rate_max');
     }
 
     public function test_rate_max_is_required_when_rate_min_is_filled(): void
@@ -507,6 +531,34 @@ class ProjectControllerTest extends TestCase
         $response->assertSessionDoesntHaveErrors('work_location_station');
     }
 
+    public function test_work_location_line_is_required_when_work_location_setting_is_true_and_work_style_is_onsite(): void
+    {
+        $this->seedFormFieldSettings(['work_location' => true]);
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'work_style'          => 'onsite',
+            'work_location_line'  => null,
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('work_location_line');
+    }
+
+    public function test_work_location_line_is_not_required_when_work_style_is_remote(): void
+    {
+        $this->seedFormFieldSettings(['work_location' => true]);
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'work_style'         => 'remote',
+            'work_location_line' => null,
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionDoesntHaveErrors('work_location_line');
+    }
+
     public function test_required_skills_is_required_when_form_field_setting_is_true(): void
     {
         $this->seedFormFieldSettings(['required_skills' => true]);
@@ -548,6 +600,35 @@ class ProjectControllerTest extends TestCase
         $response = $this->actingAs($user)->post('/projects', $payload);
 
         $response->assertSessionHasErrors('required_skills.0.label');
+    }
+
+    public function test_skill_label_is_required_when_required_skills_setting_is_true(): void
+    {
+        $this->seedFormFieldSettings(['required_skills' => true]);
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'required_skills' => [
+                ['label' => null, 'detail' => null],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('required_skills.0.label');
+    }
+
+    public function test_rate_min_is_required_when_rate_max_is_filled(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'rate_min' => null,
+            'rate_max' => 80,
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('rate_min');
     }
 
     public function test_commercial_flow_rejects_invalid_value(): void
