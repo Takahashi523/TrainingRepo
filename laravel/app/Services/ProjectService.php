@@ -55,12 +55,21 @@ class ProjectService
                 continue;
             }
 
+            $meaningful = array_filter(
+                $skills[$type],
+                fn($s) => !empty($s['label']) || !empty($s['detail'])
+            );
+
+            if (empty($meaningful)) {
+                continue;
+            }
+
             $project->projectSkills()->createMany(
                 array_map(fn($s) => [
                     'skill_type' => $type,
                     'label'      => $s['label']  ?? null,
                     'detail'     => $s['detail'] ?? null,
-                ], $skills[$type])
+                ], $meaningful)
             );
         }
     }

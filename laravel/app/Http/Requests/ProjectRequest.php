@@ -8,6 +8,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class ProjectRequest extends FormRequest
 {
+    private \Illuminate\Support\Collection $fieldSettings;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -25,10 +27,10 @@ class ProjectRequest extends FormRequest
      */
     public function rules(): array
     {
-        $settings = FormFieldSetting::where('form_type', 'project')
+        $this->fieldSettings = FormFieldSetting::where('form_type', 'project')
             ->pluck('is_required', 'field_key');
         
-        $isRequired = fn(string $key): bool => (bool) $settings->get($key, false);
+        $isRequired = fn(string $key): bool => (bool) $this->fieldSettings->get($key, false);
 
         // 第1層：システム固定必須
         $rules = [
@@ -100,10 +102,18 @@ class ProjectRequest extends FormRequest
         $rules['required_skills']  = [$isRequired('required_skills') ? 'required' : 'nullable', 'array'];
         $rules['preferred_skills'] = [$isRequired('preferred_skills') ? 'required' : 'nullable', 'array'];
 
-        // ↓ required_with がワイルドカードに非対応のため nullable にし、withValidator() で補完
-        $rules['required_skills.*.label']   = ['nullable', 'string', 'max:15'];
+        if ($isRequired('required_skills')) {
+            $rules['required_skills.*.label']   = ['required', 'string', 'max:15'];
+        } else {
+            $rules['required_skills.*.label']   = ['nullable', 'string', 'max:15'];
+        }
         $rules['required_skills.*.detail']  = ['nullable', 'string', 'max:500'];
-        $rules['preferred_skills.*.label']  = ['nullable', 'string', 'max:15'];
+
+        if ($isRequired('preferred_skills')) {
+            $rules['preferred_skills.*.label']  = ['required', 'string', 'max:15'];
+        } else {
+            $rules['preferred_skills.*.label']  = ['nullable', 'string', 'max:15'];
+        }
         $rules['preferred_skills.*.detail'] = ['nullable', 'string', 'max:500'];
 
         // ----------------------------------------------------------------
@@ -127,23 +137,21 @@ class ProjectRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            $skills = $this->input('required_skills', []);
-            foreach ($skills as $index => $skill) {
-                if (!empty($skill['detail']) && empty($skill['label'])) {
-                    $validator->errors()->add(
-                        "required_skills.{$index}.label",
-                        'スキル詳細を入力する場合はスキル名も入力してください。'
-                    );
-                }
-            }
+            $isRequired = fn(string $key): bool => (bool) $this->fieldSettings->get($key, false);
 
-            $skills = $this->input('preferred_skills', []);
-            foreach ($skills as $index => $skill) {
-                if (!empty($skill['detail']) && empty($skill['label'])) {
-                    $validator->errors()->add(
-                        "preferred_skills.{$index}.label",
-                        'スキル詳細を入力する場合はスキル名も入力してください。'
-                    );
+            foreach (['required_skills', 'preferred_skills'] as $field) {
+                if ($isRequired($field)) {
+                    continue; // required のときは rules() で担保されるためスキップ
+                }
+
+                $skills = $this->input($field, []);
+                foreach ($skills as $index => $skill) {
+                    if (!empty($skill['detail']) && empty($skill['label'])) {
+                        $validator->errors()->add(
+                            "{$field}.{$index}.label",
+                            'スキル詳細を入力する場合はスキル名も入力してください。'
+                        );
+                    }
                 }
             }
         });
