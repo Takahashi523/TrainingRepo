@@ -98,15 +98,16 @@ class ProjectRequest extends FormRequest
         //   - work_style が onsite / hybrid の場合 → 必須
         //   - work_style が remote の場合         → バリデーション対象外
         // ----------------------------------------------------------------
-        $workLocationRequired = $isRequired('work_location'); // DBアクセスなし
+        $workLocationRequired = $isRequired('work_location');
+        $workStyle = $this->input('work_style');
+        $isWorkLocationActive = in_array($workStyle, ['onsite', 'hybrid'], true);
 
         $rules['work_location_line'] = [
-            $workLocationRequired ? 'required' : 'nullable',
+            ($workLocationRequired && $isWorkLocationActive) ? 'required' : 'nullable',
             'string', 'max:100',
         ];
 
-        $workStyle = $this->input('work_style');
-        $rules['work_location_station'] = in_array($workStyle, ['onsite', 'hybrid'], true)
+        $rules['work_location_station'] = $isWorkLocationActive
             ? ['required', 'string', 'max:100']
             : ['nullable', 'string', 'max:100'];
 
