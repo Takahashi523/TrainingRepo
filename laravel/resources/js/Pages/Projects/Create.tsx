@@ -1,34 +1,10 @@
-import ProjectForm, {
-    ProjectFormData,
-} from "@/Components/Projects/ProjectForm";
+import ProjectForm from "@/Components/Projects/ProjectForm";
+import { ProjectFormData, FieldSettings } from "@/types/project";
 import { Button } from "@/Components/ui/button";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
 import { Head, router, useForm } from "@inertiajs/react";
 import { Loader2 } from "lucide-react";
-
-type FieldSetting = {
-    is_required: boolean;
-};
-
-type FieldSettings = {
-    client_name: FieldSetting;
-    headcount: FieldSetting;
-    start_date: FieldSetting;
-    rate: FieldSetting;
-    commercial_flow: FieldSetting;
-    work_style: FieldSetting;
-    work_location: FieldSetting;
-    interview_count: FieldSetting;
-    required_skills: FieldSetting;
-    preferred_skills: FieldSetting;
-    proc_experience: FieldSetting;
-    negotiation_required: FieldSetting;
-    description: FieldSetting;
-    work_env: FieldSetting;
-    billing_range: FieldSetting;
-    remarks: FieldSetting;
-};
 
 type Props = PageProps<{
     fieldSettings: FieldSettings;
