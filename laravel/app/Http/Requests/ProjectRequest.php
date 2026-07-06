@@ -42,11 +42,11 @@ class ProjectRequest extends FormRequest
         // 第2層：動的フィールド
         $dynamicFields = [
             'client_name'          => ['string', 'max:100'],
-            'headcount'            => ['integer', 'min:0'],
+            'headcount'            => ['integer', 'min:0', 'max:99'],
             'start_date'           => ['date'],
             'commercial_flow'      => ['in:prime,secondary,tertiary,other'],
             'work_style'           => ['in:onsite,hybrid,remote'],
-            'interview_count'      => ['integer', 'min:0'],
+            'interview_count'      => ['integer', 'min:0', 'max:10'],
             'negotiation_required' => ['boolean'],
             'description'          => ['string'],
             'work_env'             => ['string'],
@@ -72,12 +72,12 @@ class ProjectRequest extends FormRequest
 
         if ($this->boolean('rate_is_negotiable')) {
             // スキル見合いの場合は rate_min / rate_max を完全に nullable にする
-            $rules['rate_min'] = ['nullable', 'integer', 'min:0'];
-            $rules['rate_max'] = ['nullable', 'integer', 'min:0'];
+            $rules['rate_min'] = ['nullable', 'integer', 'min:0', 'max:999'];
+            $rules['rate_max'] = ['nullable', 'integer', 'min:0', 'max:999'];
         } else {
             // 通常の場合：下限・上限の相互必須チェック
-            $rateMinRules = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0'];
-            $rateMaxRules = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0'];
+            $rateMinRules = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'max:999'];
+            $rateMaxRules = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'max:999'];
 
             if ($this->filled('rate_min')) {
                 $rateMaxRules[] = 'required';
