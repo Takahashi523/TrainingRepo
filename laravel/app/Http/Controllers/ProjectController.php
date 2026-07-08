@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProjectRequest;
+use App\Http\Resources\ProjectResource;
 use App\Models\FormFieldSetting;
 use App\Models\User;
 use App\Models\Project;
@@ -10,6 +11,7 @@ use App\Services\ProjectService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ProjectController extends Controller
 {
@@ -108,9 +110,13 @@ class ProjectController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Project $project): Response
     {
-        //
+        $project->loadMissing(['projectSkills', 'mainUser', 'subUser']);
+
+        return Inertia::render('Projects/Show', [
+            'project' => ProjectResource::make($project),
+        ]);
     }
 
     /**
