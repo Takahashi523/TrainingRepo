@@ -291,10 +291,12 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             <label className="text-[10px] font-bold text-muted-foreground">
                                 顧客コメント
                             </label>
+                            {/* 過大な入力による PostTooLargeException を避けるため、バックエンドの max:1000 と揃えてフロントでも制限する */}
                             <Textarea
                                 rows={2}
                                 value={data.client_comment}
                                 onChange={(e) => setData('client_comment', e.target.value)}
+                                maxLength={1000}
                                 className="min-h-0 w-full resize-y bg-white px-2.5 py-2 text-xs leading-relaxed md:text-xs"
                             />
                             {errors.client_comment && (
@@ -304,11 +306,13 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
 
                         <div className="flex flex-col gap-1">
                             <label className="text-[10px] font-bold text-muted-foreground">NG理由</label>
+                            {/* 過大な入力による PostTooLargeException を避けるため、バックエンドの max:1000 と揃えてフロントでも制限する */}
                             <Textarea
                                 rows={2}
                                 value={data.ng_reason}
                                 onChange={(e) => setData('ng_reason', e.target.value)}
                                 placeholder="見送り・不成立の場合に記入"
+                                maxLength={1000}
                                 className="min-h-0 w-full resize-y bg-white px-2.5 py-2 text-xs leading-relaxed md:text-xs"
                             />
                             {errors.ng_reason && (

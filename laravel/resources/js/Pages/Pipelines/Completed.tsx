@@ -1,7 +1,7 @@
 import CompletedFilterPanel from '@/Components/Pipelines/CompletedFilterPanel';
 import PipelineTabHeader from '@/Components/Pipelines/PipelineTabHeader';
 import ConfirmDialog from '@/Components/Common/ConfirmDialog';
-import SortSelect, { SortOption } from '@/Components/Common/SortSelect';
+import SortSelect from '@/Components/Common/SortSelect';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import PipelineStatusBadge from '@/Components/Pipelines/PipelineStatusBadge';
 import Pagination from '@/Components/Common/Pagination';
@@ -24,13 +24,6 @@ import { useEffect, useRef, useState } from 'react';
 type Props = PageProps<PipelineCompletedPageProps>;
 
 const KEYWORD_DEBOUNCE_MS = 300;
-
-// 完了済みタブのソート選択肢（WF_10 準拠。テーブル上部の件数行に表示する）。
-// スコアはこのタブで非表示のため、スコアソートは提供しない（終了日のみ）。
-const SORT_OPTIONS: SortOption[] = [
-    { sort: 'ended_at', order: 'desc', label: '終了日（新しい順）' },
-    { sort: 'ended_at', order: 'asc', label: '終了日（古い順）' },
-];
 
 type QueryPayload = {
     keyword?: string;
@@ -64,7 +57,7 @@ function formatEndedAt(value: string | null): string {
     return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-export default function Completed({ pipelines, filters, users, statuses, auth }: Props) {
+export default function Completed({ pipelines, filters, users, statuses, sortOptions, auth }: Props) {
     const isAdmin = auth.user.role === 'admin';
     const [keywordInput, setKeywordInput] = useState(filters.keyword);
 
@@ -169,7 +162,7 @@ export default function Completed({ pipelines, filters, users, statuses, auth }:
                     </span>
                     <div className="ml-auto">
                         <SortSelect
-                            options={SORT_OPTIONS}
+                            options={sortOptions}
                             currentSort={filters.sort}
                             currentOrder={filters.order}
                             onChange={(sort, order) => visit({ sort, order }, 1)}

@@ -41,6 +41,7 @@ export default function Index({
     users,
     ranks,
     statuses,
+    sortOptions,
     selectedPipeline,
     statusOptions,
 }: Props) {
@@ -158,6 +159,7 @@ export default function Index({
                             ranks={ranks}
                             statuses={statuses}
                             count={activeCount}
+                            sortOptions={sortOptions}
                             keywordInput={keywordInput}
                             onKeywordInput={setKeywordInput}
                             onFilterChange={(patch) => visit(patch)}

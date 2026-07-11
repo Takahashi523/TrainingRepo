@@ -1,6 +1,6 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
-import SortSelect, { SortOption } from '@/Components/Common/SortSelect';
+import SortSelect from '@/Components/Common/SortSelect';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import {
@@ -10,7 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/Components/ui/select';
-import { ActiveFilters, RankOption, StatusOption, UserOption } from '@/types/pipeline';
+import { ActiveFilters, RankOption, SortOption, StatusOption, UserOption } from '@/types/pipeline';
 import { Search, X } from 'lucide-react';
 
 interface Props {
@@ -21,16 +21,12 @@ interface Props {
     keywordInput: string;
     /** 現在の絞り込み結果の総件数（進行中カード合計）。WF_10 準拠でソート左に表示する */
     count: number;
+    /** ソート選択肢（バックエンドの SORT_OPTIONS_ACTIVE から props で受け取る＝SSOT） */
+    sortOptions: SortOption[];
     onKeywordInput: (value: string) => void;
     onFilterChange: (patch: Partial<ActiveFilters>) => void;
     onClearAll: () => void;
 }
-
-const SORT_OPTIONS: SortOption[] = [
-    { sort: 'next_action_date', order: 'asc', label: '次回アクション日（近い順）' },
-    { sort: 'match_score', order: 'desc', label: 'スコア（高い順）' },
-    { sort: 'updated_at', order: 'desc', label: '最終更新日（新しい順）' },
-];
 
 /**
  * 進行中タブのフィルタ内容（キーワード・担当営業・ランク・ステータス・ソート）。
@@ -43,6 +39,7 @@ export default function PipelineFilterPanel({
     statuses,
     keywordInput,
     count,
+    sortOptions,
     onKeywordInput,
     onFilterChange,
     onClearAll,
@@ -201,7 +198,7 @@ export default function PipelineFilterPanel({
                 </span>
                 <div className="ml-auto">
                     <SortSelect
-                        options={SORT_OPTIONS}
+                        options={sortOptions}
                         currentSort={filters.sort}
                         currentOrder={filters.order}
                         onChange={(sort, order) => onFilterChange({ sort, order })}

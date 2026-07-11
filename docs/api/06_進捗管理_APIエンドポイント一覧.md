@@ -88,8 +88,8 @@
 | user_id | int \| "all" | 任意 | 担当営業フィルタ | 未指定時：ログインユーザーがメイン・サブ担当の人材のカードを表示（QA #70）。`all`：全担当のカードを表示（全員）。数値指定：指定ユーザーがメイン担当の人材のカードを表示 |
 | rank | string[] | 任意 | マッチングランクフィルタ | A / B / C / D |
 | status | string[] | 任意 | 進行中ステータスフィルタ | 進行中12種の値。終了ステータスは `/pipelines/completed` で取得 |
-| sort | string | 任意 | ソート項目 | デフォルト：next_action_date。有効値：next_action_date / match_score / updated_at |
-| order | string | 任意 | 並び順 | asc / desc（デフォルト：asc） |
+| sort | string | 任意 | ソート項目 | デフォルト：next_action_date。**有効な sort×order の組み合わせは Props の `sortOptions`（下記）に列挙されたペアのみ**。仕様外の組み合わせ（例：sort=match_score&order=asc）はデフォルトへフォールバックする |
+| order | string | 任意 | 並び順 | asc / desc。`sortOptions` のペアと一致しない組み合わせは不可（デフォルトへフォールバック） |
 
 > **初期表示フィルタ（QA #70）**：`user_id` 未指定時はログインユーザーの `id` を使い、`engineers.main_user_id = ? OR engineers.sub_user_id = ?` で絞り込む（初期表示＝自分の担当）。
 > **【2026-07-02 追加】担当営業フィルタは 3 状態**：未指定＝自分の担当（デフォルト）/ `user_id=all`＝全員（絞り込みなし）/ `user_id=<数値>`＝指定ユーザーのメイン担当。
@@ -163,6 +163,13 @@
       "label": "string",  // 表示名
       "group": "string"   // カンバングループキー（entry / first_interview / final_interview / offer）
     }
+  ],
+
+  // ソート選択肢（sort×order のペア＋ラベル）。バックエンド定数を SSOT として渡す。
+  // バリデーションもこのペアを基準に行い、UI の選択肢と許可される組み合わせを一致させる。
+  "sortOptions": [
+    { "sort": "string", "order": "string", "label": "string" }
+    // 例：next_action_date/asc（近い順）, match_score/desc（高い順）, updated_at/desc（新しい順）
   ]
 }
 ```
@@ -190,8 +197,8 @@
 | user_id | int | 任意 | 担当営業フィルタ | 未指定時は全員表示（WF_10の完了済みタブ仕様） |
 | ended_from | date | 任意 | 日付範囲フィルタ（開始） | `pipelines.ended_at` で絞り込む |
 | ended_to | date | 任意 | 日付範囲フィルタ（終了） | `pipelines.ended_at` で絞り込む |
-| sort | string | 任意 | ソート項目 | デフォルト：ended_at。有効値：ended_at（スコアは完了タブで非表示のためソート対象外） |
-| order | string | 任意 | 並び順 | asc / desc（デフォルト：desc） |
+| sort | string | 任意 | ソート項目 | デフォルト：ended_at。**有効な sort×order の組み合わせは Props の `sortOptions` のペアのみ**（ended_at の asc/desc）。スコアは完了タブで非表示のためソート対象外 |
+| order | string | 任意 | 並び順 | asc / desc。`sortOptions` のペアと一致しない組み合わせはデフォルトへフォールバック |
 
 > 完了済みタブは進行中タブと異なり担当フィルタの初期値が「全員」（WF_10注記より）
 
@@ -246,6 +253,12 @@
   // 終了ステータス一覧（フィルタ選択肢用）
   "statuses": [
     { "value": "string", "label": "string" }
+  ],
+
+  // ソート選択肢（sort×order のペア＋ラベル）。SSOT はバックエンド定数。
+  // 完了タブは終了日のみ（例：ended_at/desc（新しい順）, ended_at/asc（古い順））
+  "sortOptions": [
+    { "sort": "string", "order": "string", "label": "string" }
   ]
 }
 ```

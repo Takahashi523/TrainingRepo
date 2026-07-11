@@ -191,9 +191,61 @@ class PipelineControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page->where('columns.0.count', 1));
     }
 
+    public function test_index_filters_by_status_multiple_or(): void
+    {
+        $me = User::factory()->create();
+        $this->makePipeline($me, ['status' => 'proposed']);         // entry
+        $this->makePipeline($me, ['status' => 'first_waiting']);    // first_interview
+        $this->makePipeline($me, ['status' => 'final_waiting']);    // final_interview（除外される）
+
+        // proposed OR first_waiting の複数選択で両方ヒットすること（OR 条件）
+        $response = $this->actingAs($me)->get('/pipelines?status[]=proposed&status[]=first_waiting');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('columns.0.count', 1)   // entry: proposed
+            ->where('columns.1.count', 1)   // first_interview: first_waiting
+            ->where('columns.2.count', 0)   // final_interview: 除外
+        );
+    }
+
+    public function test_index_keyword_matches_engineer_name_or_project_name(): void
+    {
+        $me = User::factory()->create();
+
+        // 人材Aは氏名でヒット（案件名は無関係）
+        $engA = Engineer::factory()->create(['main_user_id' => $me->id, 'name' => 'ヒット太郎']);
+        $prjA = Project::factory()->create(['main_user_id' => $me->id, 'name' => '無関係案件アルファ']);
+        Pipeline::factory()->create(['engineer_id' => $engA->id, 'project_id' => $prjA->id, 'status' => 'proposed']);
+
+        // 人材Bは案件名でヒット（氏名は無関係）
+        $engB = Engineer::factory()->create(['main_user_id' => $me->id, 'name' => '無関係花子']);
+        $prjB = Project::factory()->create(['main_user_id' => $me->id, 'name' => 'ヒット案件ベータ']);
+        Pipeline::factory()->create(['engineer_id' => $engB->id, 'project_id' => $prjB->id, 'status' => 'proposed']);
+
+        // 氏名一致(A)・案件名一致(B)が OR で両方返る（entry 列に2件）
+        $response = $this->actingAs($me)->get('/pipelines?keyword='.urlencode('ヒット'));
+
+        $response->assertInertia(fn ($page) => $page->where('columns.0.count', 2));
+    }
+
     // -------------------------------------------------------
     // index: ソート（null 末尾）
     // -------------------------------------------------------
+
+    public function test_index_sort_rejects_invalid_sort_order_pair(): void
+    {
+        $me = User::factory()->create();
+        $this->makePipeline($me, ['status' => 'proposed', 'match_score' => 90]);
+        $this->makePipeline($me, ['status' => 'proposed', 'match_score' => 60]);
+
+        // match_score は desc のみ許可。asc は UI に無い仕様外ペアのためデフォルト（next_action_date asc）へフォールバックする。
+        $response = $this->actingAs($me)->get('/pipelines?sort=match_score&order=asc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('filters.sort', 'next_action_date')
+            ->where('filters.order', 'asc')
+        );
+    }
 
     public function test_index_sort_by_next_action_date_places_nulls_last(): void
     {

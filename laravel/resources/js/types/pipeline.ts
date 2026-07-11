@@ -166,12 +166,24 @@ export interface Paginated<T> {
 }
 
 /** GET /pipelines（進行中タブ）Props。show 部分リロードで selectedPipeline / statusOptions が付与される */
+/**
+ * ソート選択肢（sort×order のペア＋表示ラベル）。
+ * バックエンド（PipelineController の SORT_OPTIONS_*）を SSOT として props で受け取り、
+ * UI の選択肢と許可された組み合わせを常に一致させる。
+ */
+export interface SortOption {
+    sort: string;
+    order: string;
+    label: string;
+}
+
 export type PipelineIndexPageProps = {
     columns: KanbanColumn[];
     filters: ActiveFilters;
     users: UserOption[];
     ranks: RankOption[];
     statuses: StatusOption[];
+    sortOptions: SortOption[];
     selectedPipeline?: PipelineDetail | null;
     statusOptions?: StatusOption[] | null;
 };
@@ -182,4 +194,5 @@ export type PipelineCompletedPageProps = {
     filters: CompletedFilters;
     users: UserOption[];
     statuses: StatusOption[];
+    sortOptions: SortOption[];
 };

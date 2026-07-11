@@ -20,12 +20,23 @@ class PipelineController extends Controller
 {
     public function __construct(private PipelineService $pipelineService) {}
 
-    private const ALLOWED_SORTS_ACTIVE = ['next_action_date', 'match_score', 'updated_at'];
+    /**
+     * ソートの許可組み合わせ（sort×order のペア）を Single Source of Truth として定義する。
+     * バリデーションはこのペアを基準に行い、同じ配列を sortOptions として props でフロントへ渡す。
+     * これにより「UI の選択肢」と「バックエンドが許可する組み合わせ」が常に一致し、
+     * URL 経由で仕様外の組み合わせ（例：sort=match_score&order=asc）が通らない。先頭要素がデフォルト。
+     */
+    private const SORT_OPTIONS_ACTIVE = [
+        ['sort' => 'next_action_date', 'order' => 'asc', 'label' => '次回アクション日（近い順）'],
+        ['sort' => 'match_score', 'order' => 'desc', 'label' => 'スコア（高い順）'],
+        ['sort' => 'updated_at', 'order' => 'desc', 'label' => '最終更新日（新しい順）'],
+    ];
 
     // 完了済みタブはスコアを表示しないため、非表示項目でのソートは提供しない（終了日のみ）
-    private const ALLOWED_SORTS_COMPLETED = ['ended_at'];
-
-    private const ALLOWED_ORDERS = ['asc', 'desc'];
+    private const SORT_OPTIONS_COMPLETED = [
+        ['sort' => 'ended_at', 'order' => 'desc', 'label' => '終了日（新しい順）'],
+        ['sort' => 'ended_at', 'order' => 'asc', 'label' => '終了日（古い順）'],
+    ];
 
     private const COMPLETED_PER_PAGE = 50;
 
@@ -74,9 +85,7 @@ class PipelineController extends Controller
         $endedFrom = $request->input('ended_from');
         $endedTo = $request->input('ended_to');
 
-        [$sort, $order] = $this->resolveSort(
-            $request, self::ALLOWED_SORTS_COMPLETED, 'ended_at', 'desc'
-        );
+        [$sort, $order] = $this->resolveSort($request, self::SORT_OPTIONS_COMPLETED);
 
         $query = Pipeline::query()
             ->select(['id', 'engineer_id', 'project_id', 'status', 'ng_reason', 'ended_at'])
@@ -127,6 +136,7 @@ class PipelineController extends Controller
             ],
             'users' => $this->userOptions(),
             'statuses' => $this->terminalStatusOptions(),
+            'sortOptions' => self::SORT_OPTIONS_COMPLETED,
         ]);
     }
 
@@ -206,9 +216,7 @@ class PipelineController extends Controller
             (array) $request->input('status', []), $inProgressValues
         ));
 
-        [$sort, $order] = $this->resolveSort(
-            $request, self::ALLOWED_SORTS_ACTIVE, 'next_action_date', 'asc'
-        );
+        [$sort, $order] = $this->resolveSort($request, self::SORT_OPTIONS_ACTIVE);
 
         $query = Pipeline::query()
             ->select([
@@ -271,6 +279,7 @@ class PipelineController extends Controller
             'users' => $this->userOptions(),
             'ranks' => Pipeline::RANKS,
             'statuses' => $this->inProgressStatusOptions(),
+            'sortOptions' => self::SORT_OPTIONS_ACTIVE,
             // ドロワー未開封時は null（部分リロードで show が上書きする）
             'selectedPipeline' => null,
             'statusOptions' => $this->statusOptions(),
@@ -309,7 +318,8 @@ class PipelineController extends Controller
             return;
         }
 
-        $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $keyword).'%';
+        // LIKE ワイルドカードのエスケープ。バックスラッシュ（MySQL 既定のエスケープ文字）を最初に処理する。
+        $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $keyword).'%';
         $query->where(function (Builder $q) use ($like) {
             $q->whereHas('engineer', fn (Builder $e) => $e->where('name', 'like', $like))
                 ->orWhereHas('project', fn (Builder $p) => $p->where('name', 'like', $like));
@@ -322,20 +332,26 @@ class PipelineController extends Controller
      * @param  array<int, string>  $allowedSorts
      * @return array{0: string, 1: string}
      */
-    private function resolveSort(Request $request, array $allowedSorts, string $defaultSort, string $defaultOrder): array
+    /**
+     * ソートを sort×order のペア単位で検証する。
+     * $sortOptions（許可組の配列）に一致するペアだけ採用し、無ければ先頭（デフォルト）へフォールバックする。
+     * これにより仕様外の sort×order の組み合わせを弾き、UI の選択肢と完全に一致させる。
+     *
+     * @param  array<int, array{sort: string, order: string, label: string}>  $sortOptions
+     * @return array{0: string, 1: string} [$sort, $order]
+     */
+    private function resolveSort(Request $request, array $sortOptions): array
     {
-        $sortInput = $request->input('sort');
+        $sortInput = (string) $request->input('sort', '');
         $orderInput = strtolower((string) $request->input('order', ''));
 
-        if (in_array($sortInput, $allowedSorts, true)) {
-            $sort = $sortInput;
-            $order = in_array($orderInput, self::ALLOWED_ORDERS, true) ? $orderInput : $defaultOrder;
-        } else {
-            $sort = $defaultSort;
-            $order = $defaultOrder;
+        foreach ($sortOptions as $opt) {
+            if ($opt['sort'] === $sortInput && $opt['order'] === $orderInput) {
+                return [$opt['sort'], $opt['order']];
+            }
         }
 
-        return [$sort, $order];
+        return [$sortOptions[0]['sort'], $sortOptions[0]['order']];
     }
 
     /**
