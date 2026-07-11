@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from '@/Components/ui/select';
 import { CompletedFilters, StatusOption, UserOption } from '@/types/pipeline';
+import { usePage } from '@inertiajs/react';
 import { Search, X } from 'lucide-react';
 
 interface Props {
@@ -38,6 +39,11 @@ export default function CompletedFilterPanel({
 }: Props) {
     const statusOptions: MultiSelectOption[] = statuses.map((s) => ({ value: s.value, label: s.label }));
 
+    // 終了日範囲のバリデーションエラー（例：終了 < 開始）。エラー時はサーバーが直前の
+    // 条件のまま差し戻すため、メッセージを出さないと「選んだのに反映されない」Silent Rejection になる
+    const { errors } = usePage().props;
+    const dateRangeError = errors.ended_from ?? errors.ended_to;
+
     const statusLabel = (v: string) => statuses.find((s) => s.value === v)?.label ?? v;
     const userLabel = (id: number) => users.find((u) => u.id === id)?.name ?? `ID:${id}`;
 
@@ -54,11 +60,13 @@ export default function CompletedFilterPanel({
                 {/* フリーワード */}
                 <div className="relative">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    {/* バックエンドの max:100（バリデーション設計書 §6）と揃えてフロントでも制限する */}
                     <Input
                         type="text"
                         value={keywordInput}
                         onChange={(e) => onKeywordInput(e.target.value)}
                         placeholder="人材名・案件名で検索"
+                        maxLength={100}
                         className="h-8 w-[220px] bg-white pl-8 pr-2 text-xs md:text-xs"
                     />
                 </div>
@@ -124,6 +132,10 @@ export default function CompletedFilterPanel({
                     />
                 </div>
             </div>
+
+            {dateRangeError && (
+                <p className="mt-1 text-[11px] text-destructive">{dateRangeError}</p>
+            )}
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-[11px] text-muted-foreground">絞り込み条件：</span>

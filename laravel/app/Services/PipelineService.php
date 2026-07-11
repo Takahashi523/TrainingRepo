@@ -21,6 +21,13 @@ class PipelineService
      */
     public function update(Pipeline $pipeline, array $data): Pipeline
     {
+        // status の明示的な null は「ステータス変更なし」として無視する。
+        // バリデーション設計書 §6 は status を nullable と定義しているが、DB 上は NOT NULL（ENUM）
+        // のため null をそのまま UPDATE に渡すと DB エラー（500）になる。
+        if (array_key_exists('status', $data) && $data['status'] === null) {
+            unset($data['status']);
+        }
+
         return DB::transaction(function () use ($pipeline, $data) {
             if (array_key_exists('status', $data)
                 && Pipeline::isTerminal($data['status'])

@@ -250,7 +250,7 @@ class PipelineControllerTest extends TestCase
     public function test_index_sort_by_next_action_date_places_nulls_last(): void
     {
         $me = User::factory()->create();
-        $this->makePipeline($me, ['status' => 'proposed', 'next_action_date' => null, 'match_rank' => 'N']);
+        $this->makePipeline($me, ['status' => 'proposed', 'next_action_date' => null, 'match_rank' => 'D']);
         $this->makePipeline($me, ['status' => 'proposed', 'next_action_date' => '2026-08-01', 'match_rank' => 'B']);
         $this->makePipeline($me, ['status' => 'proposed', 'next_action_date' => '2026-07-10', 'match_rank' => 'A']);
 
@@ -322,6 +322,11 @@ class PipelineControllerTest extends TestCase
     // -------------------------------------------------------
     // completed: GET /pipelines/completed
     // -------------------------------------------------------
+
+    public function test_guest_is_redirected_to_login_from_completed(): void
+    {
+        $this->get('/pipelines/completed')->assertRedirect('/login');
+    }
 
     public function test_completed_shows_only_terminal_statuses(): void
     {
@@ -431,9 +436,72 @@ class PipelineControllerTest extends TestCase
         );
     }
 
+    public function test_completed_rejects_invalid_ended_date_format(): void
+    {
+        $me = User::factory()->create();
+        $this->makePipeline($me, ['status' => 'rejected', 'ended_at' => now()]);
+
+        // 不正な日付文字列は 422（バリデーション設計書 §6：nullable / date）
+        $this->actingAs($me)->get('/pipelines/completed?ended_from=not-a-date')
+            ->assertSessionHasErrors('ended_from');
+        $this->actingAs($me)->get('/pipelines/completed?ended_to=2026-13-99')
+            ->assertSessionHasErrors('ended_to');
+    }
+
+    public function test_completed_rejects_ended_to_before_ended_from(): void
+    {
+        $me = User::factory()->create();
+        $this->makePipeline($me, ['status' => 'rejected', 'ended_at' => now()]);
+
+        // 終了 < 開始 は設計書のメッセージ例どおりのエラー文で拒否される
+        $this->actingAs($me)
+            ->get('/pipelines/completed?ended_from=2026-06-30&ended_to=2026-06-01')
+            ->assertInvalid(['ended_to' => '開始日以降の日付を入力してください']);
+    }
+
+    public function test_completed_accepts_same_day_range_and_ended_to_alone(): void
+    {
+        $me = User::factory()->create();
+        $this->makePipeline($me, ['status' => 'rejected', 'ended_at' => '2026-06-15 10:00:00']);
+
+        // 境界値：開始＝終了の同日指定は許可（after_or_equal）
+        $this->actingAs($me)
+            ->get('/pipelines/completed?ended_from=2026-06-15&ended_to=2026-06-15')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('pipelines.data', 1));
+
+        // ended_to 単独指定でも after_or_equal が誤発火しない（比較先が空のケース）
+        $this->actingAs($me)
+            ->get('/pipelines/completed?ended_to=2026-06-30')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('pipelines.data', 1));
+    }
+
+    public function test_completed_keyword_max_is_100(): void
+    {
+        $me = User::factory()->create();
+        $this->makePipeline($me, ['status' => 'rejected', 'ended_at' => now()]);
+
+        // 境界値：100文字は許可、101文字は 422
+        $this->actingAs($me)
+            ->get('/pipelines/completed?keyword='.urlencode(str_repeat('あ', 100)))
+            ->assertOk();
+        $this->actingAs($me)
+            ->get('/pipelines/completed?keyword='.urlencode(str_repeat('あ', 101)))
+            ->assertInvalid(['keyword' => 'キーワード']);
+    }
+
     // -------------------------------------------------------
     // show: GET /pipelines/{id}
     // -------------------------------------------------------
+
+    public function test_guest_is_redirected_to_login_from_show(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $pipeline = $this->makePipeline($admin, ['status' => 'proposed']);
+
+        $this->get('/pipelines/'.$pipeline->id)->assertRedirect('/login');
+    }
 
     public function test_show_returns_selected_pipeline_with_text_columns(): void
     {
@@ -484,6 +552,37 @@ class PipelineControllerTest extends TestCase
     // -------------------------------------------------------
     // update: PATCH /pipelines/{id} — 正常系
     // -------------------------------------------------------
+
+    public function test_guest_cannot_update_pipeline(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $pipeline = $this->makePipeline($admin, ['status' => 'proposed']);
+
+        $this->patch('/pipelines/'.$pipeline->id, ['status' => 'rejected'])
+            ->assertRedirect('/login');
+        $this->assertSame('proposed', $pipeline->fresh()->status);
+    }
+
+    public function test_update_ignores_explicit_null_status(): void
+    {
+        $me = User::factory()->create();
+        $pipeline = $this->makePipeline($me, ['status' => 'first_waiting']);
+
+        // status は設計書上 nullable。明示的な null は「ステータス変更なし」として無視され、
+        // 他項目の更新は成功する（従来は isTerminal(null) の TypeError で 500 になっていた）。
+        $response = $this->actingAs($me)->from(route('pipelines.index'))->patch('/pipelines/'.$pipeline->id, [
+            'status' => null,
+            'client_comment' => 'コメントのみ更新',
+        ]);
+
+        $response->assertRedirect(route('pipelines.index'));
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('pipelines', [
+            'id' => $pipeline->id,
+            'status' => 'first_waiting',
+            'client_comment' => 'コメントのみ更新',
+        ]);
+    }
 
     public function test_update_persists_management_fields(): void
     {
@@ -700,6 +799,39 @@ class PipelineControllerTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $this->actingAs($admin)->delete('/pipelines/99999')->assertNotFound();
+    }
+
+    /**
+     * ドロワー表示中（referer が show URL /pipelines/{id}）に削除しても、
+     * 削除済み ID の show へ戻らず（404 になるため）、index へ戻る。
+     * 絞り込み条件（referer のクエリ）は index に引き継ぐ。update の 2026-07-11 修正と同方針。
+     */
+    public function test_destroy_from_drawer_redirects_to_index_with_filters(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $pipeline = $this->makePipeline($admin, ['status' => 'proposed']);
+
+        $response = $this->actingAs($admin)
+            ->from('/pipelines/'.$pipeline->id.'?keyword=foo')
+            ->delete('/pipelines/'.$pipeline->id);
+
+        $response->assertRedirect(route('pipelines.index', ['keyword' => 'foo']));
+        $response->assertSessionHas('success', 'パイプラインを削除しました。');
+        $this->assertDatabaseMissing('pipelines', ['id' => $pipeline->id]);
+    }
+
+    public function test_destroy_from_completed_redirects_to_completed_with_filters(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $pipeline = $this->makePipeline($admin, ['status' => 'rejected', 'ended_at' => now()]);
+
+        // 完了済みタブからの削除は completed へ戻り、絞り込み条件を保持する
+        $response = $this->actingAs($admin)
+            ->from('/pipelines/completed?keyword=bar')
+            ->delete('/pipelines/'.$pipeline->id);
+
+        $response->assertRedirect(route('pipelines.completed', ['keyword' => 'bar']));
+        $this->assertDatabaseMissing('pipelines', ['id' => $pipeline->id]);
     }
 
     // -------------------------------------------------------

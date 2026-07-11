@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\PipelineCompletedRequest;
 use App\Http\Requests\PipelineUpdateRequest;
 use App\Http\Resources\PipelineCardResource;
 use App\Http\Resources\PipelineCompletedResource;
@@ -72,8 +73,9 @@ class PipelineController extends Controller
 
     /**
      * 完了済みタブ（テーブル・ページネーション）。
+     * keyword / ended_from / ended_to は PipelineCompletedRequest で検証する（バリデーション設計書 §6）。
      */
-    public function completed(Request $request): Response
+    public function completed(PipelineCompletedRequest $request): Response
     {
         $terminalValues = Pipeline::terminalValues();
 
@@ -183,15 +185,33 @@ class PipelineController extends Controller
     /**
      * DELETE：管理者のみ物理削除（PipelinePolicy@delete で認可）。
      */
-    public function destroy(Pipeline $pipeline): RedirectResponse
+    public function destroy(Request $request, Pipeline $pipeline): RedirectResponse
     {
         $this->authorize('delete', $pipeline);
 
         $this->pipelineService->delete($pipeline);
 
-        // 直前の画面（進行中／完了済みの絞り込み状態）へ戻す。
-        return redirect()->back()
+        // 行き先は referer から明示的に解決する。redirect()->back() だと、ドロワーから削除した
+        // 場合に referer が /pipelines/{id}（show）のため、削除済み ID の show へ戻って 404 になる
+        // （update と同じ原因。2026-07-11 の update 修正と同方針）。
+        // 完了済みタブからの削除は completed へ、それ以外（カンバン・ドロワー）は index へ戻し、
+        // 絞り込み条件（referer のクエリ）は引き継ぐ。
+        $routeName = $this->refererIsCompleted($request) ? 'pipelines.completed' : 'pipelines.index';
+
+        return redirect()
+            ->route($routeName, $this->filtersFromReferer($request))
             ->with('success', 'パイプラインを削除しました。');
+    }
+
+    /**
+     * referer が完了済みタブ（/pipelines/completed）かどうか。
+     * destroy の戻り先タブの判定に使う。
+     */
+    private function refererIsCompleted(Request $request): bool
+    {
+        $path = parse_url((string) $request->headers->get('referer', ''), PHP_URL_PATH);
+
+        return is_string($path) && str_ends_with($path, '/pipelines/completed');
     }
 
     /**
