@@ -85,13 +85,16 @@
 | パラメータ名 | 型 | 必須 | 説明 | 備考 |
 |------------|---|:----:|------|------|
 | keyword | string | 任意 | 人材名・案件名で部分一致検索 | |
-| user_id | int | 任意 | 担当営業フィルタ | 未指定時：ログインユーザーがメイン・サブ担当の人材のカードを表示（QA #70確定）。指定時：指定ユーザーがメイン担当の人材のカードを表示 |
+| user_id | int \| "all" | 任意 | 担当営業フィルタ | 未指定時：ログインユーザーがメイン・サブ担当の人材のカードを表示（QA #70）。`all`：全担当のカードを表示（全員）。数値指定：指定ユーザーがメイン担当の人材のカードを表示 |
 | rank | string[] | 任意 | マッチングランクフィルタ | A / B / C / D |
 | status | string[] | 任意 | 進行中ステータスフィルタ | 進行中12種の値。終了ステータスは `/pipelines/completed` で取得 |
 | sort | string | 任意 | ソート項目 | デフォルト：next_action_date。有効値：next_action_date / match_score / updated_at |
 | order | string | 任意 | 並び順 | asc / desc（デフォルト：asc） |
 
-> **初期表示フィルタ（QA #70確定）**：`user_id` 未指定時はログインユーザーの `id` を使い、`engineers.main_user_id = ? OR engineers.sub_user_id = ?` で絞り込む。  
+> **初期表示フィルタ（QA #70）**：`user_id` 未指定時はログインユーザーの `id` を使い、`engineers.main_user_id = ? OR engineers.sub_user_id = ?` で絞り込む（初期表示＝自分の担当）。
+> **【2026-07-02 追加】担当営業フィルタは 3 状態**：未指定＝自分の担当（デフォルト）/ `user_id=all`＝全員（絞り込みなし）/ `user_id=<数値>`＝指定ユーザーのメイン担当。
+> **背景：** UI レビューで「担当営業（全員）を選択できない／表示がログインユーザーに固定される／すべてクリアで担当が消えない」と判明した。旧実装は未指定時に `filters.user_id` へログインIDを返しており、ドロップダウンが常に自分に固定され「全員」を選べなかった。
+> **理由：** QA #70 の初期表示（自分の担当）は維持しつつ、明示的な「全員」選択を可能にするため `all` センチネルを追加。`filters.user_id` は未指定時 `null`（＝自分の担当）を返し、`all` 選択時のみ `"all"` を返す。  
 > **ソートデフォルト**：次回アクション日（近い順）= `next_action_date ASC`。null のものは末尾に表示する。
 
 ---
@@ -103,8 +106,8 @@
   // カンバン構造：4グループ固定
   "columns": [
     {
-      "key": "string",    // applying_before | first_interview | final_interview | offer
-      "label": "string",  // 応募前 | 一次選考 | 最終選考 | オファー
+      "key": "string",    // entry | first_interview | final_interview | offer
+      "label": "string",  // エントリー | 一次選考 | 最終選考 | オファー
       "count": "int",     // グループ内のカード件数
       "cards": [
         {
@@ -158,7 +161,7 @@
     {
       "value": "string",  // DB値
       "label": "string",  // 表示名
-      "group": "string"   // カンバングループキー（applying_before / first_interview / final_interview / offer）
+      "group": "string"   // カンバングループキー（entry / first_interview / final_interview / offer）
     }
   ]
 }
@@ -166,8 +169,12 @@
 
 > **実装注意（N+1対策）**：`engineer`・`engineer.mainUser`・`project` を Eager Loading すること  
 > **実装注意（スコア）**：`match_score` / `match_rank` は `pipelines` テーブルの追加時スナップショット値を返す。リアルタイム再計算はしない（QA #45確定）  
+> **【2026-07-02 変更】カンバン第1グループのキー／表示名を変更**：`applying_before`／「応募前」→ **`entry`／「エントリー」**。
+> **背景：** 「応募前」グループに `applied_by_candidate`（求職者応募済み）・`applying`（応募中）が含まれ、"応募前"という名称と中身（応募後・応募中）が矛盾していた。
+> **理由：** 当グループの実態は「一次選考より前の、提案〜応募のエントリーフェーズ」であるため、内容と一致する `entry`／「エントリー」へ変更した。他3グループ（first_interview / final_interview / offer）は変更なし。
+>
 > **実装注意（カンバングループ）**：DBのステータス値をカンバングループへのマッピングは以下の通り
-> - `applying_before`：proposed / applied_by_candidate / applying
+> - `entry`：proposed / applied_by_candidate / applying
 > - `first_interview`：first_scheduling / first_waiting / first_result_waiting
 > - `final_interview`：final_scheduling / final_waiting / final_result_waiting
 > - `offer`：offered / assign_waiting / contracted
@@ -183,7 +190,7 @@
 | user_id | int | 任意 | 担当営業フィルタ | 未指定時は全員表示（WF_10の完了済みタブ仕様） |
 | ended_from | date | 任意 | 日付範囲フィルタ（開始） | `pipelines.ended_at` で絞り込む |
 | ended_to | date | 任意 | 日付範囲フィルタ（終了） | `pipelines.ended_at` で絞り込む |
-| sort | string | 任意 | ソート項目 | デフォルト：ended_at。有効値：ended_at / match_score |
+| sort | string | 任意 | ソート項目 | デフォルト：ended_at。有効値：ended_at（スコアは完了タブで非表示のためソート対象外） |
 | order | string | 任意 | 並び順 | asc / desc（デフォルト：desc） |
 
 > 完了済みタブは進行中タブと異なり担当フィルタの初期値が「全員」（WF_10注記より）
@@ -253,6 +260,12 @@
 > WF_10のドロワーは画面遷移ではなくオーバーレイ表示だが、Inertia.js では `GET /pipelines/{id}` を呼び出してPropsを取得する。  
 > 一覧PropsにTEXTカラム（`ai_score_reason` 等）を含めるとパフォーマンス劣化のリスクがあるため、ドロワー開封時に別途GETして取得する方針を推奨する（TBD#3）。  
 
+> **【2026-07-02 実装方針確定】ドロワーは Index ページの部分リロードとして実装する。**
+> **背景：** Inertia.js は「1 URL ＝ 1 ページ」を基本とし、URL 遷移を伴わないオーバーレイ（重ね表示）の状態を素直に保持する仕組みを持たない。そのため本節が定義する「`{ pipeline, statuses }` を単独で返す」形をそのまま実装すると、ドロワー（カンバンの上に重ねる表示）ではなく詳細ページへの全画面遷移になってしまう。
+> **理由・実装解釈：** `GET /pipelines/{id}` は詳細のみを単独で返すのではなく、進行中カンバン画面（`Pipelines/Index`）の Props に `selectedPipeline`（本節の `pipeline` 相当）と `statusOptions`（本節の `statuses` 相当）を**追加して**返す。フロントは `selectedPipeline` が非 null のときドロワーを開く。カード選択時は Inertia の部分リロード `only: ['selectedPipeline', 'statusOptions']` を用い、カンバン本体を再送信せず詳細だけを取得することで、本節が推奨する「一覧を軽量に保ちドロワー開封時にTEXTを取得する」方針も満たす。
+> **本節との差分：** 返却 Props の**トップレベル形状**が異なる（単独の `{ pipeline, statuses }` ではなく Index Props に内包）。中身の項目定義（下記 `pipeline` / `statuses`）は変更しない。新規エンドポイントの追加も行わない。
+> **代替案（不採用）：** axios で詳細専用のJSONを取得する案も検討したが、Inertia とは別系統の通信・返却口を増やすことになり、フレームワークの一貫性を損なうため採用しなかった。
+
 ```jsonc
 {
   "pipeline": {
@@ -289,7 +302,7 @@
     {
       "value": "string",
       "label": "string",
-      "group": "string",      // applying_before / first_interview / final_interview / offer / completed
+      "group": "string",      // entry / first_interview / final_interview / offer / completed
       "is_terminal": "bool"   // true = 終了ステータス（不可逆）
     }
   ]
@@ -377,9 +390,9 @@
 
 ## 3. 未確定事項（TBD）
 
-| # | 項目 | QA# | 理由 |
-|---|------|-----|------|
-| 1 | 各ステータスの業務定義 | QA #62 | 未着手。確定後にステータス一覧表に追記する |
-| 2 | `client_comment` / `ng_reason` の文字数上限 | - | DBがTEXT型のためDB上限なし。バリデーション上の制限値を設けるか確認が必要 |
-| 3 | ドロワーの実装方式（GET /pipelines/{id} の要否） | - | Inertia.js でドロワーを実装する場合、別途GETエンドポイントが必要かフロント側で一覧データを使い回すかは実装判断に委ねる。一覧PropsにTEXTカラム（ai_score_reason等）を含めるとパフォーマンス劣化のリスクがあるため、別途GETを推奨する |
-| 4 | 完了済みタブの件数上限・ページネーション要否 | - | WF_10に件数表示「14件」があるが、ページネーションの記載なし。件数が増加した場合の対応を確認すること |
+| # | 項目 | QA# | 状態 | 理由・決定内容 |
+|---|------|-----|------|------|
+| 1 | 各ステータスの業務定義 | QA #62 | 未確定 | 未着手。確定後にステータス一覧表に追記する。実装では表示名のみ扱い、業務定義ツールチップは未実装 |
+| 2 | `client_comment` / `ng_reason` の文字数上限 | - | **確定（2026-07-02）** | DBはTEXT型のままとするが、バリデーション上限を **1000文字**に設定する。**背景：** DB上限がないと過大な入力を無制限に許容してしまう。**理由：** 顧客コメント・NG理由は補足メモ用途であり、実運用で1000文字を超える入力は想定しにくい。過大送信による負荷・表示崩れを防ぐため上限を設けた |
+| 3 | ドロワーの実装方式（GET /pipelines/{id} の要否） | - | **確定（2026-07-02）** | `GET /pipelines/{id}` を維持しつつ、Index ページの部分リロード（`only: ['selectedPipeline','statusOptions']`）として実装する（本節冒頭の実装方針を参照）。**背景：** Inertia.js は URL 遷移なしのオーバーレイ状態を素直に扱えない。**理由：** エンドポイントを増やさずドロワー表示と一覧の軽量化を両立できるため。 |
+| 4 | 完了済みタブの件数上限・ページネーション要否 | - | **確定（2026-07-02）** | `paginate()` を採用し、**1ページ50件**とする。**背景：** WF_10には件数表示のみでページネーションの記載がなかったが、完了済みは時間経過で増え続ける。**理由：** 無制限取得はクエリ・描画負荷を招くため、既存の人材一覧（`/engineers`）と同様にページネーションで制御する |

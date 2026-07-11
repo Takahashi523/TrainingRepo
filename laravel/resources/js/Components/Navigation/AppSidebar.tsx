@@ -63,8 +63,8 @@ const navSections: NavSection[] = [
         items: [
             {
                 label: 'パイプライン',
-                href: '/pipeline',
-                match: '/pipeline',
+                href: '/pipelines',
+                match: '/pipelines',
                 icon: <BarChart2 className="h-4 w-4" />,
             },
         ],
