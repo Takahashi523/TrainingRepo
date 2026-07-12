@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.routers import matching, profile
+from app.routers import health, matching, profile
 from app.services.bedrock_service import BedrockError
 from app.services.matching_service import EngineerNotFoundError, NoActiveCandidateError
 
@@ -16,6 +16,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.include_router(health.router)
 app.include_router(matching.router)
 app.include_router(profile.router)
 
