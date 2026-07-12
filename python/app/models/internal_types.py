@@ -34,8 +34,6 @@ class EngineerData:
     work_style_hybrid: int
     work_style_remote: int
     skills: List[EngineerSkill]
-    appeal_point: Optional[str] = None  # E2新方針用
-    raw_skills: Optional[str] = None    # E2新方針用
 
 @dataclass
 class ProjectData:
