@@ -254,7 +254,10 @@ def _get_commute_time_minutes(
 # E1 マッチング計算フロー（Step 3.0〜3.12）
 # ---------------------------------------------------------------------------
 
-_MAX_MATCHES = 5  # QA#33・QA#50 確定値
+_MAX_AI_BATCH_SIZE = 30  # スコアリングロジック設計書 v0.6 §3.4 Step 3.6 確定値：
+                          # 30件以下はそのまま全件AI評価、30件超はカスケードソートで上位30件に絞込。
+                          # AIは候補1件ごとに個別呼び出しするため、1プロンプトへの一括投入トークン上限の制約は受けない。
+_MAX_RESPONSE_MATCHES = 5  # QA#33・QA#50 確定値：AI評価後、レスポンスとして返却するのは常に上位5件固定
 
 
 def calculate_matching(
@@ -286,9 +289,9 @@ def calculate_matching(
     if not candidates:
         raise NoActiveCandidateError(engineer_id)
 
-    # 【仕様修正】Step 3.6: 候補 >5 件ならカスケードソートで上位 5 件に厳選絞込（Claudeの最大トークン制限・コスト最適化のため）
-    if len(candidates) > _MAX_MATCHES:
-        candidates = _cascade_sort(candidates, engineer)[:_MAX_MATCHES]
+    # Step 3.6: 候補 > 30 件ならカスケードソートで上位30件に絞込（AI評価対象の絞込。§3.4 Step 3.6 準拠）
+    if len(candidates) > _MAX_AI_BATCH_SIZE:
+        candidates = _cascade_sort(candidates, engineer)[:_MAX_AI_BATCH_SIZE]
 
     # Step 3.7〜3.10: 案件ごとに通勤時間取得 → Bedrock AI 総合判定 → クランプ・ランク検算
     results: list[MatchCandidate] = []
@@ -343,7 +346,7 @@ def calculate_matching(
     return MatchingOutput(
         engineer_id=engineer_id,
         generated_at=datetime.now(timezone.utc),
-        matches=results[:_MAX_MATCHES],
+        matches=results[:_MAX_RESPONSE_MATCHES],
     )
 
 
@@ -352,38 +355,38 @@ def calculate_matching(
 # ---------------------------------------------------------------------------
 
 def generate_profile_summary(
-    db: Session, 
-    engineer_id: int, 
-    appeal_point: str, 
-    raw_skills: str
+    db: Session,
+    engineer_id: int,
 ) -> tuple[str, datetime]:
-    """E2 プロフィール紹介文生成のメインフロー。
-    最新のAI活用方針に準拠し、古い職務経歴書（appeal_note）を廃止。
-    画面から入力されたアピールポイントとフリーテキストスキルをベースに肉付け文章を生成する。
+    """E2 人材プロフィール要約のメインフロー（スコアリングロジック設計書 v0.6 §4.3 準拠）。
+    engineers.appeal_note を入力源として、AIが強み・特徴を要約したテキストを生成する。
     """
 
-    # Step 8.1: エンジニア情報の存在チェック（存在しない場合は例外）
+    # Step 8.1: エンジニア情報の存在チェック（存在しない場合は例外）。appeal_note もここで取得する。
     engineer = fetch_engineer(db, engineer_id)
+    appeal_note = engineer.appeal_note or ""
 
     generated_at = datetime.now(timezone.utc)
 
     # 【AWSアカウントがない現在の防衛策：MOCK_MODE=True】
     if settings.MOCK_MODE:
-        logger.info("Running in MOCK_MODE: Generating stub summary based on new AI policy.")
-        
-        # 入力テキストを活用しつつ、表記ゆれをAI側で綺麗に吸収した風のアピール文章を生成
-        ai_summary = (
-            f"【AI生成プロフィール】\n"
-            f"ご提示いただいたアピール内容（{appeal_point[:15]}...）および、"
-            f"入力されたスキル要素（{raw_skills}）をインテリジェンスに統合・肉付けしました。\n\n"
-            f"5年以上の豊富なインフラ設計構築経験（VMware, Windows Server）を軸に、"
-            f"現在はPython/FastAPIを用いたバックエンドAPI開発スキルを意欲的に習得中のハイブリッドエンジニアです。"
-            f"手元環境(Docker)での先回りのリスクヘッジや、仕様変更を柔軟に取り込む高度な自走力を有しており、即戦力として推薦いたします。"
-        )
+        logger.info("Running in MOCK_MODE: Generating stub summary based on appeal_note.")
+
+        if appeal_note.strip():
+            ai_summary = (
+                f"【AI生成プロフィール】\n"
+                f"ご提示いただいたアピール内容（{appeal_note[:15]}...）をもとに要約しました。\n\n"
+                f"5年以上の豊富なインフラ設計構築経験（VMware, Windows Server）を軸に、"
+                f"現在はPython/FastAPIを用いたバックエンドAPI開発スキルを意欲的に習得中のハイブリッドエンジニアです。"
+                f"手元環境(Docker)での先回りのリスクヘッジや、仕様変更を柔軟に取り込む高度な自走力を有しており、即戦力として推薦いたします。"
+            )
+        else:
+            # appeal_note が空の場合は空文字を返す（AIプロンプト設計書 v0.3 §4.6：空出力時は ai_summary を更新しない）
+            ai_summary = ""
     else:
         # 【MOCK_MODE=False : AWSアカウント到着後の本番ルート】
-        # 新仕様の引数（アピールポイントとフリースキル）をBedrockのプロンプト関数に渡す
-        ai_summary = invoke_profile_summary(appeal_point, raw_skills)
+        # engineers.appeal_note（H1）のみを入力としてBedrockのプロンプト関数に渡す
+        ai_summary = invoke_profile_summary(appeal_note)
 
     # Step 8.3: 生成結果がある場合のみ DB を更新（明示的なカラム指定でSELECT *を防止）
     if ai_summary:
