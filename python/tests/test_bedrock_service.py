@@ -157,7 +157,8 @@ class TestInvokeMatching:
     def test_returns_matching_ai_result_on_success(self, mocker):
         mock_client = MagicMock()
         mocker.patch.object(svc, "_get_client", return_value=mock_client)
-        mock_client.invoke_model.return_value = _bedrock_response(_valid_ai_response(78))
+        ai_response = _valid_ai_response(78)
+        mock_client.invoke_model.return_value = _bedrock_response(ai_response)
 
         engineer = _make_engineer()
         project = _make_project()
@@ -167,6 +168,28 @@ class TestInvokeMatching:
         assert result.match_score == 78
         assert result.match_rank == "B"  # アプリ層で検算
         assert len(result.ai_score_reason) > 0
+        # 推薦理由自動生成機能（ai_comment）・不足条件説明機能（ai_missing）が
+        # Bedrock のレスポンスから正しく抽出され、途中で欠落・混同していないことを検証する
+        assert result.ai_comment == ai_response["ai_comment"]
+        assert result.ai_missing == ai_response["ai_missing"]
+        # ai_score_reason・ai_comment・ai_missing が互いに取り違えられていないことも確認
+        assert result.ai_comment != result.ai_missing
+        assert result.ai_score_reason != result.ai_comment
+
+    def test_uses_bedrock_parameters_per_prompt_design_doc(self, mocker):
+        """Bedrock呼び出しパラメータ（max_tokens=800 / temperature=0.3 / top_p=0.9）が
+        AIプロンプト設計書 v0.3 §3.1 の仕様通りに送信されること。
+        """
+        mock_client = MagicMock()
+        mocker.patch.object(svc, "_get_client", return_value=mock_client)
+        mock_client.invoke_model.return_value = _bedrock_response(_valid_ai_response(78))
+
+        invoke_matching(_make_engineer(), _make_project(), commute_time_minutes=30)
+
+        sent_body = json.loads(mock_client.invoke_model.call_args.kwargs["body"])
+        assert sent_body["max_tokens"] == 800
+        assert sent_body["temperature"] == 0.3
+        assert sent_body["top_p"] == 0.9
 
     def test_clamps_negative_score_to_zero(self, mocker):
         """必須スキル全不足ペナルティで負値になった場合でも 0 にクランプされること。"""
@@ -344,9 +367,54 @@ class TestBuildPrompts:
         assert "希望なし" in prompt
 
     def test_summary_prompt_contains_appeal_note(self):
+        """E2 はスコアリングロジック設計書 v0.6 §4.3 準拠で、
+        engineers.appeal_note（H1）のみを単一の入力とする。
+        """
         appeal_note = "テスト用アピールポイント"
         prompt = _build_summary_user_prompt(appeal_note)
         assert appeal_note in prompt
+
+    def test_matching_prompt_contains_scoring_guide(self):
+        """【判定観点と配点目安】が8観点すべてプロンプトに埋め込まれていること
+        （AIプロンプト設計書 v0.3 §3.3 準拠。以前は欠落していた重要項目）。
+        """
+        prompt = _build_matching_user_prompt(_make_engineer(), _make_project(), commute_time_minutes=30)
+
+        assert "【判定観点と配点目安】" in prompt
+        assert "必須スキル充足度(最大30点)" in prompt
+        assert "工程経験適合度(最大20点)" in prompt
+        assert "尚可スキル適合度(最大10点)" in prompt
+        assert "勤務形態適合度(最大10点)" in prompt
+        assert "勤務地/通勤適合度(最大10点)" in prompt
+        assert "単価適合度(最大10点)" in prompt
+        assert "稼働開始時期適合度(最大5点)" in prompt
+        assert "顧客折衝/人物要件適合度(最大5点)" in prompt
+        # -30点ペナルティと合計値一致の厳守事項も含まれること
+        assert "-30点" in prompt
+        assert "match_score は上記「合計" in prompt
+
+    def test_matching_prompt_contains_correct_char_count_ranges(self):
+        """出力フォーマットの文字数指定が設計書通り（ai_comment 150-250字・ai_missing 50-150字）であること。"""
+        prompt = _build_matching_user_prompt(_make_engineer(), _make_project(), commute_time_minutes=30)
+
+        assert "200字以上300字以下" in prompt   # ai_score_reason
+        assert "150字以上250字以下" in prompt   # ai_comment
+        assert "50字以上150字以下" in prompt    # ai_missing
+
+
+class TestInvokeProfileSummaryParameters:
+    def test_uses_max_tokens_600_per_design_doc(self, mocker):
+        """E2のmax_tokensがAIプロンプト設計書 v0.3 §4.2の仕様通り600であること。"""
+        mock_client = MagicMock()
+        mocker.patch.object(svc, "_get_client", return_value=mock_client)
+        mock_client.invoke_model.return_value = _bedrock_response("要約テキスト")
+
+        invoke_profile_summary("アピールポイントのテキスト")
+
+        sent_body = json.loads(mock_client.invoke_model.call_args.kwargs["body"])
+        assert sent_body["max_tokens"] == 600
+        assert sent_body["temperature"] == 0.3
+        assert sent_body["top_p"] == 0.9
 
     def test_matching_prompt_shows_false_negotiation(self):
         """negotiation_required=0 のとき '不問' が出力されること（_tinyint_label value=0 ブランチ）。"""
