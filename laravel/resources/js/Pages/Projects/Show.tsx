@@ -137,12 +137,12 @@ export default function Show({ project }: Props) {
 
     const rateLabel = (() => {
         if (project.rate_min != null && project.rate_max != null) {
-            return `${project.rate_min}〜${project.rate_max}万円`;
+            return `${project.rate_min}万円　〜　${project.rate_max}万円`;
         }
-        if (project.rate_min != null || project.rate_max != null) {
-            return `${project.rate_min ?? project.rate_max}万円〜`;
+        if (project.rate_note) {
+            return project.rate_note;
         }
-        return project.rate_note || "—";
+        return "非公開";
     })();
 
     const workLocationLabel =
@@ -164,16 +164,10 @@ export default function Show({ project }: Props) {
                         案件詳細
                     </h1>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                        登録された案件情報の確認
+                        案件の登録情報を確認します
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        onClick={() => router.get("/projects")}
-                    >
-                        一覧に戻る
-                    </Button>
                     <Button
                         onClick={() =>
                             router.get(`/projects/${project.id}/edit`)

@@ -2,21 +2,13 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ProjectResource extends JsonResource
 {
     public static $wrap = null;
-
-    private const PHASES = [
-        ['key' => 'proc_requirements',  'name' => '要件定義'],
-        ['key' => 'proc_basic_design',  'name' => '基本設計'],
-        ['key' => 'proc_detail_design', 'name' => '詳細設計'],
-        ['key' => 'proc_development',   'name' => '開発'],
-        ['key' => 'proc_testing',       'name' => 'テスト'],
-        ['key' => 'proc_maintenance',   'name' => '保守・運用'],
-    ];
 
     public function toArray(Request $request): array
     {
@@ -73,7 +65,7 @@ class ProjectResource extends JsonResource
                 'key' => $phase['key'],
                 'name' => $phase['name'],
                 'is_target' => (bool) $this->{$phase['key']},
-            ], self::PHASES),
+            ], Project::PHASES),
 
             'updated_at' => $this->updated_at,
         ];

@@ -67,8 +67,11 @@
                                                // ※ 過去日付の扱いはTBD
         "rate_min": "int",                     // 単価下限（万円）
         "rate_max": "int",                     // 単価上限（万円）
-                                               // rate_min / rate_max が両方 null の場合 → フロントで「非公開」と表示する
         "rate_note": "string",                 // 単価備考（"スキル見合い"等）
+                                               // 単価表示ロジック（一覧・詳細共通）：
+                                               //   1. rate_min/rate_max があればその範囲を表示
+                                               //   2. 無くても rate_note があればそれを表示（"スキル見合い"等）
+                                               //   3. どちらも無ければ「非公開」と表示する
         "work_style": "string",                // onsite | hybrid | remote
         "interview_count": "int",              // 面談回数
         "users": {
@@ -217,6 +220,7 @@
     "rate_min": "int",                         // 単価下限（万円）
     "rate_max": "int",                         // 単価上限（万円）
     "rate_note": "string",                     // 単価備考（"スキル見合い"等）
+                                               // 単価表示ロジックは一覧Propsと同じ（③参照）
     "work_style": "string",                    // onsite | hybrid | remote
     "work_location_line": "string",            // 勤務地（路線）。フリーテキスト
     "work_location_station": "string",         // 勤務地（最寄駅）。フリーテキスト
@@ -280,6 +284,7 @@
 > **PATCHについて**：部分更新（PATCH）は使用しない。ステータスのみ変更する場合も PUT で全フィールドを送信すること。  
 > **bool値の変換**：`proc_requirements` 〜 `proc_maintenance` / `negotiation_required` の bool 値はEloquentモデルに `boolean` キャストを定義し、DB側の `TINYINT(1)`（1:true / 0:false）へ変換すること。
 > **単価の扱い**：`rate_is_negotiable`（スキル見合いフラグ）が `true` の場合は `rate_min` / `rate_max` を null として扱い、`rate_note` に "スキル見合い" 等のテキストを保存する（QA #14確定）。  
+> **単価の表示ルール（一覧・詳細共通）**：① rate_min/rate_max があれば範囲表示、② 無くても rate_note があればそれを表示、③ どちらも無ければ「非公開」と表示する。rate_min/rate_maxは片方のみの登録ができないため、③は「未入力」または「rate_is_negotiableかつrate_note未入力」の場合のみ発生する。  
 > **勤務地の扱い**：`work_style` が `remote`（フルリモート）の場合は `work_location_line` / `work_location_station` を null として扱う。フロント側で `work_style` 変更時に勤務地フィールドをクリアすること（WF_07確定）。  
 > **スキルの更新処理**：PUT時に `required_skills[]` / `preferred_skills[]` を送信した場合、既存レコードを全件削除後に再挿入する（人材スキルと同方針）。空配列または省略の場合は全件削除として扱う。  
 
