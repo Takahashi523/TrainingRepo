@@ -9,6 +9,9 @@ class HealthResponse(BaseModel):
 
 
 # --- E1: マッチング計算 ---
+# スコアリングロジック設計書 v0.6 §4.2 準拠。
+# limit / rank_filter / total_hits は v0.6 改訂履歴（B-05・B-06・B-07）にて
+# 「フロント側で未使用、QA#33/50で5件固定済」のため削除された経緯があるため、持たない。
 
 class MatchingRequest(BaseModel):
     engineer_id: int
@@ -27,28 +30,20 @@ class MatchResult(BaseModel):
 class MatchingResponse(BaseModel):
     engineer_id: int
     generated_at: str       # ISO8601
-    matches: list[MatchResult]
+    matches: list[MatchResult]  # スコア降順、常に最大5件（QA#33・QA#50）
 
 
-# --- E2: プロフィール要約（最新のAI活用方針に準拠） ---
+# --- E2: プロフィール要約 ---
+# スコアリングロジック設計書 v0.6 §4.3 準拠。
+# 入力は engineer_id のみ。engineers.appeal_note を Python 側が DB から取得して AI に渡す。
 
 class ProfileSummaryRequest(BaseModel):
-    engineer_id: int = Field(..., description="エンジニアID")
-    appeal_point: str = Field(
-        ..., 
-        description="文字数制限なしのアピールポイント（職務経歴書廃止に伴う代替テキスト入力）",
-        example="インフラエンジニアとしてVMwareやWindows Serverの設計構築を5年経験。最近はPythonでのAPI開発を学習中です。"
-    )
-    raw_skills: str = Field(
-        ..., 
-        description="フリーテキスト入力されたスキル（AI側で表記ゆれを吸収する前提）",
-        example="Java, AWS, くらうど, どっかー, FastAPI"
-    )
+    engineer_id: int = Field(..., description="対象人材ID（appeal_note を取得して入力に使用）")
 
 
 class ProfileSummaryResponse(BaseModel):
     engineer_id: int
-    ai_summary: str = Field(..., description="アピールポイントとスキルからAIが肉付け生成したプロフィール紹介文")
+    ai_summary: str = Field(..., description="AIが生成したプロフィール要約（人材詳細画面で表示）")
     ai_summary_generated_at: str    # ISO8601
 
 
