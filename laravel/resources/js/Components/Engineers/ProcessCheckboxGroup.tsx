@@ -22,6 +22,8 @@ export default function ProcessCheckboxGroup({ phases, values, onChange, readOnl
                     <Checkbox
                         id={`phase-${phase.key}`}
                         checked={!!values[phase.key]}
+                        // readOnly（一覧・詳細の表示専用）ではキーボードの Tab 順から外す
+                        tabIndex={readOnly ? -1 : undefined}
                         onCheckedChange={
                             !readOnly && onChange
                                 ? (checked) => onChange(phase.key, !!checked)

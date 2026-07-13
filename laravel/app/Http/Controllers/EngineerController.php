@@ -101,8 +101,11 @@ class EngineerController extends Controller
         }
 
         if ($keyword !== '') {
-            $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $keyword).'%';
-            $prefix = str_replace(['%', '_'], ['\%', '\_'], $keyword).'%';
+            // LIKE のメタ文字をエスケープ。バックスラッシュを最初に処理する
+            // （後にすると %/_ 用に付与した \ まで二重エスケープされるため順序が重要）。
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $keyword);
+            $like = '%'.$escaped.'%';       // 氏名：部分一致
+            $prefix = $escaped.'%';         // スキル：前方一致
             $query->where(function ($q) use ($like, $prefix) {
                 $q->where('name', 'like', $like)
                     ->orWhereHas('skills', fn ($s) => $s->where('label', 'like', $prefix));

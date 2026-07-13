@@ -1344,6 +1344,31 @@ class EngineerControllerTest extends TestCase
         );
     }
 
+    public function test_index_escapes_backslash_in_keyword(): void
+    {
+        // LIKE のバックスラッシュエスケープは DB の「LIKE 既定エスケープ文字」に依存する。
+        // 本番の MySQL は既定エスケープが '\' のため、パターン中の '\\' は \ リテラルにマッチする。
+        // 一方テスト用の SQLite は ESCAPE 句なしでは '\' をエスケープ扱いしない（'\\' は \ 2 個の
+        // リテラル）ため、この検証は本番と同じ MySQL 接続でのみ意味を持つ。SQLite ではスキップする。
+        if (\DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('LIKE のバックスラッシュエスケープ検証は MySQL でのみ有効（SQLite は LIKE の既定エスケープを持たない）。');
+        }
+
+        $user = User::factory()->create();
+        // A：バックスラッシュを含む氏名（リテラルで一致させたい対象）
+        Engineer::factory()->create(['main_user_id' => $user->id, 'name' => 'a\\b']);
+        // B（対照）：バックスラッシュを含まない 'ab'。未エスケープだと \b が消えて '%ab%' 扱いになり誤ヒットする。
+        Engineer::factory()->create(['main_user_id' => $user->id, 'name' => 'ab']);
+
+        $response = $this->actingAs($user)->get('/engineers?keyword='.urlencode('a\\b'));
+
+        // バックスラッシュがリテラルとして扱われ、'a\b' のみヒット（'ab' は非ヒット）
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 1)
+            ->where('engineers.data.0.name', 'a\\b')
+        );
+    }
+
     public function test_index_does_not_search_keyword_by_appeal_note(): void
     {
         $user = User::factory()->create();
