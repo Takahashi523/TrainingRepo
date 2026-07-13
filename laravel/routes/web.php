@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\EngineerController;
+use App\Http\Controllers\ProjectController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -14,6 +15,7 @@ Route::get('/dashboard', function () {
 
 Route::middleware('auth')->group(function () {
     Route::resource('engineers', EngineerController::class)->only(['create', 'store', 'show', 'edit', 'update', 'destroy']);
+    Route::resource('projects', ProjectController::class);
 });
 
 require __DIR__.'/auth.php';
