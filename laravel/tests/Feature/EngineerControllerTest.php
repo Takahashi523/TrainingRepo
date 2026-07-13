@@ -1199,6 +1199,24 @@ class EngineerControllerTest extends TestCase
         );
     }
 
+    public function test_index_filters_status_with_or_logic(): void
+    {
+        $user = User::factory()->create();
+        Engineer::factory()->create(['main_user_id' => $user->id, 'status' => 'proposable']);
+        Engineer::factory()->create(['main_user_id' => $user->id, 'status' => 'interviewing']);
+        Engineer::factory()->create(['main_user_id' => $user->id, 'status' => 'not_proposable']);
+
+        $response = $this->actingAs($user)
+            ->get('/engineers?status[]=proposable&status[]=interviewing');
+
+        // proposable OR interviewing の 2 件のみヒット（not_proposable は除外）
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 2)
+            ->where('engineers.data', fn ($data) => collect($data)
+                ->pluck('status')->sort()->values()->all() === ['interviewing', 'proposable'])
+        );
+    }
+
     public function test_index_filters_work_styles_with_or_logic(): void
     {
         $user = User::factory()->create();
@@ -1282,6 +1300,47 @@ class EngineerControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->count('engineers.data', 1)
             ->where('engineers.data.0.name', 'Aさん')
+        );
+    }
+
+    public function test_index_does_not_search_skill_by_partial_match(): void
+    {
+        $user = User::factory()->create();
+        // 氏名は 'Native' を含まない。スキルは前方一致のみのため 'ReactNative' は 'Native' で非ヒットになるべき。
+        $e = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => 'Cさん']);
+        $e->skills()->create(['label' => 'ReactNative', 'detail' => null]);
+
+        $response = $this->actingAs($user)->get('/engineers?keyword=Native');
+
+        // スキルは LIKE 'Native%'（前方一致）。実装が部分一致 '%Native%' に退行すると ReactNative がヒットして落ちる。
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 0)
+        );
+    }
+
+    public function test_index_searches_keyword_by_name_or_skill(): void
+    {
+        $user = User::factory()->create();
+
+        // A：氏名で部分一致（%Ruby%）／スキルは無関係
+        $a = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => 'RubyDev']);
+        $a->skills()->create(['label' => 'COBOL', 'detail' => null]);
+
+        // B：氏名は非ヒット／スキルで前方一致（Ruby%）
+        $b = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => 'Sato']);
+        $b->skills()->create(['label' => 'Ruby', 'detail' => null]);
+
+        // C（対照）：氏名・スキルとも非ヒット
+        $c = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => 'Tanaka']);
+        $c->skills()->create(['label' => 'Java', 'detail' => null]);
+
+        $response = $this->actingAs($user)->get('/engineers?keyword=Ruby');
+
+        // 氏名一致(A) と スキル一致(B) の OR が同一クエリで両立し、両方ヒット・C は除外
+        $response->assertInertia(fn ($page) => $page
+            ->count('engineers.data', 2)
+            ->where('engineers.data', fn ($data) => collect($data)
+                ->pluck('name')->sort()->values()->all() === ['RubyDev', 'Sato'])
         );
     }
 
