@@ -44,6 +44,21 @@ class ProjectControllerTest extends TestCase
         ];
     }
 
+    /**
+     * show/index/destroy 系のテスト用に Project を直接作成する
+     * （ProjectFactory が存在しないため最小限の属性で作成）
+     */
+    private function createProject(array $overrides = []): Project
+    {
+        $mainUser = $overrides['main_user_id'] ?? User::factory()->create()->id;
+
+        return Project::create(array_merge([
+            'name'         => 'テスト案件',
+            'status'       => 'open',
+            'main_user_id' => $mainUser,
+        ], $overrides));
+    }
+
     // -------------------------------------------------------
     // create: GET /projects/create
     // -------------------------------------------------------
@@ -655,5 +670,251 @@ class ProjectControllerTest extends TestCase
         $response = $this->actingAs($user)->post('/projects', $payload);
 
         $response->assertSessionHasErrors('work_style');
+    }
+
+    // -------------------------------------------------------
+    // index: GET /projects
+    // -------------------------------------------------------
+
+    public function test_guest_is_redirected_to_login_from_index_page(): void
+    {
+        $response = $this->get('/projects');
+
+        $response->assertRedirect('/login');
+    }
+
+    public function test_authenticated_user_can_view_index_page(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['name' => 'A案件', 'main_user_id' => $user->id]);
+        $this->createProject(['name' => 'B案件', 'main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get('/projects');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Projects/Index')
+            ->has('projects', 2)
+        );
+    }
+
+    public function test_index_projects_are_ordered_by_id_desc(): void
+    {
+        $user   = User::factory()->create();
+        $first  = $this->createProject(['name' => '先に作成', 'main_user_id' => $user->id]);
+        $second = $this->createProject(['name' => '後に作成', 'main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get('/projects');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.0.id', $second->id)
+            ->where('projects.1.id', $first->id)
+        );
+    }
+
+    // -------------------------------------------------------
+    // show: GET /projects/{project}
+    // -------------------------------------------------------
+
+    public function test_guest_is_redirected_to_login_from_show_page(): void
+    {
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+
+        $response = $this->get("/projects/{$project->id}");
+
+        $response->assertRedirect('/login');
+    }
+
+    public function test_authenticated_user_can_view_show_page(): void
+    {
+        $user    = User::factory()->create();
+        $project = $this->createProject(['name' => 'テスト案件', 'main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get("/projects/{$project->id}");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Projects/Show')
+            ->where('project.id', $project->id)
+            ->where('project.name', 'テスト案件')
+        );
+    }
+
+    public function test_show_returns_404_for_non_existent_project(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/projects/99999');
+
+        $response->assertNotFound();
+    }
+
+    public function test_show_page_contains_main_user_information(): void
+    {
+        $mainUser = User::factory()->create(['name' => '担当太郎']);
+        $project  = $this->createProject(['main_user_id' => $mainUser->id]);
+
+        $response = $this->actingAs($mainUser)->get("/projects/{$project->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('project.users.main.id', $mainUser->id)
+            ->where('project.users.main.name', '担当太郎')
+        );
+    }
+
+    public function test_show_page_sub_user_is_null_when_not_set(): void
+    {
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id, 'sub_user_id' => null]);
+
+        $response = $this->actingAs($user)->get("/projects/{$project->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('project.users.sub', null)
+        );
+    }
+
+    public function test_show_page_contains_sub_user_information_when_set(): void
+    {
+        $mainUser = User::factory()->create();
+        $subUser  = User::factory()->create(['name' => '副担当花子']);
+        $project  = $this->createProject(['main_user_id' => $mainUser->id, 'sub_user_id' => $subUser->id]);
+
+        $response = $this->actingAs($mainUser)->get("/projects/{$project->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('project.users.sub.id', $subUser->id)
+            ->where('project.users.sub.name', '副担当花子')
+        );
+    }
+
+    public function test_show_page_separates_required_and_preferred_skills(): void
+    {
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+        $project->projectSkills()->createMany([
+            ['skill_type' => 'required',  'label' => 'PHP',    'detail' => 'Laravel 5年以上'],
+            ['skill_type' => 'preferred', 'label' => 'Docker', 'detail' => null],
+        ]);
+
+        $response = $this->actingAs($user)->get("/projects/{$project->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->has('project.required_skills', 1)
+            ->where('project.required_skills.0.label', 'PHP')
+            ->where('project.required_skills.0.detail', 'Laravel 5年以上')
+            ->has('project.preferred_skills', 1)
+            ->where('project.preferred_skills.0.label', 'Docker')
+        );
+    }
+
+    public function test_show_page_skills_are_empty_arrays_when_none_registered(): void
+    {
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get("/projects/{$project->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->has('project.required_skills', 0)
+            ->has('project.preferred_skills', 0)
+        );
+    }
+
+    public function test_show_page_phases_reflect_proc_boolean_columns(): void
+    {
+        $user    = User::factory()->create();
+        $project = $this->createProject([
+            'main_user_id'       => $user->id,
+            'proc_requirements'  => true,
+            'proc_basic_design'  => false,
+            'proc_detail_design' => false,
+            'proc_development'   => true,
+            'proc_testing'       => false,
+            'proc_maintenance'   => false,
+        ]);
+
+        $response = $this->actingAs($user)->get("/projects/{$project->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->has('project.phases', 6)
+            ->where('project.phases.0.key', 'proc_requirements')
+            ->where('project.phases.0.is_target', true)
+            ->where('project.phases.3.key', 'proc_development')
+            ->where('project.phases.3.is_target', true)
+            ->where('project.phases.1.is_target', false)
+        );
+    }
+
+    // -------------------------------------------------------
+    // destroy: DELETE /projects/{project}
+    // -------------------------------------------------------
+
+    public function test_guest_cannot_delete_project(): void
+    {
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+
+        $response = $this->delete("/projects/{$project->id}");
+
+        $response->assertRedirect('/login');
+        $this->assertDatabaseHas('projects', ['id' => $project->id]);
+    }
+
+    public function test_admin_can_delete_project(): void
+    {
+        $admin   = User::factory()->create(['role' => 'admin']);
+        $project = $this->createProject(['main_user_id' => $admin->id]);
+
+        $response = $this->actingAs($admin)->delete("/projects/{$project->id}");
+
+        $response->assertRedirect('/projects');
+        $this->assertDatabaseMissing('projects', ['id' => $project->id]);
+    }
+
+    public function test_destroy_sets_success_flash_message(): void
+    {
+        $admin   = User::factory()->create(['role' => 'admin']);
+        $project = $this->createProject(['main_user_id' => $admin->id]);
+
+        $response = $this->actingAs($admin)->delete("/projects/{$project->id}");
+
+        $response->assertSessionHas('success', '案件情報を削除しました。');
+    }
+
+    public function test_general_user_cannot_delete_project(): void
+    {
+        $user    = User::factory()->create(['role' => 'general']);
+        $project = $this->createProject(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->delete("/projects/{$project->id}");
+
+        $response->assertForbidden();
+        $this->assertDatabaseHas('projects', ['id' => $project->id]);
+    }
+
+    public function test_destroy_returns_404_for_non_existent_project(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $response = $this->actingAs($admin)->delete('/projects/99999');
+
+        $response->assertNotFound();
+    }
+
+    public function test_deleting_project_cascades_to_project_skills(): void
+    {
+        $admin   = User::factory()->create(['role' => 'admin']);
+        $project = $this->createProject(['main_user_id' => $admin->id]);
+        $project->projectSkills()->create([
+            'skill_type' => 'required',
+            'label'      => 'PHP',
+            'detail'     => null,
+        ]);
+
+        $this->actingAs($admin)->delete("/projects/{$project->id}");
+
+        $this->assertDatabaseMissing('project_skills', ['project_id' => $project->id]);
     }
 }
