@@ -1,7 +1,7 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
-import SortSelect, { SortOption } from '@/Components/Common/SortSelect';
-import { EngineerFilters, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
+import SortSelect from '@/Components/Common/SortSelect';
+import { EngineerFilters, Phase, SortOption, StatusOption, WorkTypeOption } from '@/types/engineer';
 import { Search, X } from 'lucide-react';
 
 interface Props {
@@ -9,24 +9,19 @@ interface Props {
     statuses: StatusOption[];
     workStyles: WorkTypeOption[];
     phases: Phase[];
+    sortOptions: SortOption[];
     keywordInput: string;
     onKeywordInput: (value: string) => void;
     onFilterChange: (patch: Partial<EngineerFilters>) => void;
     onClearAll: () => void;
 }
 
-const SORT_OPTIONS: SortOption[] = [
-    { sort: 'created_at',     order: 'desc', label: '登録日順（新しい順）' },
-    { sort: 'created_at',     order: 'asc',  label: '登録日順（古い順）' },
-    { sort: 'updated_at',     order: 'desc', label: '更新日順（新しい順）' },
-    { sort: 'available_from', order: 'asc',  label: '提案可能タイミング順' },
-];
-
 export default function EngineerFilterPanel({
     filters,
     statuses,
     workStyles,
     phases,
+    sortOptions,
     keywordInput,
     onKeywordInput,
     onFilterChange,
@@ -135,7 +130,7 @@ export default function EngineerFilterPanel({
 
                 <div className="ml-auto">
                     <SortSelect
-                        options={SORT_OPTIONS}
+                        options={sortOptions}
                         currentSort={filters.sort}
                         currentOrder={filters.order}
                         onChange={(sort, order) =>

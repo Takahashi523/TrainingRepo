@@ -131,6 +131,17 @@ export interface PaginationMeta {
     to: number | null;
 }
 
+/**
+ * ソート選択肢（sort×order のペア＋表示ラベル）。
+ * バックエンド（EngineerController の SORT_OPTIONS）を SSOT として props で受け取り、
+ * UI の選択肢と許可された組み合わせを常に一致させる。
+ */
+export interface SortOption {
+    sort: string;
+    order: string;
+    label: string;
+}
+
 export type EngineerListPageProps = {
     engineers: {
         data: EngineerListItem[];
@@ -140,4 +151,9 @@ export type EngineerListPageProps = {
     statusOptions: StatusOption[];
     workStyleOptions: WorkTypeOption[];
     phaseOptions: Phase[];
+<<<<<<< HEAD
 };
+=======
+    sortOptions: SortOption[];
+};
+>>>>>>> 6161345f (fix: engineer sort ssot)

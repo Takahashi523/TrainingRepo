@@ -26,9 +26,9 @@ class EngineerControllerTest extends TestCase
         ];
         foreach ($fields as $key) {
             FormFieldSetting::create([
-                'form_type'          => 'engineer',
-                'field_key'          => $key,
-                'is_required'        => $overrides[$key] ?? false,
+                'form_type' => 'engineer',
+                'field_key' => $key,
+                'is_required' => $overrides[$key] ?? false,
                 'is_system_required' => false,
             ]);
         }
@@ -37,11 +37,11 @@ class EngineerControllerTest extends TestCase
     private function validPayload(int $mainUserId): array
     {
         return [
-            'name'         => '山田太郎',
-            'name_kana'    => 'ヤマダタロウ',
-            'status'       => 'proposable',
+            'name' => '山田太郎',
+            'name_kana' => 'ヤマダタロウ',
+            'status' => 'proposable',
             'main_user_id' => $mainUserId,
-            'sub_user_id'  => null,
+            'sub_user_id' => null,
         ];
     }
 
@@ -131,9 +131,9 @@ class EngineerControllerTest extends TestCase
         $engineer = Engineer::where('name', '山田太郎')->first();
         $response->assertRedirect("/engineers/{$engineer->id}");
         $this->assertDatabaseHas('engineers', [
-            'name'         => '山田太郎',
-            'name_kana'    => 'ヤマダタロウ',
-            'status'       => 'proposable',
+            'name' => '山田太郎',
+            'name_kana' => 'ヤマダタロウ',
+            'status' => 'proposable',
             'main_user_id' => $user->id,
         ]);
     }
@@ -201,7 +201,7 @@ class EngineerControllerTest extends TestCase
     {
         $this->seedFormFieldSettings();
         $mainUser = User::factory()->create();
-        $subUser  = User::factory()->create();
+        $subUser = User::factory()->create();
 
         $payload = array_merge($this->validPayload($mainUser->id), ['sub_user_id' => $subUser->id]);
         $this->actingAs($mainUser)->post('/engineers', $payload);
@@ -216,7 +216,7 @@ class EngineerControllerTest extends TestCase
     public function test_name_is_required(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id);
         unset($payload['name']);
 
@@ -228,7 +228,7 @@ class EngineerControllerTest extends TestCase
     public function test_name_exceeding_max_length_fails(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['name' => str_repeat('あ', 101)]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -239,7 +239,7 @@ class EngineerControllerTest extends TestCase
     public function test_name_kana_is_required(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id);
         unset($payload['name_kana']);
 
@@ -251,7 +251,7 @@ class EngineerControllerTest extends TestCase
     public function test_name_kana_must_be_katakana(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['name_kana' => 'yamada taro']);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -262,7 +262,7 @@ class EngineerControllerTest extends TestCase
     public function test_name_kana_rejects_hiragana(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['name_kana' => 'やまだたろう']);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -273,7 +273,7 @@ class EngineerControllerTest extends TestCase
     public function test_name_kana_exceeding_max_length_fails(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['name_kana' => str_repeat('ア', 101)]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -284,7 +284,7 @@ class EngineerControllerTest extends TestCase
     public function test_status_is_required(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id);
         unset($payload['status']);
 
@@ -296,7 +296,7 @@ class EngineerControllerTest extends TestCase
     public function test_status_must_be_valid_enum(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['status' => 'unknown']);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -307,7 +307,7 @@ class EngineerControllerTest extends TestCase
     public function test_main_user_id_is_required(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id);
         unset($payload['main_user_id']);
 
@@ -319,7 +319,7 @@ class EngineerControllerTest extends TestCase
     public function test_main_user_id_must_exist_in_users(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['main_user_id' => 99999]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -330,7 +330,7 @@ class EngineerControllerTest extends TestCase
     public function test_sub_user_id_must_exist_when_provided(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['sub_user_id' => 99999]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -383,10 +383,10 @@ class EngineerControllerTest extends TestCase
     public function test_proc_experience_fields_are_nullable_by_default(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'proc_requirements' => false,
-            'proc_development'  => true,
+            'proc_development' => true,
         ]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -464,7 +464,7 @@ class EngineerControllerTest extends TestCase
     public function test_skill_label_max_length_validation(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'skills' => [['label' => str_repeat('A', 16), 'detail' => null]],
         ]);
@@ -477,7 +477,7 @@ class EngineerControllerTest extends TestCase
     public function test_skill_detail_max_length_validation(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'skills' => [['label' => 'PHP', 'detail' => str_repeat('あ', 501)]],
         ]);
@@ -490,7 +490,7 @@ class EngineerControllerTest extends TestCase
     public function test_birth_date_in_future_fails(): void
     {
         $this->seedFormFieldSettings(['birth_date' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['birth_date' => now()->addDay()->toDateString()]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -501,7 +501,7 @@ class EngineerControllerTest extends TestCase
     public function test_birth_date_today_passes(): void
     {
         $this->seedFormFieldSettings(['birth_date' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['birth_date' => now()->toDateString()]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -512,7 +512,7 @@ class EngineerControllerTest extends TestCase
     public function test_desired_rate_exceeding_max_fails(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['desired_rate' => 65536]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -523,7 +523,7 @@ class EngineerControllerTest extends TestCase
     public function test_desired_rate_at_max_passes(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['desired_rate' => 65535]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -534,7 +534,7 @@ class EngineerControllerTest extends TestCase
     public function test_work_styles_invalid_value_fails(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['work_styles' => ['invalid_value']]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -545,7 +545,7 @@ class EngineerControllerTest extends TestCase
     public function test_proc_field_invalid_boolean_fails(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['proc_requirements' => 'invalid']);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -556,7 +556,7 @@ class EngineerControllerTest extends TestCase
     public function test_has_negotiation_exp_invalid_value_fails(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['has_negotiation_exp' => 'invalid']);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -567,7 +567,7 @@ class EngineerControllerTest extends TestCase
     public function test_sub_user_id_must_differ_from_main_user_id(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['sub_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
@@ -578,7 +578,7 @@ class EngineerControllerTest extends TestCase
     public function test_skill_label_is_required_when_detail_is_present(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'skills' => [['label' => null, 'detail' => 'Laravel 10年']],
         ]);
@@ -592,7 +592,7 @@ class EngineerControllerTest extends TestCase
     {
         // フロントは空入力を null ではなく空文字 "" として送るため、null だけでなく "" のケースも回帰防止する
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'skills' => [['label' => '', 'detail' => 'Laravel 10年']],
         ]);
@@ -605,7 +605,7 @@ class EngineerControllerTest extends TestCase
     public function test_name_kana_half_width_space_is_normalized_to_full_width(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['name_kana' => 'ヤマダ タロウ']);
 
         $this->actingAs($user)->post('/engineers', $payload);
@@ -664,7 +664,7 @@ class EngineerControllerTest extends TestCase
 
     public function test_authenticated_user_can_view_show_page(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
@@ -684,7 +684,7 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_contain_engineer_key(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
@@ -694,11 +694,11 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_contain_correct_engineer_data(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
-            'name'         => '田中花子',
-            'name_kana'    => 'タナカハナコ',
-            'status'       => 'interviewing',
+            'name' => '田中花子',
+            'name_kana' => 'タナカハナコ',
+            'status' => 'interviewing',
             'main_user_id' => $user->id,
         ]);
 
@@ -714,9 +714,9 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_available_label_is_未定_when_available_from_is_null(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
-            'main_user_id'  => $user->id,
+            'main_user_id' => $user->id,
             'available_from' => null,
         ]);
 
@@ -729,9 +729,9 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_available_label_is_formatted_date_when_available_from_is_set(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
-            'main_user_id'   => $user->id,
+            'main_user_id' => $user->id,
             'available_from' => '2026-08-01',
         ]);
 
@@ -744,10 +744,10 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_age_is_null_when_birth_date_is_null(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
             'main_user_id' => $user->id,
-            'birth_date'   => null,
+            'birth_date' => null,
         ]);
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
@@ -759,10 +759,10 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_age_is_calculated_from_birth_date(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
             'main_user_id' => $user->id,
-            'birth_date'   => now()->subYears(30)->toDateString(),
+            'birth_date' => now()->subYears(30)->toDateString(),
         ]);
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
@@ -774,7 +774,7 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_skills_include_detail(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
         $engineer->skills()->create(['label' => 'PHP', 'detail' => 'Laravel 5年']);
 
@@ -788,11 +788,11 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_phases_contain_all_six_entries(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
-            'main_user_id'       => $user->id,
-            'proc_requirements'  => true,
-            'proc_development'   => true,
+            'main_user_id' => $user->id,
+            'proc_requirements' => true,
+            'proc_development' => true,
         ]);
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
@@ -807,9 +807,9 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_work_styles_returns_only_selected(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
-            'main_user_id'      => $user->id,
+            'main_user_id' => $user->id,
             'work_style_onsite' => true,
             'work_style_hybrid' => false,
             'work_style_remote' => true,
@@ -826,10 +826,10 @@ class EngineerControllerTest extends TestCase
 
     public function test_show_props_sub_user_is_null_when_not_set(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
             'main_user_id' => $user->id,
-            'sub_user_id'  => null,
+            'sub_user_id' => null,
         ]);
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
@@ -842,10 +842,10 @@ class EngineerControllerTest extends TestCase
     public function test_show_props_sub_user_is_returned_when_set(): void
     {
         $mainUser = User::factory()->create();
-        $subUser  = User::factory()->create();
+        $subUser = User::factory()->create();
         $engineer = Engineer::factory()->create([
             'main_user_id' => $mainUser->id,
-            'sub_user_id'  => $subUser->id,
+            'sub_user_id' => $subUser->id,
         ]);
 
         $response = $this->actingAs($mainUser)->get("/engineers/{$engineer->id}");
@@ -872,7 +872,7 @@ class EngineerControllerTest extends TestCase
 
     public function test_admin_can_delete_engineer(): void
     {
-        $admin    = User::factory()->create(['role' => 'admin']);
+        $admin = User::factory()->create(['role' => 'admin']);
         $engineer = Engineer::factory()->create(['main_user_id' => $admin->id]);
 
         $response = $this->actingAs($admin)->delete("/engineers/{$engineer->id}");
@@ -883,7 +883,7 @@ class EngineerControllerTest extends TestCase
 
     public function test_destroy_sets_success_flash_message(): void
     {
-        $admin    = User::factory()->create(['role' => 'admin']);
+        $admin = User::factory()->create(['role' => 'admin']);
         $engineer = Engineer::factory()->create(['main_user_id' => $admin->id]);
 
         $response = $this->actingAs($admin)->delete("/engineers/{$engineer->id}");
@@ -893,7 +893,7 @@ class EngineerControllerTest extends TestCase
 
     public function test_general_user_cannot_delete_engineer(): void
     {
-        $user     = User::factory()->create(['role' => 'general']);
+        $user = User::factory()->create(['role' => 'general']);
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->delete("/engineers/{$engineer->id}");
@@ -927,7 +927,7 @@ class EngineerControllerTest extends TestCase
     public function test_authenticated_user_can_view_edit_page(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/edit");
@@ -939,7 +939,7 @@ class EngineerControllerTest extends TestCase
     public function test_edit_page_props_contain_required_keys(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/edit");
@@ -958,10 +958,10 @@ class EngineerControllerTest extends TestCase
     public function test_edit_page_props_engineer_contains_existing_values(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
-            'name'         => '佐藤花子',
-            'name_kana'    => 'サトウハナコ',
+            'name' => '佐藤花子',
+            'name_kana' => 'サトウハナコ',
             'main_user_id' => $user->id,
         ]);
 
@@ -999,9 +999,9 @@ class EngineerControllerTest extends TestCase
     public function test_engineer_is_updated_with_valid_payload(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
-            'name'         => '旧氏名',
+            'name' => '旧氏名',
             'main_user_id' => $user->id,
         ]);
 
@@ -1016,7 +1016,7 @@ class EngineerControllerTest extends TestCase
     public function test_update_sets_success_flash_message(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $this->validPayload($user->id));
@@ -1027,7 +1027,7 @@ class EngineerControllerTest extends TestCase
     public function test_update_replaces_skills_with_submitted_list(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
         $engineer->skills()->createMany([
             ['label' => 'PHP',  'detail' => null],
@@ -1051,7 +1051,7 @@ class EngineerControllerTest extends TestCase
     public function test_update_deletes_all_skills_when_empty_array_submitted(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
         $engineer->skills()->createMany([
             ['label' => 'PHP', 'detail' => null],
@@ -1068,9 +1068,9 @@ class EngineerControllerTest extends TestCase
     public function test_update_converts_work_styles_to_boolean_columns(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
-            'main_user_id'      => $user->id,
+            'main_user_id' => $user->id,
             'work_style_onsite' => true,
             'work_style_hybrid' => true,
             'work_style_remote' => true,
@@ -1081,7 +1081,7 @@ class EngineerControllerTest extends TestCase
         $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
 
         $this->assertDatabaseHas('engineers', [
-            'id'                => $engineer->id,
+            'id' => $engineer->id,
             'work_style_onsite' => false,
             'work_style_hybrid' => true,
             'work_style_remote' => false,
@@ -1091,10 +1091,10 @@ class EngineerControllerTest extends TestCase
     public function test_update_regenerates_ai_summary_when_appeal_note_changes(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
             'main_user_id' => $user->id,
-            'appeal_note'  => '元のアピール',
+            'appeal_note' => '元のアピール',
         ]);
 
         $this->mock(AiSummaryService::class, function ($mock) {
@@ -1113,10 +1113,10 @@ class EngineerControllerTest extends TestCase
     public function test_update_does_not_regenerate_ai_summary_when_appeal_note_unchanged(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
             'main_user_id' => $user->id,
-            'appeal_note'  => 'そのままのアピール',
+            'appeal_note' => 'そのままのアピール',
         ]);
 
         $this->mock(AiSummaryService::class, function ($mock) {
@@ -1134,7 +1134,7 @@ class EngineerControllerTest extends TestCase
     public function test_update_validates_required_fields(): void
     {
         $this->seedFormFieldSettings();
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 
         $payload = $this->validPayload($user->id);
@@ -1203,19 +1203,19 @@ class EngineerControllerTest extends TestCase
     {
         $user = User::factory()->create();
         Engineer::factory()->create([
-            'main_user_id'      => $user->id,
+            'main_user_id' => $user->id,
             'work_style_onsite' => true,
             'work_style_hybrid' => false,
             'work_style_remote' => false,
         ]);
         Engineer::factory()->create([
-            'main_user_id'      => $user->id,
+            'main_user_id' => $user->id,
             'work_style_onsite' => false,
             'work_style_hybrid' => false,
             'work_style_remote' => true,
         ]);
         Engineer::factory()->create([
-            'main_user_id'      => $user->id,
+            'main_user_id' => $user->id,
             'work_style_onsite' => false,
             'work_style_hybrid' => true,
             'work_style_remote' => false,
@@ -1231,19 +1231,19 @@ class EngineerControllerTest extends TestCase
     {
         $user = User::factory()->create();
         Engineer::factory()->create([
-            'main_user_id'      => $user->id,
-            'proc_development'  => true,
-            'proc_testing'      => true,
+            'main_user_id' => $user->id,
+            'proc_development' => true,
+            'proc_testing' => true,
         ]);
         Engineer::factory()->create([
-            'main_user_id'      => $user->id,
-            'proc_development'  => true,
-            'proc_testing'      => false,
+            'main_user_id' => $user->id,
+            'proc_development' => true,
+            'proc_testing' => false,
         ]);
         Engineer::factory()->create([
-            'main_user_id'      => $user->id,
-            'proc_development'  => false,
-            'proc_testing'      => true,
+            'main_user_id' => $user->id,
+            'proc_development' => false,
+            'proc_testing' => true,
         ]);
 
         $response = $this->actingAs($user)
@@ -1290,13 +1290,13 @@ class EngineerControllerTest extends TestCase
         $user = User::factory()->create();
         Engineer::factory()->create([
             'main_user_id' => $user->id,
-            'name'         => 'Aさん',
-            'appeal_note'  => 'バックエンド開発が得意です',
+            'name' => 'Aさん',
+            'appeal_note' => 'バックエンド開発が得意です',
         ]);
         Engineer::factory()->create([
             'main_user_id' => $user->id,
-            'name'         => 'Bさん',
-            'appeal_note'  => 'デザインが得意です',
+            'name' => 'Bさん',
+            'appeal_note' => 'デザインが得意です',
         ]);
 
         $response = $this->actingAs($user)->get('/engineers?keyword=バックエンド');
@@ -1310,10 +1310,12 @@ class EngineerControllerTest extends TestCase
     public function test_index_default_sort_is_created_at_desc(): void
     {
         $user = User::factory()->create();
-        $old  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
-        $old->created_at = now()->subDays(5); $old->save();
-        $new  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
-        $new->created_at = now(); $new->save();
+        $old = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
+        $old->created_at = now()->subDays(5);
+        $old->save();
+        $new = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
+        $new->created_at = now();
+        $new->save();
 
         $response = $this->actingAs($user)->get('/engineers');
 
@@ -1327,18 +1329,18 @@ class EngineerControllerTest extends TestCase
     {
         $user = User::factory()->create();
         Engineer::factory()->create([
-            'main_user_id'   => $user->id,
-            'name'           => 'A',
+            'main_user_id' => $user->id,
+            'name' => 'A',
             'available_from' => '2026-08-01',
         ]);
         Engineer::factory()->create([
-            'main_user_id'   => $user->id,
-            'name'           => 'B',
+            'main_user_id' => $user->id,
+            'name' => 'B',
             'available_from' => null,
         ]);
         Engineer::factory()->create([
-            'main_user_id'   => $user->id,
-            'name'           => 'C',
+            'main_user_id' => $user->id,
+            'name' => 'C',
             'available_from' => '2026-07-01',
         ]);
 
@@ -1398,7 +1400,7 @@ class EngineerControllerTest extends TestCase
 
         $response = $this->actingAs($user)->get(
             '/engineers?status[]=proposable&work_styles[]=remote&phases[]=proc_development'
-            . '&keyword=Java&sort=available_from&order=asc&per_page=10&page=1'
+            .'&keyword=Java&sort=available_from&order=asc&per_page=10&page=1'
         );
 
         $response->assertInertia(fn ($page) => $page
@@ -1414,12 +1416,12 @@ class EngineerControllerTest extends TestCase
 
     public function test_index_does_not_return_text_columns(): void
     {
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         $engineer = Engineer::factory()->create([
             'main_user_id' => $user->id,
-            'appeal_note'  => 'これは表示されないはず',
-            'remarks'      => '特記事項も表示されないはず',
-            'ai_summary'   => 'AI要約も表示されないはず',
+            'appeal_note' => 'これは表示されないはず',
+            'remarks' => '特記事項も表示されないはず',
+            'ai_summary' => 'AI要約も表示されないはず',
         ]);
         $engineer->skills()->create(['label' => 'PHP', 'detail' => 'Laravel 5年']);
 
@@ -1437,10 +1439,12 @@ class EngineerControllerTest extends TestCase
     public function test_index_sort_by_updated_at_desc(): void
     {
         $user = User::factory()->create();
-        $e1   = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い更新']);
-        $e1->updated_at = now()->subDays(3); $e1->saveQuietly();
-        $e2   = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい更新']);
-        $e2->updated_at = now(); $e2->saveQuietly();
+        $e1 = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い更新']);
+        $e1->updated_at = now()->subDays(3);
+        $e1->saveQuietly();
+        $e2 = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい更新']);
+        $e2->updated_at = now();
+        $e2->saveQuietly();
 
         $response = $this->actingAs($user)->get('/engineers?sort=updated_at&order=desc');
 
@@ -1453,7 +1457,7 @@ class EngineerControllerTest extends TestCase
     public function test_index_tiebreak_by_id_asc_when_sort_key_is_equal(): void
     {
         $user = User::factory()->create();
-        $now  = now()->toDateTimeString();
+        $now = now()->toDateTimeString();
 
         // created_at を同値に揃えて id の昇順が効くことを確認する
         $e1 = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '先に登録']);
@@ -1471,9 +1475,10 @@ class EngineerControllerTest extends TestCase
     public function test_index_invalid_sort_key_falls_back_to_created_at_desc(): void
     {
         $user = User::factory()->create();
-        $old  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
-        $old->created_at = now()->subDays(5); $old->saveQuietly();
-        $new  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
+        $old = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
+        $old->created_at = now()->subDays(5);
+        $old->saveQuietly();
+        $new = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
 
         // order は省略 → デフォルト desc が適用される
         $response = $this->actingAs($user)->get('/engineers?sort=invalid_key');
@@ -1489,9 +1494,10 @@ class EngineerControllerTest extends TestCase
     public function test_index_invalid_sort_key_with_asc_also_falls_back_to_desc(): void
     {
         $user = User::factory()->create();
-        $old  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
-        $old->created_at = now()->subDays(5); $old->saveQuietly();
-        $new  = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
+        $old = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '古い']);
+        $old->created_at = now()->subDays(5);
+        $old->saveQuietly();
+        $new = Engineer::factory()->create(['main_user_id' => $user->id, 'name' => '新しい']);
 
         // sort が無効なら order=asc が指定されていても desc にリセットされる
         $response = $this->actingAs($user)->get('/engineers?sort=invalid_key&order=asc');
@@ -1511,6 +1517,50 @@ class EngineerControllerTest extends TestCase
 
         $response->assertInertia(fn ($page) => $page
             ->where('filters.order', 'desc')
+        );
+    }
+
+    public function test_index_disallowed_sort_order_pair_updated_at_asc_falls_back_to_default(): void
+    {
+        $user = User::factory()->create();
+
+        // updated_at:asc は DB設計書 §8 の4パターンに存在しない仕様外の組み合わせ。
+        // sort・order は個別には有効値だが、ペアとして許可されていないためデフォルトへフォールバックする。
+        $response = $this->actingAs($user)->get('/engineers?sort=updated_at&order=asc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('filters.sort', 'created_at')
+            ->where('filters.order', 'desc')
+        );
+    }
+
+    public function test_index_disallowed_sort_order_pair_available_from_desc_falls_back_to_default(): void
+    {
+        $user = User::factory()->create();
+
+        // available_from:desc も許可4組に無い仕様外の組み合わせ（許可は available_from:asc のみ）。
+        $response = $this->actingAs($user)->get('/engineers?sort=available_from&order=desc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('filters.sort', 'created_at')
+            ->where('filters.order', 'desc')
+        );
+    }
+
+    public function test_index_provides_sort_options_from_backend_as_ssot(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/engineers');
+
+        // 許可組はバックエンド一本化（SSOT）。props に4組の sort×order＋label が渡り、先頭がデフォルト。
+        $response->assertInertia(fn ($page) => $page
+            ->has('sortOptions', 4)
+            ->where('sortOptions.0.sort', 'created_at')
+            ->where('sortOptions.0.order', 'desc')
+            ->where('sortOptions.0.label', '登録日順（新しい順）')
+            ->where('sortOptions.3.sort', 'available_from')
+            ->where('sortOptions.3.order', 'asc')
         );
     }
 
