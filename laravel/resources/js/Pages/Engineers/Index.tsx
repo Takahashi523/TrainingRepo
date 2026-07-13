@@ -67,8 +67,15 @@ export default function Index({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [keywordInput]);
 
+    // 常に最新の filters を指す ref。
+    // キーワードのデバウンス visit はタイマー設定時点の filters をクロージャに閉じ込めるため、
+    // 「すべてクリア」直後に古いタイマーが発火すると空にしたはずの条件を古い値で再適用してしまう。
+    // visit を ref 経由の最新 filters にマージすることでこの競合（stale closure）を根治する。
+    const filtersRef = useRef(filters);
+    filtersRef.current = filters;
+
     const visit = (patch: Partial<EngineerFilters>) => {
-        const next: EngineerFilters = { ...filters, ...patch };
+        const next: EngineerFilters = { ...filtersRef.current, ...patch };
         router.get('/engineers', buildQuery(next), {
             preserveState: true,
             preserveScroll: true,
