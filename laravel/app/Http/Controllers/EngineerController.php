@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\EngineerIndexRequest;
 use App\Http\Requests\EngineerRequest;
 use App\Http\Resources\EngineerListResource;
 use App\Http\Resources\EngineerResource;
@@ -46,7 +47,7 @@ class EngineerController extends Controller
 
     private const PER_PAGE_MAX = 100;
 
-    public function index(Request $request): Response
+    public function index(EngineerIndexRequest $request): Response
     {
         $allowedPhases = array_column(Engineer::PHASES, 'key');
 

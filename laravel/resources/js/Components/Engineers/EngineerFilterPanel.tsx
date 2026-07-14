@@ -1,7 +1,7 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
-import SortSelect from '@/Components/Common/SortSelect';
-import { EngineerFilters, Phase, SortOption, StatusOption, WorkTypeOption } from '@/types/engineer';
+import { Input } from '@/Components/ui/input';
+import { EngineerFilters, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
 import { Search, X } from 'lucide-react';
 
 interface Props {
@@ -9,19 +9,20 @@ interface Props {
     statuses: StatusOption[];
     workStyles: WorkTypeOption[];
     phases: Phase[];
-    sortOptions: SortOption[];
     keywordInput: string;
     onKeywordInput: (value: string) => void;
     onFilterChange: (patch: Partial<EngineerFilters>) => void;
     onClearAll: () => void;
 }
 
+// キーワード入力の上限（氏名 max:100 に揃える。サーバ側 EngineerIndexRequest でも検証）
+const KEYWORD_MAX_LENGTH = 100;
+
 export default function EngineerFilterPanel({
     filters,
     statuses,
     workStyles,
     phases,
-    sortOptions,
     keywordInput,
     onKeywordInput,
     onFilterChange,
@@ -47,12 +48,13 @@ export default function EngineerFilterPanel({
                 {/* フリーワード */}
                 <div className="relative">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <input
+                    <Input
                         type="text"
                         value={keywordInput}
                         onChange={(e) => onKeywordInput(e.target.value)}
                         placeholder="氏名・スキルで検索"
-                        className="h-8 w-[220px] rounded-md border border-input bg-white pl-8 pr-2 text-xs"
+                        maxLength={KEYWORD_MAX_LENGTH}
+                        className="h-8 w-[220px] bg-white pl-8 pr-2 text-xs md:text-xs"
                     />
                 </div>
 
@@ -127,20 +129,6 @@ export default function EngineerFilterPanel({
                         すべてクリア
                     </button>
                 )}
-
-                <div className="ml-auto">
-                    <SortSelect
-                        options={sortOptions}
-                        currentSort={filters.sort}
-                        currentOrder={filters.order}
-                        onChange={(sort, order) =>
-                            onFilterChange({
-                                sort: sort as EngineerFilters['sort'],
-                                order: order as EngineerFilters['order'],
-                            })
-                        }
-                    />
-                </div>
             </div>
         </div>
     );

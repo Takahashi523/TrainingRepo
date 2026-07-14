@@ -1,3 +1,5 @@
+import { Badge } from '@/Components/ui/badge';
+import { Button } from '@/Components/ui/button';
 import { X } from 'lucide-react';
 
 interface Props {
@@ -7,16 +9,21 @@ interface Props {
 
 export default function ActiveTag({ label, onRemove }: Props) {
     return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-foreground/60 bg-muted px-2.5 py-0.5 text-[11px]">
+        <Badge
+            variant="outline"
+            className="gap-1 border-foreground/60 bg-muted py-0.5 pl-2.5 pr-1 text-[11px] font-normal"
+        >
             {label}
-            <button
+            <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onRemove}
-                className="text-muted-foreground hover:text-foreground"
+                className="h-4 w-4 rounded-full text-muted-foreground hover:bg-transparent hover:text-foreground"
                 aria-label={`${label} を解除`}
             >
                 <X className="h-3 w-3" />
-            </button>
-        </span>
+            </Button>
+        </Badge>
     );
 }

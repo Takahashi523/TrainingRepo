@@ -1369,6 +1369,29 @@ class EngineerControllerTest extends TestCase
         );
     }
 
+    public function test_index_accepts_keyword_at_max_length_100(): void
+    {
+        $user = User::factory()->create();
+
+        // 100 文字（氏名 max:100 と同上限）は許容される
+        $keyword = str_repeat('a', 100);
+        $response = $this->actingAs($user)->get('/engineers?keyword='.$keyword);
+
+        $response->assertOk();
+        $response->assertSessionHasNoErrors();
+        $response->assertInertia(fn ($page) => $page->where('filters.keyword', $keyword));
+    }
+
+    public function test_index_rejects_keyword_over_100(): void
+    {
+        $user = User::factory()->create();
+
+        // 101 文字はサーバ側 FormRequest で弾く（フロント maxLength の安全網）
+        $response = $this->actingAs($user)->get('/engineers?keyword='.str_repeat('a', 101));
+
+        $response->assertSessionHasErrors('keyword');
+    }
+
     public function test_index_does_not_search_keyword_by_appeal_note(): void
     {
         $user = User::factory()->create();

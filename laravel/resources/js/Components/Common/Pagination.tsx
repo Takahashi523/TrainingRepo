@@ -1,3 +1,4 @@
+import { Button } from '@/Components/ui/button';
 import { cn } from '@/lib/utils';
 import { PaginationMeta } from '@/types/engineer';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -38,45 +39,52 @@ export default function Pagination({ meta, onChange }: Props) {
 
     return (
         <div className="flex items-center justify-center gap-1.5 py-3">
-            <button
+            <Button
                 type="button"
+                variant="outline"
+                size="icon"
                 onClick={() => onChange(prev)}
                 disabled={meta.current_page <= 1}
-                className="flex h-8 w-8 items-center justify-center rounded border border-input bg-white text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-8 w-8 bg-white"
                 aria-label="前のページ"
             >
                 <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
+            </Button>
             {items.map((item, i) =>
                 item === 'ellipsis' ? (
                     <span key={`e-${i}`} className="px-1 text-xs text-muted-foreground">
                         …
                     </span>
                 ) : (
-                    <button
+                    <Button
                         key={item}
                         type="button"
+                        variant="outline"
+                        size="icon"
                         onClick={() => onChange(item)}
                         className={cn(
-                            'h-8 w-8 rounded border text-xs',
+                            'h-8 w-8 bg-white text-xs',
                             item === meta.current_page
-                                ? 'border-primary bg-white font-bold text-primary'
-                                : 'border-input bg-white hover:bg-muted/50',
+                                ? 'border-primary font-bold text-primary hover:bg-white'
+                                : 'hover:bg-muted/50',
                         )}
+                        aria-current={item === meta.current_page ? 'page' : undefined}
                     >
                         {item}
-                    </button>
+                    </Button>
                 ),
             )}
-            <button
+            <Button
                 type="button"
+                variant="outline"
+                size="icon"
                 onClick={() => onChange(next)}
                 disabled={meta.current_page >= meta.last_page}
-                className="flex h-8 w-8 items-center justify-center rounded border border-input bg-white text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-8 w-8 bg-white"
                 aria-label="次のページ"
             >
                 <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+            </Button>
             {meta.from != null && meta.to != null && (
                 <span className="ml-2 text-xs text-muted-foreground">
                     {meta.from}〜{meta.to}件 / 全{meta.total}件
