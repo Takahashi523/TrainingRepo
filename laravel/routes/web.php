@@ -14,7 +14,7 @@ Route::get('/dashboard', function () {
 })->middleware(['auth'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    Route::resource('engineers', EngineerController::class)->only(['create', 'store', 'show', 'edit', 'update', 'destroy']);
+    Route::resource('engineers', EngineerController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
     Route::resource('projects', ProjectController::class);
 });
 
