@@ -31,6 +31,7 @@ type Project = {
     commercial_flow: string | null;
     headcount: number | null;
     start_date: string | null;
+    start_label: string;
     rate_min: number | null;
     rate_max: number | null;
     rate_note: string | null;
@@ -127,14 +128,6 @@ export default function Show({ project }: Props) {
         });
     };
 
-    const startDateLabel = project.start_date
-        ? new Date(project.start_date).toLocaleDateString("ja-JP", {
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-          }) + "〜"
-        : "—";
-
     const rateLabel = (() => {
         if (project.rate_min != null && project.rate_max != null) {
             return `${project.rate_min}万円　〜　${project.rate_max}万円`;
@@ -224,7 +217,7 @@ export default function Show({ project }: Props) {
                         )}
                         <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
                             <Clock className="mr-1 inline h-3 w-3" />
-                            {startDateLabel}
+                            {project.start_label}
                         </span>
                     </div>
                     <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
@@ -257,7 +250,9 @@ export default function Show({ project }: Props) {
                             ? `${project.headcount}名`
                             : "—"}
                     </DetailRow>
-                    <DetailRow label="参画開始時期">{startDateLabel}</DetailRow>
+                    <DetailRow label="参画開始時期">
+                        {project.start_label}
+                    </DetailRow>
                 </SectionCard>
 
                 {/* 契約条件 */}

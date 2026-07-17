@@ -21,6 +21,20 @@ class ProjectService
         });
     }
 
+    public function update(ProjectRequest $request, Project $project): Project
+    {
+        $skills = [
+            'required'  => $request->input('required_skills', []),
+            'preferred' => $request->input('preferred_skills', []),
+        ];
+
+        return DB::transaction(function () use ($request, $project, $skills) {
+            $project->update($this->projectAttributes($request));
+            $this->replaceSkills($project, $skills);
+            return $project;
+        });
+    }
+
     /**
     * リクエストから Project の保存用属性配列を組み立てる
     */
@@ -72,6 +86,15 @@ class ProjectService
                 ], $meaningful)
             );
         }
+    }
+
+    /**
+    * 既存のスキルを削除してから新しい内容で登録し直す（更新用）
+    */
+    private function replaceSkills(Project $project, array $skills): void
+    {
+        $project->projectSkills()->delete();
+        $this->insertSkills($project, $skills);
     }
 
     public function destroy(Project $project): void

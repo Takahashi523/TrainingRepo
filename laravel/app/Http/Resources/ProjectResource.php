@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 
 class ProjectResource extends JsonResource
 {
@@ -20,6 +21,9 @@ class ProjectResource extends JsonResource
             'commercial_flow' => $this->commercial_flow,
             'headcount' => $this->headcount,
             'start_date' => $this->start_date,
+            'start_label' => $this->start_date
+                ? Carbon::parse($this->start_date)->format('Y/m/d') . '〜'
+                : '未定',
             'rate_min' => $this->rate_min,
             'rate_max' => $this->rate_max,
             'rate_note' => $this->rate_note,
