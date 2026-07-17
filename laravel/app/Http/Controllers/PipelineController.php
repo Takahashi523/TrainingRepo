@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PipelineCompletedRequest;
+use App\Http\Requests\PipelineStoreRequest;
 use App\Http\Requests\PipelineUpdateRequest;
 use App\Http\Resources\PipelineCardResource;
 use App\Http\Resources\PipelineCompletedResource;
@@ -47,6 +48,18 @@ class PipelineController extends Controller
     public function index(Request $request): Response
     {
         return Inertia::render('Pipelines/Index', $this->buildActiveProps($request));
+    }
+
+    /**
+     * POST /pipelines：マッチング結果画面からのパイプライン生成（WF_09 の追加ボタン）。
+     * 重複・上限（1案件5件）チェックと生成は PipelineService@create がトランザクションで担う。
+     * 追加後は同画面に留まる想定のため back リダイレクト＋成功フラッシュを返す。
+     */
+    public function store(PipelineStoreRequest $request): RedirectResponse
+    {
+        $this->pipelineService->create($request->validated());
+
+        return redirect()->back()->with('success', 'パイプラインに追加しました。');
     }
 
     /**

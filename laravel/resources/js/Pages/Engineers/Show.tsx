@@ -1,10 +1,12 @@
+import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import { Button } from '@/Components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerShowPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import { ArrowLeftRight, Check, Clock, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 type Props = PageProps<EngineerShowPageProps>;
 
@@ -78,6 +80,15 @@ export default function Show({ engineer }: Props) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    // マッチング実行は遷移先描画前にサーバーで Python AI を同期呼び出しするため数秒待つ。
+    // その間、遷移元のこの画面に AI 計算中オーバーレイを被せる（onStart で表示・onFinish で解除）。
+    const [isMatching, setIsMatching] = useState(false);
+    const { toast } = useToast();
+
+    // マッチングは読み取り専用（DB保存なし）のため、途中キャンセルは安全（副作用が残らない）。
+    // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する。
+    const matchingCancel = useRef<(() => void) | null>(null);
+
     const handleDelete = () => {
         router.delete(`/engineers/${engineer.id}`, {
             onStart:   () => setIsDeleting(true),
@@ -97,6 +108,15 @@ export default function Show({ engineer }: Props) {
     return (
         <AuthenticatedLayout>
             <Head title="人材詳細" />
+            {/* マッチング実行の遷移中（Python AI 同期計算）に全画面で計算中を表示する。
+                共通部品のデフォルトは汎用文言のため、ここではマッチング用途の具体文言を渡す。
+                マッチングは読み取り専用でキャンセルが安全なため onCancel を渡す（visit を中断）。 */}
+            <AiLoadingOverlay
+                show={isMatching}
+                message="AIがマッチングを計算しています…"
+                onCancel={() => matchingCancel.current?.()}
+            />
+
             {/* Sticky page header */}
             <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between border-b border-border bg-white px-10 py-4">
                 <div>
@@ -105,10 +125,36 @@ export default function Show({ engineer }: Props) {
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
-                        onClick={() => router.get(`/matching/${engineer.id}`)}
+                        onClick={() =>
+                            router.get(
+                                `/engineers/${engineer.id}/matching`,
+                                {},
+                                {
+                                    onStart: () => setIsMatching(true),
+                                    // Inertia が渡す cancel トークンを保持し、オーバーレイのキャンセルボタンで叩けるようにする。
+                                    onCancelToken: (token) => {
+                                        matchingCancel.current = token.cancel;
+                                    },
+                                    // サーバー到達エラー（通信断・リクエスト中断）は成功レスポンスの
+                                    // flash.error では拾えないため、ここでトースト表示し Silent Rejection を防ぐ。
+                                    // （エンジン通信失敗など到達済みエラーはサーバーが flash.error で通知する）
+                                    onError: () =>
+                                        toast({
+                                            description:
+                                                'マッチングの実行に失敗しました。通信環境をご確認のうえ、再度お試しください。',
+                                            variant: 'destructive',
+                                        }),
+                                    // onFinish は成功・失敗・キャンセルすべてで発火するためオーバーレイは必ず解除される。
+                                    onFinish: () => {
+                                        setIsMatching(false);
+                                        matchingCancel.current = null;
+                                    },
+                                },
+                            )
+                        }
                     >
                         <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
-                        マッチング
+                        マッチング実行
                     </Button>
                     <Button
                         variant="outline"

@@ -123,4 +123,19 @@ class Pipeline extends Model
     {
         return self::STATUSES[$status]['label'] ?? $status;
     }
+
+    /**
+     * match_score から match_rank（A/B/C/D）を判定する（SSOT）。
+     * 閾値はスコアリングロジック設計書（PR #12）§3.3・本モデルの RANKS 定数と整合させる。
+     * Python が付与した rank を信頼しつつ、生成受領時の検証・テストで本ヘルパーを基準にする。
+     */
+    public static function rankForScore(int $score): string
+    {
+        return match (true) {
+            $score >= 80 => 'A',
+            $score >= 65 => 'B',
+            $score >= 50 => 'C',
+            default => 'D',
+        };
+    }
 }
