@@ -37,13 +37,13 @@ function toFormData(project: Project): ProjectFormData {
             project.required_skills.length > 0
                 ? project.required_skills.map((s) => ({
                       id: crypto.randomUUID(),
-                      label: s.label,
+                      label: s.label ?? "",
                       detail: s.detail,
                   }))
                 : [{ id: crypto.randomUUID(), label: "", detail: "" }],
         preferred_skills: project.preferred_skills.map((s) => ({
             id: crypto.randomUUID(),
-            label: s.label,
+            label: s.label ?? "",
             detail: s.detail,
         })),
         proc_requirements: procValuesByKey.proc_requirements ?? false,

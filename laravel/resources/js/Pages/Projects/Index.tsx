@@ -1,17 +1,11 @@
 import { Button } from "@/Components/ui/button";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import { ProjectIndexPageProps } from "@/types/project";
 import { PageProps } from "@/types";
 import { Head, router } from "@inertiajs/react";
 import { Plus } from "lucide-react";
 
-type Project = {
-    id: number;
-    name: string;
-};
-
-type Props = PageProps<{
-    projects: Project[];
-}>;
+type Props = PageProps<ProjectIndexPageProps>;
 
 export default function Index({ projects }: Props) {
     return (

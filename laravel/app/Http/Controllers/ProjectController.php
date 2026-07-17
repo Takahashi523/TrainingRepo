@@ -136,6 +136,7 @@ class ProjectController extends Controller
             'commercial_flows' => Project::COMMERCIAL_FLOWS,
             'statuses'         => Project::STATUSES,
             'users'            => User::select('id', 'name')->orderBy('name')->get(),
+            'authUserId'       => auth()->id(),
         ];
     }
 }

@@ -1,20 +1,12 @@
 import ProjectForm from "@/Components/Projects/ProjectForm";
-import { ProjectFormData, FieldSettings } from "@/types/project";
+import { ProjectFormData, ProjectCreatePageProps } from "@/types/project";
 import { Button } from "@/Components/ui/button";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
 import { Head, router, useForm } from "@inertiajs/react";
 import { Loader2 } from "lucide-react";
 
-type Props = PageProps<{
-    fieldSettings: FieldSettings;
-    phases: { key: string; name: string }[];
-    work_styles: { key: string; name: string }[];
-    commercial_flows: { value: string; label: string }[];
-    statuses: { value: string; label: string }[];
-    users: { id: number; name: string }[];
-    authUserId: number;
-}>;
+type Props = PageProps<ProjectCreatePageProps>;
 
 export default function Create({
     fieldSettings,
