@@ -33,7 +33,7 @@ function AiBlock({ title, children }: { title: string; children: React.ReactNode
 
 /**
  * マッチング結果ドロワー（WF_09）。見せ方は進捗管理ドロワー（PipelineDrawer）に合わせる。
- * ヘッダー（案件名＋顧客名）／スコアサマリ箱／AIスコア算出理由／AI総合コメント（推薦理由＋不足条件）／
+ * ヘッダー（案件名）／スコアサマリ箱／AIスコア算出理由／AI総合コメント（推薦理由＋不足条件）／
  * フッター（＋パイプラインに追加）で構成する。AI 表示は PipelineDrawer と異なりアコーディオンにしない。
  *
  * 追加はスナップショット（マッチング実行時点の値）を POST /pipelines し、成功時はリダイレクトで props 更新＋成功トースト。
@@ -70,18 +70,13 @@ export default function MatchDrawer({ result, engineerId, onClose }: Props) {
 
     return (
         <div className="flex h-full w-full flex-col">
-            <div className="flex shrink-0 items-start justify-between border-b border-border p-4">
+            <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
                 <div className="min-w-0">
-                    {/* 案件名・顧客名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ。 */}
+                    {/* 案件名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ。 */}
                     <TruncatedText
                         as="p"
                         text={project.name}
                         className="text-[15px] font-bold text-foreground"
-                    />
-                    <TruncatedText
-                        as="p"
-                        text={project.client_name || 'クライアント未設定'}
-                        className="mt-0.5 text-xs text-muted-foreground"
                     />
                 </div>
                 <Button
