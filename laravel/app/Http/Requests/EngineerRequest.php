@@ -44,7 +44,7 @@ class EngineerRequest extends FormRequest
             'available_from'      => ['date'],
             'has_negotiation_exp' => ['boolean'],
             'appeal_note'         => ['string', 'max:4000'],
-            'desired_rate'        => ['integer', 'min:0', 'max:65535'],
+            'desired_rate'        => ['integer', 'min:0', 'max:999'],
             'remarks'             => ['string', 'max:1000'],
         ];
 

@@ -8,6 +8,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class ProjectRequest extends FormRequest
 {
+    private \Illuminate\Support\Collection $fieldSettings;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -25,10 +27,10 @@ class ProjectRequest extends FormRequest
      */
     public function rules(): array
     {
-        $settings = FormFieldSetting::where('form_type', 'project')
+        $this->fieldSettings = FormFieldSetting::where('form_type', 'project')
             ->pluck('is_required', 'field_key');
         
-        $isRequired = fn(string $key): bool => (bool) $settings->get($key, false);
+        $isRequired = fn(string $key): bool => (bool) $this->fieldSettings->get($key, false);
 
         // 第1層：システム固定必須
         $rules = [
@@ -40,11 +42,11 @@ class ProjectRequest extends FormRequest
         // 第2層：動的フィールド
         $dynamicFields = [
             'client_name'          => ['string', 'max:100'],
-            'headcount'            => ['integer', 'min:0'],
+            'headcount'            => ['integer', 'min:0', 'max:99'],
             'start_date'           => ['date'],
             'commercial_flow'      => ['in:prime,secondary,tertiary,other'],
             'work_style'           => ['in:onsite,hybrid,remote'],
-            'interview_count'      => ['integer', 'min:0'],
+            'interview_count'      => ['integer', 'min:0', 'max:10'],
             'negotiation_required' => ['boolean'],
             'description'          => ['string'],
             'work_env'             => ['string'],
@@ -69,11 +71,25 @@ class ProjectRequest extends FormRequest
         $rateRequired = $isRequired('rate');
 
         if ($this->boolean('rate_is_negotiable')) {
-            $rules['rate_min'] = ['nullable', 'integer', 'min:0'];
-            $rules['rate_max'] = ['nullable', 'integer', 'min:0'];
+            // スキル見合いの場合は rate_min / rate_max を完全に nullable にする
+            $rules['rate_min'] = ['nullable', 'integer', 'min:0', 'max:999'];
+            $rules['rate_max'] = ['nullable', 'integer', 'min:0', 'max:999'];
         } else {
-            $rules['rate_min'] = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'lte:rate_max'];
-            $rules['rate_max'] = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'gte:rate_min'];
+            // 通常の場合：下限・上限の相互必須チェック
+            $rateMinRules = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'max:999'];
+            $rateMaxRules = [$rateRequired ? 'required' : 'nullable', 'integer', 'min:0', 'max:999'];
+
+            if ($this->filled('rate_min')) {
+                $rateMaxRules[] = 'required';
+                $rateMaxRules[] = 'gte:rate_min';
+            }
+            if ($this->filled('rate_max')) {
+                $rateMinRules[] = 'required';
+                $rateMinRules[] = 'lte:rate_max';
+            }
+
+            $rules['rate_min'] = $rateMinRules;
+            $rules['rate_max'] = $rateMaxRules;
         }
 
         // ----------------------------------------------------------------
@@ -82,15 +98,16 @@ class ProjectRequest extends FormRequest
         //   - work_style が onsite / hybrid の場合 → 必須
         //   - work_style が remote の場合         → バリデーション対象外
         // ----------------------------------------------------------------
-        $workLocationRequired = $isRequired('work_location'); // DBアクセスなし
+        $workLocationRequired = $isRequired('work_location');
+        $workStyle = $this->input('work_style');
+        $isWorkLocationActive = in_array($workStyle, ['onsite', 'hybrid'], true);
 
         $rules['work_location_line'] = [
-            $workLocationRequired ? 'required' : 'nullable',
+            ($workLocationRequired && $isWorkLocationActive) ? 'required' : 'nullable',
             'string', 'max:100',
         ];
 
-        $workStyle = $this->input('work_style');
-        $rules['work_location_station'] = in_array($workStyle, ['onsite', 'hybrid'], true)
+        $rules['work_location_station'] = $isWorkLocationActive
             ? ['required', 'string', 'max:100']
             : ['nullable', 'string', 'max:100'];
 
@@ -100,10 +117,18 @@ class ProjectRequest extends FormRequest
         $rules['required_skills']  = [$isRequired('required_skills') ? 'required' : 'nullable', 'array'];
         $rules['preferred_skills'] = [$isRequired('preferred_skills') ? 'required' : 'nullable', 'array'];
 
-        // ↓ required_with がワイルドカードに非対応のため nullable にし、withValidator() で補完
-        $rules['required_skills.*.label']   = ['nullable', 'string', 'max:15'];
+        if ($isRequired('required_skills')) {
+            $rules['required_skills.*.label']   = ['required', 'string', 'max:15'];
+        } else {
+            $rules['required_skills.*.label']   = ['nullable', 'string', 'max:15'];
+        }
         $rules['required_skills.*.detail']  = ['nullable', 'string', 'max:500'];
-        $rules['preferred_skills.*.label']  = ['nullable', 'string', 'max:15'];
+
+        if ($isRequired('preferred_skills')) {
+            $rules['preferred_skills.*.label']  = ['required', 'string', 'max:15'];
+        } else {
+            $rules['preferred_skills.*.label']  = ['nullable', 'string', 'max:15'];
+        }
         $rules['preferred_skills.*.detail'] = ['nullable', 'string', 'max:500'];
 
         // ----------------------------------------------------------------
@@ -127,23 +152,21 @@ class ProjectRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            $skills = $this->input('required_skills', []);
-            foreach ($skills as $index => $skill) {
-                if (!empty($skill['detail']) && empty($skill['label'])) {
-                    $validator->errors()->add(
-                        "required_skills.{$index}.label",
-                        'スキル詳細を入力する場合はスキル名も入力してください。'
-                    );
-                }
-            }
+            $isRequired = fn(string $key): bool => (bool) $this->fieldSettings->get($key, false);
 
-            $skills = $this->input('preferred_skills', []);
-            foreach ($skills as $index => $skill) {
-                if (!empty($skill['detail']) && empty($skill['label'])) {
-                    $validator->errors()->add(
-                        "preferred_skills.{$index}.label",
-                        'スキル詳細を入力する場合はスキル名も入力してください。'
-                    );
+            foreach (['required_skills', 'preferred_skills'] as $field) {
+                if ($isRequired($field)) {
+                    continue; // required のときは rules() で担保されるためスキップ
+                }
+
+                $skills = $this->input($field, []);
+                foreach ($skills as $index => $skill) {
+                    if (!empty($skill['detail']) && empty($skill['label'])) {
+                        $validator->errors()->add(
+                            "{$field}.{$index}.label",
+                            'スキル詳細を入力する場合はスキル名も入力してください。'
+                        );
+                    }
                 }
             }
         });

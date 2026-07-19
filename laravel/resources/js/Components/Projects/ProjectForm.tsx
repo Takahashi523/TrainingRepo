@@ -12,68 +12,8 @@ import {
 } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 import { InertiaFormProps } from "@inertiajs/react";
+import { FieldSettings, SkillPair, ProjectFormData } from "@/types/project";
 import React from "react";
-
-export type ProjectFormData = {
-    name: string;
-    client_name: string;
-    headcount: string;
-    start_date: string;
-    rate_is_negotiable: boolean;
-    rate_min: string;
-    rate_max: string;
-    rate_note: string;
-    commercial_flow: string;
-    work_style: string;
-    interview_count: string;
-    work_location_line: string;
-    work_location_station: string;
-    required_skills: SkillPair[];
-    preferred_skills: SkillPair[];
-    proc_requirements: boolean;
-    proc_basic_design: boolean;
-    proc_detail_design: boolean;
-    proc_development: boolean;
-    proc_testing: boolean;
-    proc_maintenance: boolean;
-    negotiation_required: boolean;
-    description: string;
-    work_env: string;
-    status: string;
-    main_user_id: string;
-    sub_user_id: string;
-    billing_range: string;
-    remarks: string;
-};
-
-type SkillPair = {
-    id?: string;
-    label: string;
-    detail: string | null;
-};
-
-type FieldSetting = {
-    is_required: boolean;
-};
-
-type FieldSettings = {
-    client_name: FieldSetting;
-    headcount: FieldSetting;
-    start_date: FieldSetting;
-    rate: FieldSetting;
-    commercial_flow: FieldSetting;
-    work_style: FieldSetting;
-    work_location: FieldSetting;
-    interview_count: FieldSetting;
-    required_skills: FieldSetting;
-    preferred_skills: FieldSetting;
-    proc_experience: FieldSetting;
-    negotiation_required: FieldSetting;
-    description: FieldSetting;
-    work_env: FieldSetting;
-    billing_range: FieldSetting;
-    remarks: FieldSetting;
-};
 
 interface Props {
     form: InertiaFormProps<ProjectFormData>;
@@ -403,6 +343,37 @@ export default function ProjectForm({
                 </div>
             </FormRow>
 
+            <SectionHeading>就業条件</SectionHeading>
+
+            <FormRow
+                label="精算幅"
+                required={fieldSettings.billing_range.is_required}
+                error={errors.billing_range}
+                hint="月の精算時間帯をフリーテキストで入力してください"
+            >
+                <Input
+                    type="text"
+                    value={data.billing_range}
+                    onChange={(e) => setData("billing_range", e.target.value)}
+                    placeholder="例：140〜180h"
+                    className={`w-48 ${errors.billing_range ? "border-destructive" : ""}`}
+                />
+            </FormRow>
+
+            <FormRow
+                label="特記事項"
+                required={fieldSettings.remarks.is_required}
+                error={errors.remarks}
+                hint="スコア計算には使用しません。営業担当者が把握しておきたい就業条件を自由記述してください"
+            >
+                <Textarea
+                    value={data.remarks}
+                    onChange={(e) => setData("remarks", e.target.value)}
+                    placeholder="例：基本勤務時間 10:00〜19:00、シフト制なし、出張なし など"
+                    className={`min-h-28 ${errors.remarks ? "border-destructive" : ""}`}
+                />
+            </FormRow>
+
             <SectionHeading>スキル要件</SectionHeading>
 
             <FormRow
@@ -598,37 +569,6 @@ export default function ProjectForm({
                         </SelectContent>
                     </Select>
                 </div>
-            </FormRow>
-
-            <SectionHeading>就業条件</SectionHeading>
-
-            <FormRow
-                label="精算幅"
-                required={fieldSettings.billing_range.is_required}
-                error={errors.billing_range}
-                hint="月の精算時間帯をフリーテキストで入力してください"
-            >
-                <Input
-                    type="text"
-                    value={data.billing_range}
-                    onChange={(e) => setData("billing_range", e.target.value)}
-                    placeholder="例：140〜180h"
-                    className={`w-48 ${errors.billing_range ? "border-destructive" : ""}`}
-                />
-            </FormRow>
-
-            <FormRow
-                label="特記事項"
-                required={fieldSettings.remarks.is_required}
-                error={errors.remarks}
-                hint="スコア計算には使用しません。営業担当者が把握しておきたい就業条件を自由記述してください"
-            >
-                <Textarea
-                    value={data.remarks}
-                    onChange={(e) => setData("remarks", e.target.value)}
-                    placeholder="例：基本勤務時間 10:00〜19:00、シフト制なし、出張なし など"
-                    className={`min-h-28 ${errors.remarks ? "border-destructive" : ""}`}
-                />
             </FormRow>
         </div>
     );
