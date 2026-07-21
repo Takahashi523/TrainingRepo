@@ -82,7 +82,9 @@ export default function StatusSelect({
                 onKeyDown={stopPropagation ? (e) => e.stopPropagation() : undefined}
                 className={cn(
                     'h-8 text-xs',
-                    variant === 'card' ? 'w-full' : 'w-auto min-w-0 flex-1',
+                    // card：カード幅いっぱい。drawer：内容幅（w-auto）に固定し、
+                    // 隣接する長い案件名・顧客名に列幅を引っ張られて間延びしないようにする。
+                    variant === 'card' ? 'w-full' : 'w-auto',
                     className,
                 )}
             >

@@ -1,5 +1,5 @@
 import ConfirmDialog from '@/Components/Common/ConfirmDialog';
-import RankBadge from '@/Components/Common/RankBadge';
+import RankBadge, { RANK_BAR_FALLBACK_STYLE, RANK_BAR_STYLES } from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import PipelineStatusBadge from '@/Components/Pipelines/PipelineStatusBadge';
 import StatusSelect from '@/Components/Pipelines/StatusSelect';
@@ -130,8 +130,13 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                         />
                         {/* 顧客名・案件名は個別に省略。短い時は内容幅でぴったり、溢れた時だけ各自 truncate（長い顧客名で案件名が丸ごと消えるのを防ぎ、全文はホバーで確認） */}
                         <p className="mt-0.5 mb-2 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                            <TruncatedText text={pipeline.project.client_name} className="min-w-0" />
-                            <span className="shrink-0">/</span>
+                            {/* 顧客名は nullable。無い場合は区切り「/」を出さず案件名のみ表示する（孤立セパレータ防止） */}
+                            {pipeline.project.client_name && (
+                                <>
+                                    <TruncatedText text={pipeline.project.client_name} className="min-w-0" />
+                                    <span className="shrink-0">/</span>
+                                </>
+                            )}
                             <TruncatedText text={pipeline.project.name} className="min-w-0" />
                         </p>
 
@@ -199,7 +204,12 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             <div className="flex-1">
                                 <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                                     <div
-                                        className="h-full rounded-full bg-muted-foreground"
+                                        // バー色はランクバッジと配色を統一する（A=緑〜D=赤。未算出はグレー）
+                                        className={`h-full rounded-full ${
+                                            pipeline.match_rank
+                                                ? RANK_BAR_STYLES[pipeline.match_rank] ?? RANK_BAR_FALLBACK_STYLE
+                                                : RANK_BAR_FALLBACK_STYLE
+                                        }`}
                                         style={{ width: `${score != null ? Math.min(100, Math.max(0, score)) : 0}%` }}
                                     />
                                 </div>

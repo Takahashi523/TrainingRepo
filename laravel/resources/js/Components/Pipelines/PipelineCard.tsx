@@ -56,8 +56,13 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
             <TruncatedText as="p" className="text-xs font-bold text-foreground" text={card.engineer.name} />
             {/* 顧客名・案件名は個別に省略。短い時は内容幅でぴったり、溢れた時だけ各自 truncate（長い顧客名で案件名が丸ごと消えるのを防ぎ、全文はホバーで確認） */}
             <p className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
-                <TruncatedText text={card.project.client_name} className="min-w-0" />
-                <span className="shrink-0">/</span>
+                {/* 顧客名は nullable。無い場合は区切り「/」を出さず案件名のみ表示する（孤立セパレータ防止） */}
+                {card.project.client_name && (
+                    <>
+                        <TruncatedText text={card.project.client_name} className="min-w-0" />
+                        <span className="shrink-0">/</span>
+                    </>
+                )}
                 <TruncatedText text={card.project.name} className="min-w-0" />
             </p>
 
