@@ -6,10 +6,10 @@ import MatchCard from '@/Components/Matching/MatchCard';
 import MatchDrawer from '@/Components/Matching/MatchDrawer';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
-import { MatchingShowPageProps } from '@/types/matching';
+import { MatchingEmptyReason, MatchingShowPageProps } from '@/types/matching';
 import { Head } from '@inertiajs/react';
-import { SearchX } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, PackageX, SearchX } from 'lucide-react';
+import { ComponentType, useState } from 'react';
 
 type Props = PageProps<MatchingShowPageProps>;
 
@@ -20,7 +20,33 @@ const STATUS_STYLES: Record<string, { label: string; badge: string }> = {
     not_proposable: { label: '提案不可', badge: 'border-gray-400 text-gray-600 bg-gray-50' },
 };
 
-export default function Show({ engineer, results }: Props) {
+// 結果0件時の空状態を理由ごとに出し分ける（アイコン・見出し・説明）。
+// キーはサーバー MatchingController の EMPTY_* 定数（emptyReason）と一致させる。
+const EMPTY_STATES: Record<
+    MatchingEmptyReason,
+    { icon: ComponentType<{ className?: string }>; title: string; description: string }
+> = {
+    // #1・#2：そもそも条件に合う募集中案件が無い（正常系の0件）。
+    no_match: {
+        icon: SearchX,
+        title: 'マッチする案件がありませんでした',
+        description: '条件に合う募集中の案件が見つかりませんでした。',
+    },
+    // #3：エンジン通信失敗。別途 flash.error のトーストも表示される。
+    engine_error: {
+        icon: AlertTriangle,
+        title: 'マッチングを実行できませんでした',
+        description: 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。',
+    },
+    // #4：マッチはあったが、対象案件が削除・募集終了により表示できるものが無くなった。
+    unavailable: {
+        icon: PackageX,
+        title: '表示できる案件がありませんでした',
+        description: 'マッチした案件は削除または募集終了により表示できません。',
+    },
+};
+
+export default function Show({ engineer, results, emptyReason }: Props) {
     // 選択中カードの index（ドロワー開閉）。null で閉じている。
     const [selected, setSelected] = useState<number | null>(null);
 
@@ -116,13 +142,19 @@ export default function Show({ engineer, results }: Props) {
                 {/* 結果一覧（WF_09 の list-area：薄グレー背景・この領域のみスクロール。人材一覧カードの一覧エリアと同じ bg-muted/30） */}
                 <div className="flex-1 overflow-y-auto bg-muted/30 px-10 py-4">
                     {results.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border py-16 text-center">
-                            <SearchX className="mb-2 h-8 w-8 text-muted-foreground" />
-                            <p className="text-sm font-semibold text-foreground">マッチする案件がありませんでした</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                条件に合う募集中の案件が見つからないか、マッチングを実行できませんでした。
-                            </p>
-                        </div>
+                        (() => {
+                            // 結果0件の理由で出し分ける。emptyReason は0件時は必ず入るが、
+                            // 万一 null でも no_match にフォールバックして必ず何か表示する。
+                            const empty = EMPTY_STATES[emptyReason ?? 'no_match'];
+                            const EmptyIcon = empty.icon;
+                            return (
+                                <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border py-16 text-center">
+                                    <EmptyIcon className="mb-2 h-8 w-8 text-muted-foreground" />
+                                    <p className="text-sm font-semibold text-foreground">{empty.title}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">{empty.description}</p>
+                                </div>
+                            );
+                        })()
                     ) : (
                         <div className="space-y-2.5">
                             {results.map((result, i) => (

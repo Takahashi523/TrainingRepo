@@ -1,29 +1,23 @@
 import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
+import SkillTagDetail from '@/Components/Common/SkillTagDetail';
+import StatusBadge from '@/Components/Common/StatusBadge';
+import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerShowPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { ArrowLeftRight, Check, Clock, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, Clock, Pencil, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 type Props = PageProps<EngineerShowPageProps>;
 
-const STATUS_MAP: Record<string, { label: string; className: string }> = {
-    proposable:    { label: '提案可',  className: 'border-green-600 text-green-700 bg-green-50' },
-    interviewing:  { label: '面談中',  className: 'border-amber-500 text-amber-700 bg-amber-50' },
-    not_proposable:{ label: '提案不可',className: 'border-gray-400 text-gray-600 bg-gray-50'   },
+const ENGINEER_STATUS_LABELS: Record<string, string> = {
+    proposable:     '提案可',
+    interviewing:   '面談中',
+    not_proposable: '提案不可',
 };
-
-function StatusBadge({ status }: { status: string }) {
-    const s = STATUS_MAP[status] ?? { label: status, className: 'border-gray-400 text-gray-600' };
-    return (
-        <span className={`inline-block rounded-full border px-3 py-0.5 text-xs font-bold ${s.className}`}>
-            {s.label}
-        </span>
-    );
-}
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -47,31 +41,6 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
     );
 }
 
-function SkillTag({ label, detail }: { label: string; detail: string | null }) {
-    const [open, setOpen] = useState(false);
-
-    return (
-        <div className="relative inline-flex flex-col">
-            <span className="inline-flex items-center gap-1.5 rounded border border-border bg-white px-2 py-0.5 text-xs text-foreground">
-                {label}
-                {detail && (
-                    <button
-                        type="button"
-                        className="text-[10px] text-muted-foreground hover:text-foreground"
-                        onClick={() => setOpen((v) => !v)}
-                    >
-                        {open ? '▲' : '▼'}
-                    </button>
-                )}
-            </span>
-            {open && detail && (
-                <div className="absolute left-0 top-full z-10 mt-1 min-w-48 max-w-xs rounded border border-border bg-white p-2 text-xs leading-relaxed text-muted-foreground shadow-md">
-                    {detail}
-                </div>
-            )}
-        </div>
-    );
-}
 
 export default function Show({ engineer }: Props) {
     const { auth } = usePage<Props>().props;
@@ -127,6 +96,8 @@ export default function Show({ engineer }: Props) {
                     <Button
                         onClick={() =>
                             router.get(
+                                // ルートは一覧カードと統一（`/engineers/{id}/matching`＝engineers.matching）。
+                                // 旧 `/matching/{id}` は未定義ルートで 404 になっていたため廃止（9-6）。
                                 `/engineers/${engineer.id}/matching`,
                                 {},
                                 {
@@ -191,7 +162,10 @@ export default function Show({ engineer }: Props) {
                             )}
                         </p>
                         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <StatusBadge status={engineer.status} />
+                            <StatusBadge
+                                status={engineer.status}
+                                label={ENGINEER_STATUS_LABELS[engineer.status] ?? engineer.status}
+                            />
                             <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
                                 <Clock className="mr-1 inline h-3 w-3" />{engineer.available_label}
                             </span>
@@ -282,7 +256,7 @@ export default function Show({ engineer }: Props) {
                         {engineer.skills.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {engineer.skills.map((skill, i) => (
-                                    <SkillTag key={i} label={skill.label ?? ''} detail={skill.detail} />
+                                    <SkillTagDetail key={i} label={skill.label ?? ''} detail={skill.detail} />
                                 ))}
                             </div>
                         ) : (
@@ -290,24 +264,12 @@ export default function Show({ engineer }: Props) {
                         )}
                     </DetailRow>
                     <DetailRow label="経験工程">
-                        <div className="flex flex-wrap gap-3">
-                            {engineer.phases.map((phase) => (
-                                <span key={phase.key} className="flex items-center gap-1 text-sm">
-                                    <span
-                                        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border text-[9px] font-bold ${
-                                            phase.has_experience
-                                                ? 'border-primary bg-primary text-primary-foreground'
-                                                : 'border-border bg-muted/50 text-transparent'
-                                        }`}
-                                    >
-                                        {phase.has_experience && <Check className="h-2.5 w-2.5" />}
-                                    </span>
-                                    <span className={phase.has_experience ? 'text-foreground' : 'text-muted-foreground'}>
-                                        {phase.name}
-                                    </span>
-                                </span>
-                            ))}
-                        </div>
+                        <ProcessCheckboxGroup
+                            phases={engineer.phases.map(({ key, name }) => ({ key, name }))}
+                            values={Object.fromEntries(engineer.phases.map((p) => [p.key, p.has_experience]))}
+                            readOnly
+                            className="flex-nowrap gap-x-4"
+                        />
                     </DetailRow>
                     <DetailRow label="顧客折衝経験">
                         {engineer.has_negotiation_exp === true
@@ -364,7 +326,10 @@ export default function Show({ engineer }: Props) {
                 {/* 管理情報 */}
                 <SectionCard title="管理情報">
                     <DetailRow label="ステータス">
-                        <StatusBadge status={engineer.status} />
+                        <StatusBadge
+                            status={engineer.status}
+                            label={ENGINEER_STATUS_LABELS[engineer.status] ?? engineer.status}
+                        />
                     </DetailRow>
                     <DetailRow label="担当営業">
                         <span>担当：{engineer.users.main.name}</span>

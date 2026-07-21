@@ -29,7 +29,17 @@ export interface MatchResult {
     is_in_pipeline: boolean;
 }
 
+/**
+ * 結果0件のときの理由。空状態の文言・アイコンを出し分ける（結果ありのときは null）。
+ * サーバー MatchingController の EMPTY_* 定数と一致させること。
+ *  - no_match     : 候補案件なし / スコア0件
+ *  - engine_error : エンジン通信失敗（flash.error も併発）
+ *  - unavailable  : マッチはあったが対象案件が削除・非掲出で全滅
+ */
+export type MatchingEmptyReason = 'no_match' | 'engine_error' | 'unavailable';
+
 export type MatchingShowPageProps = {
     engineer: Engineer;
     results: MatchResult[];
+    emptyReason: MatchingEmptyReason | null;
 };

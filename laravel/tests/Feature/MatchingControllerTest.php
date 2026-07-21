@@ -88,6 +88,8 @@ class MatchingControllerTest extends TestCase
             ->where('results.2.match_score', 47)
             ->where('results.0.project.id', $projects[0]->id)
             ->where('results.0.is_in_pipeline', false)
+            // 結果ありのとき emptyReason は null
+            ->where('emptyReason', null)
         );
     }
 
@@ -165,7 +167,26 @@ class MatchingControllerTest extends TestCase
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->component('Matching/Show')->has('results', 0));
+        // #1：候補案件なし → emptyReason = no_match（エラーではないので flash なし）
+        $response->assertSessionMissing('error');
+        $response->assertInertia(fn ($page) => $page->component('Matching/Show')
+            ->has('results', 0)
+            ->where('emptyReason', 'no_match'));
+    }
+
+    public function test_engine_returns_empty_matches_shows_no_match(): void
+    {
+        // #2：エンジンは 200 で成功したが matches が空配列（候補0件と同じ扱い）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $this->fakeEngine([]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        $response->assertSessionMissing('error');
+        $response->assertInertia(fn ($page) => $page->has('results', 0)
+            ->where('emptyReason', 'no_match'));
     }
 
     public function test_upstream_error_shows_flash_error_and_empty_results(): void
@@ -178,7 +199,11 @@ class MatchingControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSessionHas('error');
-        $response->assertInertia(fn ($page) => $page->has('results', 0));
+        // #3：通信失敗 → emptyReason = engine_error（flash も併発）
+        // flash.error は Inertia の共有プロップとしても同一リクエストで渡ること（トースト表示の前提）
+        $response->assertInertia(fn ($page) => $page->has('results', 0)
+            ->where('emptyReason', 'engine_error')
+            ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
     }
 
     public function test_bare_404_without_error_code_is_treated_as_upstream_not_404(): void
@@ -223,7 +248,29 @@ class MatchingControllerTest extends TestCase
 
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
 
+        // 一部だけ残る場合は結果あり＝emptyReason は null
         $response->assertInertia(fn ($page) => $page->has('results', 1)
-            ->where('results.0.project.id', $project->id));
+            ->where('results.0.project.id', $project->id)
+            ->where('emptyReason', null));
+    }
+
+    public function test_all_matched_projects_unavailable_shows_unavailable_reason(): void
+    {
+        // #4：エンジンはマッチを返したが、対象案件が全て削除・非掲出で突合できない（レース）。
+        // no_match（そもそも候補なし）と区別し emptyReason = unavailable。エラーではないので flash なし。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $this->fakeEngine([
+            $this->match(99998, 90, 'A'),
+            $this->match(99999, 85, 'A'),
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        $response->assertSessionMissing('error');
+        $response->assertInertia(fn ($page) => $page->has('results', 0)
+            ->where('emptyReason', 'unavailable'));
     }
 }

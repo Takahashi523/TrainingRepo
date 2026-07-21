@@ -23,6 +23,13 @@ use Inertia\Response;
  */
 class MatchingController extends Controller
 {
+    /** 空状態の理由（フロントで文言・アイコンを出し分ける。null＝結果あり）。 */
+    public const EMPTY_NO_MATCH = 'no_match';        // 候補案件なし / スコア0件（#1・#2）
+
+    public const EMPTY_ENGINE_ERROR = 'engine_error'; // エンジン通信失敗（#3・flash.error も併発）
+
+    public const EMPTY_UNAVAILABLE = 'unavailable';   // マッチはあったが対象案件が削除・非掲出で全滅（#4）
+
     public function __construct(private readonly MatchingEngineClient $engine) {}
 
     /**
@@ -35,23 +42,28 @@ class MatchingController extends Controller
         // （age / available_label 等の算出を二重定義しない）。skills / 担当営業を Eager Load し N+1 を防ぐ。
         $engineer->load(['skills:id,engineer_id,label,detail', 'mainUser:id,name', 'subUser:id,name']);
 
-        $results = $this->resolveMatches($engineer);
+        ['items' => $results, 'reason' => $emptyReason] = $this->resolveMatches($engineer);
 
         return Inertia::render('Matching/Show', [
             'engineer' => EngineerResource::make($engineer),
             // data ラップを避けるため toArray で素の配列にする（既存 PipelineController と同方式）。
             'results' => MatchingResource::collection($results)->toArray($request),
+            // 結果0件のとき、その理由（no_match / engine_error / unavailable）をフロントへ渡し
+            // 空状態の文言・アイコンを出し分ける。結果ありのときは null。
+            'emptyReason' => $emptyReason,
         ]);
     }
 
     /**
-     * マッチングエンジンを呼び出し、案件情報・パイプライン状態と突合した results 配列を返す。
-     * エラー種別に応じて挙動を分ける（設計書 §4.2）。
+     * マッチングエンジンを呼び出し、案件情報・パイプライン状態と突合した結果を理由付きで返す。
+     * エラー種別に応じて挙動を分ける（設計書 §4.2）。空状態はさらに reason で細分する。
      *  - NotFound（404 / 非掲出）：404 応答
-     *  - NoCandidate（候補0件）：結果0件の空状態として正常表示
-     *  - Upstream（400/500/504・接続不可）：flash.error を出しつつ結果0件で描画（Silent Rejection 回避）
+     *  - NoCandidate（候補0件）：結果0件（reason=no_match）として正常表示
+     *  - スコア0件：同上（reason=no_match）
+     *  - Upstream（400/500/504・接続不可）：flash.error を出しつつ結果0件（reason=engine_error）で描画（Silent Rejection 回避）
+     *  - 突合後全滅：マッチはあったが案件が削除・非掲出で1件も残らない（reason=unavailable）
      *
-     * @return list<array{result: MatchResult, project: Project, is_in_pipeline: bool}>
+     * @return array{items: list<array{result: MatchResult, project: Project, is_in_pipeline: bool}>, reason: ?string}
      */
     private function resolveMatches(Engineer $engineer): array
     {
@@ -63,16 +75,16 @@ class MatchingController extends Controller
             }
 
             if ($e->isNoCandidate()) {
-                return [];
+                return ['items' => [], 'reason' => self::EMPTY_NO_MATCH];
             }
 
             session()->flash('error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。');
 
-            return [];
+            return ['items' => [], 'reason' => self::EMPTY_ENGINE_ERROR];
         }
 
         if (count($matches) === 0) {
-            return [];
+            return ['items' => [], 'reason' => self::EMPTY_NO_MATCH];
         }
 
         $projectIds = array_map(static fn ($m) => $m->projectId, $matches);
@@ -110,6 +122,13 @@ class MatchingController extends Controller
             ];
         }
 
-        return $items;
+        // エンジンはマッチを返した（count($matches) > 0）のに突合後に1件も残らない場合は、
+        // スコアリング後に対象案件が削除・非掲出になったレース（#4）。no_match（そもそも候補なし）
+        // とは区別し、unavailable として専用の空状態を出す。
+        if (count($items) === 0) {
+            return ['items' => [], 'reason' => self::EMPTY_UNAVAILABLE];
+        }
+
+        return ['items' => $items, 'reason' => null];
     }
 }

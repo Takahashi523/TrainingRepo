@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class Engineer extends Model
 {
@@ -39,17 +41,46 @@ class Engineer extends Model
     protected function casts(): array
     {
         return [
-            'has_negotiation_exp'  => 'boolean',
-            'proc_requirements'    => 'boolean',
-            'proc_basic_design'    => 'boolean',
-            'proc_detail_design'   => 'boolean',
-            'proc_development'     => 'boolean',
-            'proc_testing'         => 'boolean',
-            'proc_maintenance'     => 'boolean',
-            'work_style_onsite'    => 'boolean',
-            'work_style_hybrid'    => 'boolean',
-            'work_style_remote'    => 'boolean',
+            'has_negotiation_exp' => 'boolean',
+            'proc_requirements' => 'boolean',
+            'proc_basic_design' => 'boolean',
+            'proc_detail_design' => 'boolean',
+            'proc_development' => 'boolean',
+            'proc_testing' => 'boolean',
+            'proc_maintenance' => 'boolean',
+            'work_style_onsite' => 'boolean',
+            'work_style_hybrid' => 'boolean',
+            'work_style_remote' => 'boolean',
         ];
+    }
+
+    /**
+     * 年齢（birth_date から算出）。birth_date が null なら null。
+     *
+     * 一覧（EngineerListResource）と詳細・マッチング（EngineerResource）で同一算出をしていたため、
+     * モデルのアクセサに集約して SSOT 化する（tasklist 9-3）。
+     */
+    protected function age(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?int => $this->birth_date
+                ? Carbon::parse($this->birth_date)->age
+                : null,
+        );
+    }
+
+    /**
+     * 稼働可能時期の表示ラベル（例「2026/08/01〜」）。available_from が null なら「未定」。
+     *
+     * age と同様、一覧・詳細・マッチングで重複していた表示ロジックをモデルに集約する（tasklist 9-3）。
+     */
+    protected function availableLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->available_from
+                ? Carbon::parse($this->available_from)->format('Y/m/d').'〜'
+                : '未定',
+        );
     }
 
     public function skills(): HasMany
