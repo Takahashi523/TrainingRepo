@@ -58,7 +58,12 @@ export default function ConfirmDialog({
                 if (!next) onCancel();
             }}
         >
-            <DialogContent className="max-w-sm">
+            {/* 背景幕は AI ローディングオーバーレイ（AiLoadingOverlay）と同じ明色ブラーに揃え、
+                アプリ全体でモーダル背景の見た目を統一する（既定の暗幕 bg-black/80 を上書き） */}
+            <DialogContent
+                className="max-w-sm"
+                overlayClassName="bg-white/70 backdrop-blur-sm"
+            >
                 <DialogHeader>
                     {/* shadcn 既定（text-lg）は大きめのため、従来の確認モーダルに合わせて text-base に抑える */}
                     <DialogTitle className="text-base font-bold">{title}</DialogTitle>

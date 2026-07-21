@@ -120,7 +120,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
 
     return (
         <AuthenticatedLayout>
-            <Head title="進捗管理（完了済み）" />
+            <Head title="進捗管理" />
 
             {/*
              * 進行中タブ（Index.tsx）と同様に -m-6 で <main> の p-6 を打ち消し、画面全高の flex カラムにする。
@@ -134,7 +134,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                     <div className="border-b border-border px-10 py-4">
                         <h1 className="text-lg font-bold text-foreground">進捗管理</h1>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            終了したパイプラインの一覧・検索
+                            終了したパイプラインを検索・確認します
                         </p>
                     </div>
 
@@ -202,7 +202,9 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                                             <TruncatedText as="div" text={row.engineer.name} />
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-muted-foreground">
-                                            <TruncatedText as="div" text={row.project.client_name} />
+                                            {/* 顧客名は nullable かつ空文字もあり得る。テーブルの固定カラムでは空セルが曖昧なため、
+                                                null・空文字の両方（|| で falsy を一括判定）を NG理由と平仄を合わせ「—」で表す */}
+                                            <TruncatedText as="div" text={row.project.client_name || '—'} />
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-muted-foreground">
                                             <TruncatedText as="div" text={row.project.name} />
@@ -221,7 +223,8 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                                             {formatEndedAt(row.ended_at)}
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-[11px] text-muted-foreground">
-                                            <TruncatedText as="div" text={row.ng_reason ?? '—'} />
+                                            {/* NG理由は nullable な自由記述。空文字も漏らさないよう || で falsy を一括判定し「—」に揃える */}
+                                            <TruncatedText as="div" text={row.ng_reason || '—'} />
                                         </TableCell>
                                         {isAdmin && (
                                             <TableCell className="px-3 py-2.5">

@@ -17,6 +17,21 @@ export const RANK_STYLES: Record<string, string> = {
 /** 想定外のランク値・フォールバック用の中立グレー（StatusBadge のデフォルトと同一） */
 export const RANK_FALLBACK_STYLE = 'border border-gray-400 text-gray-600 bg-gray-50';
 
+/**
+ * スコアバー等の「塗りつぶし」用ランク配色。バッジは淡色地（bg-*-50）だが、
+ * バーは視認性のため実色（RANK_STYLES のボーダー色と同一トーン）で塗る。
+ * ランク未算出（null）や想定外値は中立グレーにフォールバックする。
+ */
+export const RANK_BAR_STYLES: Record<string, string> = {
+    A: 'bg-green-600',
+    B: 'bg-lime-600',
+    C: 'bg-amber-500',
+    D: 'bg-rose-500',
+};
+
+/** ランク未算出・想定外値のバー色（中立グレー） */
+export const RANK_BAR_FALLBACK_STYLE = 'bg-muted-foreground';
+
 interface Props {
     /** マッチングランク（A/B/C/D）。null はランク未算出として「—」を表示 */
     rank: string | null;

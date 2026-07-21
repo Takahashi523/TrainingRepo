@@ -72,7 +72,8 @@ export interface PipelineEngineerRef {
 export interface PipelineProjectRef {
     id: number;
     name: string;
-    client_name: string;
+    /** 顧客名。projects.client_name は nullable のため null を許容する */
+    client_name: string | null;
 }
 
 /** カンバンカード（TEXT カラムは含まない） */
