@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\EngineerController;
+use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\ProjectController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -16,6 +17,13 @@ Route::get('/dashboard', function () {
 Route::middleware('auth')->group(function () {
     Route::resource('engineers', EngineerController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
     Route::resource('projects', ProjectController::class);
+
+    // パイプライン（進捗管理）。completed を {pipeline} より前に定義しルート衝突を避ける
+    Route::get('pipelines', [PipelineController::class, 'index'])->name('pipelines.index');
+    Route::get('pipelines/completed', [PipelineController::class, 'completed'])->name('pipelines.completed');
+    Route::get('pipelines/{pipeline}', [PipelineController::class, 'show'])->name('pipelines.show');
+    Route::patch('pipelines/{pipeline}', [PipelineController::class, 'update'])->name('pipelines.update');
+    Route::delete('pipelines/{pipeline}', [PipelineController::class, 'destroy'])->name('pipelines.destroy');
 });
 
 require __DIR__.'/auth.php';

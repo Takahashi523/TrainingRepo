@@ -97,7 +97,7 @@ WF_02より、ダッシュボードは以下の3セクションで構成され�
     {
       "status": "string",        // DB値（proposed / applying 等・進行中12種）
       "status_label": "string",  // 表示名（上位提案 / 応募中 等）
-      "group": "string",         // カンバングループ（applying_before / first_interview / final_interview / offer）
+      "group": "string",         // カンバングループ（entry / first_interview / final_interview / offer）※旧 applying_before
       "count": "int",            // 件数
       "percentage": "int"        // 全進行中カード総数に対する割合（%・小数点切り捨て）
                                  // active_pipeline_count = 0 の場合は 0 を返す
