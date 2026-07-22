@@ -133,11 +133,13 @@ class MatchingController extends Controller
             ->pluck('project_id')
             ->flip();
 
-        // 案件ごとの既存パイプライン件数（全人材）を1クエリで集計（N+1 回避）。
-        // 上限（Pipeline::MAX_PER_PROJECT）到達済みの案件を読み込み時点で「上限到達」として先出し無効化し、
+        // 案件ごとの進行中（アクティブ）パイプライン件数（全人材）を1クエリで集計（N+1 回避）。
+        // 上限判定は PipelineService@create と同じく進行中のみを数える（QA #50・アクティブ5件。
+        // 終了済みは枠を消費しない）。上限到達済みの案件を読み込み時点で「上限到達」として先出し無効化し、
         // クリックして初めて 422 で弾かれる導線（閉じる→再オープンで再度押せてしまう）を避ける。
         $pipelineCounts = Pipeline::query()
             ->whereIn('project_id', $projectIds)
+            ->whereIn('status', Pipeline::inProgressValues())
             ->selectRaw('project_id, COUNT(*) as aggregate')
             ->groupBy('project_id')
             ->pluck('aggregate', 'project_id');

@@ -162,6 +162,27 @@ class PipelineStoreTest extends TestCase
         $this->assertDatabaseCount('pipelines', 0);
     }
 
+    public function test_terminal_pipelines_do_not_count_toward_limit(): void
+    {
+        // 上限は進行中（アクティブ）のみで判定する（QA #50・アクティブ5件）。終了済みが5件あっても、
+        // 進行中が0件なら新規追加できる（終了済みは枠を消費しない）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $project = Project::factory()->create(['main_user_id' => $user->id]);
+
+        Pipeline::factory()->count(5)->terminal()->create(['project_id' => $project->id]);
+
+        $response = $this->actingAs($user)->post('/pipelines', $this->payload($engineer, $project));
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('pipelines', [
+            'engineer_id' => $engineer->id,
+            'project_id' => $project->id,
+            'status' => 'proposed',
+        ]);
+    }
+
     public function test_validation_rejects_invalid_score_and_rank(): void
     {
         $user = User::factory()->create();

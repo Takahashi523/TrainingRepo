@@ -33,8 +33,11 @@ class PipelineService
 
         try {
             return DB::transaction(function () use ($data, $engineerId, $projectId) {
-                // 上限チェック：同一案件の既存件数を lockForUpdate で確定させてから判定する。
+                // 上限チェック：進行中（アクティブ）のパイプライン件数のみを数える（QA #50・アクティブ5件）。
+                // 終了済み（不成立・見送り等の terminal）は枠を消費しない＝再度追加できる。
+                // 同一案件の進行中件数を lockForUpdate で確定させてから判定する。
                 $count = Pipeline::where('project_id', $projectId)
+                    ->whereIn('status', Pipeline::inProgressValues())
                     ->lockForUpdate()
                     ->count();
 

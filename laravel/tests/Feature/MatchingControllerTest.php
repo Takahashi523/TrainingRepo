@@ -169,6 +169,22 @@ class MatchingControllerTest extends TestCase
             ->where('results.1.is_project_full', false));
     }
 
+    public function test_terminal_pipelines_do_not_mark_project_full(): void
+    {
+        // 上限（is_project_full）は進行中のみで判定。終了済みが5件でも枠は消費しないため full にならない。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $project = Project::factory()->create(['main_user_id' => $user->id]);
+        Pipeline::factory()->count(5)->terminal()->create(['project_id' => $project->id]);
+
+        $this->fakeEngine([$this->match($project->id, 80, 'A')]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertInertia(fn ($page) => $page->has('results', 1)
+            ->where('results.0.is_project_full', false));
+    }
+
     // -------------------------------------------------------
     // 人材ステータスによる実行可否（設計書 §3.4）
     // -------------------------------------------------------
