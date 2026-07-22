@@ -154,7 +154,7 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                     {skills.length > 0 ? (
                         <CollapsibleTagRow className="mt-1.5">
                             {skills.map((s, i) => (
-                                <SkillTag key={i} label={s.label} skillType={s.skillType} className="text-muted-foreground" />
+                                <SkillTag key={`${s.skillType}-${s.label}-${i}`} label={s.label} skillType={s.skillType} className="text-muted-foreground" />
                             ))}
                         </CollapsibleTagRow>
                     ) : (

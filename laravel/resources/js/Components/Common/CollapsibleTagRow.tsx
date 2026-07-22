@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { Children, useLayoutEffect, useRef, useState } from 'react';
+import { Children, useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 interface Props {
     /** 並べるタグ群（SkillTag など）。 */
@@ -27,44 +27,55 @@ export default function CollapsibleTagRow({ children, className }: Props) {
     // 1 行に収まるタグ数。初期は全件（計測前は省略しない）。
     const [visibleCount, setVisibleCount] = useState(items.length);
 
+    // ミラー DOM の実幅から「1 行に収まるタグ数」を測る。DOM のみを読むため依存なしで安定させる。
+    const measure = useCallback(() => {
+        const el = mirrorRef.current;
+        if (!el) return;
+
+        const nodes = Array.from(el.children) as HTMLElement[];
+        // ミラーの末尾要素はトグルのプレースホルダ。それを除いたものがタグ。
+        const tagNodes = nodes.slice(0, -1);
+        const buttonNode = nodes[nodes.length - 1];
+        if (tagNodes.length === 0) {
+            setVisibleCount(0);
+            return;
+        }
+
+        const firstTop = tagNodes[0].offsetTop;
+        const firstRow = tagNodes.filter((n) => n.offsetTop === firstTop);
+
+        // トグル不要（全タグが 1 行に収まる）なら省略しない。
+        if (firstRow.length === tagNodes.length) {
+            setVisibleCount(tagNodes.length);
+            return;
+        }
+
+        // あふれる場合はトグル幅を確保し、「タグ＋トグル」が 1 行に収まる数を数える。
+        const limit = el.clientWidth - GAP_PX - buttonNode.offsetWidth;
+        let count = 0;
+        for (const n of firstRow) {
+            if (n.offsetLeft + n.offsetWidth <= limit) count++;
+            else break;
+        }
+        setVisibleCount(count);
+    }, []);
+
+    // 内容（children）の変化に追従して毎レンダー後に再計測する。items.length だけに依存すると、
+    // 件数が同じで各タグの内容/幅だけ変わったとき（別案件のスキルへ差し替え等）truncation が古い幅の
+    // ままになる。measure は同値なら setState を no-op にするため、毎レンダー実行でも収束する。
+    useLayoutEffect(() => {
+        measure();
+    });
+
+    // コンテナ幅の変化には ResizeObserver で追従（マウント時に一度だけ観測）。
     useLayoutEffect(() => {
         const el = mirrorRef.current;
         if (!el) return;
 
-        const measure = () => {
-            const nodes = Array.from(el.children) as HTMLElement[];
-            // ミラーの末尾要素はトグルのプレースホルダ。それを除いたものがタグ。
-            const tagNodes = nodes.slice(0, -1);
-            const buttonNode = nodes[nodes.length - 1];
-            if (tagNodes.length === 0) {
-                setVisibleCount(0);
-                return;
-            }
-
-            const firstTop = tagNodes[0].offsetTop;
-            const firstRow = tagNodes.filter((n) => n.offsetTop === firstTop);
-
-            // トグル不要（全タグが 1 行に収まる）なら省略しない。
-            if (firstRow.length === tagNodes.length) {
-                setVisibleCount(tagNodes.length);
-                return;
-            }
-
-            // あふれる場合はトグル幅を確保し、「タグ＋トグル」が 1 行に収まる数を数える。
-            const limit = el.clientWidth - GAP_PX - buttonNode.offsetWidth;
-            let count = 0;
-            for (const n of firstRow) {
-                if (n.offsetLeft + n.offsetWidth <= limit) count++;
-                else break;
-            }
-            setVisibleCount(count);
-        };
-
-        measure();
-        const observer = new ResizeObserver(measure);
+        const observer = new ResizeObserver(() => measure());
         observer.observe(el);
         return () => observer.disconnect();
-    }, [items.length]);
+    }, [measure]);
 
     const overflow = visibleCount < items.length;
     const shownItems = expanded ? items : items.slice(0, visibleCount);

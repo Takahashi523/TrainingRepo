@@ -109,7 +109,7 @@ export default function Show({ engineer, results, emptyReason }: Props) {
                         // detail は一覧・簡易表示の規約どおり非表示（詳細は SkillTagDetail を使う人材詳細画面で確認できる）。
                         <CollapsibleTagRow className="mt-1.5">
                             {engineer.skills.map((s, i) => (
-                                <SkillTag key={i} label={s.label ?? ''} className="text-muted-foreground" />
+                                <SkillTag key={`${s.label ?? ''}-${i}`} label={s.label ?? ''} className="text-muted-foreground" />
                             ))}
                         </CollapsibleTagRow>
                     ) : (
