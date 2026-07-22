@@ -127,7 +127,11 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                 {/* スコアバー列（WF: score-bar-wrap 80px 相当）。バーはランク配色に揃える */}
                 <div className="w-20 shrink-0">
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div className={cn('h-full rounded-full', accentClass)} style={{ width: `${match_score}%` }} />
+                        {/* 範囲外スコア（0未満/100超）でもバーが溢れ・負幅にならないよう 0〜100 に clamp（MatchDrawer と統一）。 */}
+                        <div
+                            className={cn('h-full rounded-full', accentClass)}
+                            style={{ width: `${Math.min(100, Math.max(0, match_score))}%` }}
+                        />
                     </div>
                     <div className="mt-1 text-center text-[9px] text-muted-foreground">{match_score} / 100</div>
                 </div>

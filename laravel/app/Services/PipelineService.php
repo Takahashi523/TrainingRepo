@@ -68,23 +68,24 @@ class PipelineService
                 ]);
             });
         } catch (QueryException $e) {
-            // UNIQUE 制約違反（競合で重複チェックを貫通したケース）を重複エラーへ変換する。
-            if ($this->isUniqueViolation($e)) {
+            // 競合で事前チェック（重複・上限）を貫通した DB 制約違反の処理。
+            // SQLSTATE で判定しない：`23000` は UNIQUE 違反だけでなく FK 違反も含むため、
+            // 案件/人材が計算中〜追加の間に削除された FK 違反を「すでに追加済み」と誤変換してしまう
+            // （MySQL 1062 等のドライバ依存コードは SQLite テストで動かない）。
+            // 代わりに実際に (engineer_id, project_id) の重複行が存在するかで判定する（ドライバ非依存）。
+            $isDuplicate = Pipeline::where('engineer_id', $engineerId)
+                ->where('project_id', $projectId)
+                ->exists();
+
+            if ($isDuplicate) {
                 throw ValidationException::withMessages([
                     'project_id' => 'この人材はすでにこの案件のパイプラインに追加されています。',
                 ]);
             }
 
+            // 重複でない制約違反（FK 違反など）は「重複」と偽らずそのまま送出する。
             throw $e;
         }
-    }
-
-    /**
-     * QueryException が UNIQUE 制約違反（SQLSTATE 23000）かどうか。
-     */
-    private function isUniqueViolation(QueryException $e): bool
-    {
-        return $e->getCode() === '23000';
     }
 
     /**

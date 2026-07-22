@@ -57,7 +57,12 @@ class MatchingResource extends JsonResource
                 // 掲載状態（open=募集中 / closed=終了 / pending=ペンディング）。フロントで
                 // is_available=false のときの正確なラベル（終了／ペンディング）表示に使う。
                 'status' => $project->status,
-                'start_date' => optional($project->start_date)->format('Y-m-d') ?? $project->start_date,
+                // start_date は Carbon キャストされていない文字列のため optional()->format() は常に no-op
+                // （常に null→生値フォールバック）になる。Carbon::parse で明示的に Y-m-d へ正規化する
+                // （直下の start_label と同じ生成規則）。null は null のまま返す。
+                'start_date' => $project->start_date
+                    ? Carbon::parse($project->start_date)->format('Y-m-d')
+                    : null,
                 // 開始時期ラベルは人材の available_label と同じ生成規則で揃える。
                 'start_label' => $project->start_date
                     ? Carbon::parse($project->start_date)->format('Y/m/d').'〜'

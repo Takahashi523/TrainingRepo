@@ -303,6 +303,28 @@ class MatchingControllerTest extends TestCase
         $response->assertSessionHas('error');
     }
 
+    public function test_malformed_engine_response_is_treated_as_upstream(): void
+    {
+        // 200 だが matches[] の必須キー（project_id）が欠落した不正応答。(int) キャストで 0 に潰して
+        // 突合で静かに脱落させず、上流障害として空状態＋flash.error にする（Silent Rejection 回避）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        Http::fake(['*/api/v1/matching/calculate' => Http::response([
+            'engineer_id' => $engineer->id,
+            'generated_at' => now()->toIso8601String(),
+            'matches' => [
+                ['match_score' => 90, 'match_rank' => 'A'], // project_id 欠落
+            ],
+        ], 200)]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        $response->assertSessionHas('error');
+        $response->assertInertia(fn ($page) => $page->has('results', 0)
+            ->where('emptyReason', 'engine_error'));
+    }
+
     public function test_deleted_project_is_excluded_from_results(): void
     {
         $user = User::factory()->create();

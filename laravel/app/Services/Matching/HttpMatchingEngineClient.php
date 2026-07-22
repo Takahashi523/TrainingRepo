@@ -18,6 +18,7 @@ class HttpMatchingEngineClient implements MatchingEngineClient
     {
         $baseUrl = rtrim((string) config('services.matching_engine.url'), '/');
         $timeout = (int) config('services.matching_engine.timeout', 10);
+        $connectTimeout = (int) config('services.matching_engine.connect_timeout', 5);
 
         $payload = ['engineer_id' => $engineerId];
         if ($projectIds !== null) {
@@ -25,7 +26,8 @@ class HttpMatchingEngineClient implements MatchingEngineClient
         }
 
         try {
-            $response = Http::timeout($timeout)
+            $response = Http::connectTimeout($connectTimeout)
+                ->timeout($timeout)
                 ->acceptJson()
                 ->asJson()
                 ->post($baseUrl.'/api/v1/matching/calculate', $payload);

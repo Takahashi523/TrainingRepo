@@ -50,6 +50,9 @@ return [
     'matching_engine' => [
         'url' => env('MATCHING_ENGINE_URL', 'http://python:8001'),
         'timeout' => (int) env('MATCHING_ENGINE_TIMEOUT', 10),
+        // 接続確立のタイムアウト（秒）。timeout は接続後の総応答時間しか縛らないため、
+        // ホスト到達不能・DNS 詰まり時に接続で長時間ブロックしないよう別途上限を設ける。
+        'connect_timeout' => (int) env('MATCHING_ENGINE_CONNECT_TIMEOUT', 5),
     ],
 
 ];
