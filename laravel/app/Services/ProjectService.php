@@ -52,9 +52,19 @@ class ProjectService
                 // rate_note が未入力であればデフォルト値をセットする（QA #14確定）
                 'rate_min'  => $request->boolean('rate_is_negotiable') ? null : ($request->rate_min  !== null ? (int) $request->rate_min  : null),
                 'rate_max'  => $request->boolean('rate_is_negotiable') ? null : ($request->rate_max  !== null ? (int) $request->rate_max  : null),
+                // rate_is_negotiable が false の場合：rate_note はUI上も入力欄自体が
+                // 表示されないフィールドのため、送信内容に関わらず必ず null にする
+                // （フロントで稼働形態切替時に値をクリアしなくなったことで、以前
+                // スキル見合いだった際のrate_noteが残ったまま送信されるケースがあるため）
                 'rate_note' => $request->boolean('rate_is_negotiable')
                 ? ($request->rate_note ?: 'スキル見合い')  // 未入力ならデフォルト値
-                : $request->rate_note,
+                : null,
+
+                // work_style が remote の場合：勤務地は必ず null にする（フロント側は
+                // 稼働形態切替時に入力値を保持したままにしているため、保存時にサーバー側で
+                // 強制的にnull化することを最終的な保証とする）
+                'work_location_line'    => $request->work_style === 'remote' ? null : $request->work_location_line,
+                'work_location_station' => $request->work_style === 'remote' ? null : $request->work_location_station,
             ]
         );
     }

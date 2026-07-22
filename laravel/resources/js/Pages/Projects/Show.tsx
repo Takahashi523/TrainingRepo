@@ -44,7 +44,7 @@ function DetailRow({
             <div className="w-44 shrink-0 pr-4 pt-0.5 text-xs font-semibold text-muted-foreground">
                 {label}
             </div>
-            <div className="min-w-0 flex-1 text-sm text-foreground">
+            <div className="min-w-0 flex-1 break-words text-sm text-foreground">
                 {children}
             </div>
         </div>
@@ -125,10 +125,10 @@ export default function Show({ project }: Props) {
             <div className="max-w-3xl">
                 {/* 案件サマリー */}
                 <div className="mb-6 border-b border-border pb-6">
-                    <p className="text-2xl font-bold text-foreground">
+                    <p className="break-words text-2xl font-bold text-foreground">
                         {project.name}
                     </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className="mt-0.5 break-words text-xs text-muted-foreground">
                         クライアント：{project.client_name || "—"}
                         {project.commercial_flow && (
                             <>
@@ -358,7 +358,7 @@ export default function Show({ project }: Props) {
                         <h2 className="mb-2 text-base font-bold text-foreground">
                             案件情報を削除しますか？
                         </h2>
-                        <p className="mb-5 text-sm text-muted-foreground">
+                        <p className="mb-5 break-words text-sm text-muted-foreground">
                             <strong>{project.name}</strong>{" "}
                             の情報を物理削除します。この操作は取り消せません。
                         </p>

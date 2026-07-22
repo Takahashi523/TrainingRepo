@@ -39,7 +39,9 @@ export default function Index({ projects }: Props) {
                                 }
                                 className="flex w-full items-center border-b border-border/50 px-4 py-3 text-left text-sm text-foreground last:border-b-0 hover:bg-muted/50"
                             >
-                                {project.name}
+                                <span className="min-w-0 flex-1 break-words">
+                                    {project.name}
+                                </span>
                             </button>
                         ))
                     ) : (

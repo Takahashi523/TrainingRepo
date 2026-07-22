@@ -5,6 +5,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
 import { Head, router, useForm } from "@inertiajs/react";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 type Props = PageProps<ProjectCreatePageProps>;
 
@@ -49,7 +50,19 @@ export default function Create({
         remarks: "",
     });
 
-    const { processing } = form;
+    const { processing, errors } = form;
+
+    // form.errorsが更新され、DOMに反映された後に実行されることを保証するためuseEffectを使う
+    // （onError内でrequestAnimationFrameを使う方式だと、Reactのコミット前にクエリが走ることがあり、
+    // 初回のエラー表示時だけスクロールされないことがあった）
+    useEffect(() => {
+        if (Object.keys(errors).length === 0) return;
+
+        document.querySelector(".text-destructive")?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+        });
+    }, [errors]);
 
     const handleSubmit = () => {
         form.transform((data) => ({
@@ -58,8 +71,16 @@ export default function Create({
             start_date: data.start_date || null,
             commercial_flow: data.commercial_flow || null,
             work_style: data.work_style || null,
-            work_location_line: data.work_location_line || null,
-            work_location_station: data.work_location_station || null,
+            // フルリモートの場合は勤務地を保存しない（フォーム上は切替時に値を保持し、
+            // 送信時にのみnull化することでonsite/hybridへ戻したときに再入力の手間をなくす）
+            work_location_line:
+                data.work_style === "remote"
+                    ? null
+                    : data.work_location_line || null,
+            work_location_station:
+                data.work_style === "remote"
+                    ? null
+                    : data.work_location_station || null,
             rate_note: data.rate_note || null,
             description: data.description || null,
             work_env: data.work_env || null,
