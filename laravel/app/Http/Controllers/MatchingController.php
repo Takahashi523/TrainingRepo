@@ -61,6 +61,18 @@ class MatchingController extends Controller
         // （age / available_label 等の算出を二重定義しない）。skills / 担当営業を Eager Load し N+1 を防ぐ。
         $engineer->load(['skills:id,engineer_id,label,detail', 'mainUser:id,name', 'subUser:id,name']);
 
+        // パイプライン追加直後の back リダイレクトでは、マッチングエンジンを再実行しない（#4）。
+        // スコアは未保存（QA#45）のため再計算すると並びが変わり、コストもかかり、失敗すると成功直後に
+        // 空状態へ落ちてしまう。ここではエンジンをスキップし results=null を返す（＝フロントは既存表示を
+        // preserveState で保持し、追加カードのみ「追加済み」に楽観更新する）。フラグは1回限り（pull）。
+        if (session()->pull('preserve_matching_results', false)) {
+            return Inertia::render('Matching/Show', [
+                'engineer' => EngineerResource::make($engineer),
+                'results' => null,
+                'emptyReason' => null,
+            ]);
+        }
+
         ['items' => $results, 'reason' => $emptyReason] = $this->resolveMatches($engineer);
 
         return Inertia::render('Matching/Show', [

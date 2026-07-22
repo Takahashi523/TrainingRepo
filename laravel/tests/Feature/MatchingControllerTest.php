@@ -185,6 +185,26 @@ class MatchingControllerTest extends TestCase
             ->where('results.0.is_project_full', false));
     }
 
+    public function test_reload_after_add_skips_engine_and_returns_null_results(): void
+    {
+        // #4：パイプライン追加直後の back（preserve_matching_results フラグあり）では、
+        // マッチングエンジンを再実行せず results=null を返す（フロントは既存表示を保持・楽観更新）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        Http::fake();
+
+        $response = $this->actingAs($user)
+            ->withSession(['preserve_matching_results' => true])
+            ->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        // AI エンジンは一度も呼ばれない。
+        Http::assertNothingSent();
+        $response->assertInertia(fn ($page) => $page->component('Matching/Show')
+            ->where('results', null)
+            ->where('emptyReason', null));
+    }
+
     // -------------------------------------------------------
     // 人材ステータスによる実行可否（設計書 §3.4）
     // -------------------------------------------------------

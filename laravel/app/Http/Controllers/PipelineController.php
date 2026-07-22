@@ -59,7 +59,12 @@ class PipelineController extends Controller
     {
         $this->pipelineService->create($request->validated());
 
-        return redirect()->back()->with('success', 'パイプラインに追加しました。');
+        // 追加後は同画面（マッチング結果）に留まる。ただし戻り先の show でマッチングエンジンを
+        // 再実行させない（#4：再スコアリングによる並び替わり・コスト・成功直後の空状態化を防ぐ）。
+        // preserve_matching_results フラグを立て、フロントは既存表示を保持しつつ追加カードのみ楽観更新する。
+        return redirect()->back()
+            ->with('success', 'パイプラインに追加しました。')
+            ->with('preserve_matching_results', true);
     }
 
     /**

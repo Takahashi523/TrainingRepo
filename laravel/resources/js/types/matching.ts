@@ -48,6 +48,10 @@ export type MatchingEmptyReason = 'no_match' | 'engine_error' | 'unavailable';
 
 export type MatchingShowPageProps = {
     engineer: Engineer;
-    results: MatchResult[];
+    /**
+     * マッチング結果。通常は配列。パイプライン追加直後の back では `null`＝「サーバーは再スコアリング
+     * しない（#4）。フロントは既存表示を保持し、追加カードのみ楽観更新する」ことを表す。
+     */
+    results: MatchResult[] | null;
     emptyReason: MatchingEmptyReason | null;
 };

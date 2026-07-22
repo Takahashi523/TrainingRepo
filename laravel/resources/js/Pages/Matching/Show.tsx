@@ -10,7 +10,7 @@ import { PageProps } from '@/types';
 import { MatchingEmptyReason, MatchingShowPageProps } from '@/types/matching';
 import { Head } from '@inertiajs/react';
 import { AlertTriangle, PackageX, SearchX } from 'lucide-react';
-import { ComponentType, useState } from 'react';
+import { ComponentType, useEffect, useState } from 'react';
 
 type Props = PageProps<MatchingShowPageProps>;
 
@@ -41,11 +41,32 @@ const EMPTY_STATES: Record<
     },
 };
 
-export default function Show({ engineer, results, emptyReason }: Props) {
+export default function Show({ engineer, results: resultsProp, emptyReason: emptyReasonProp }: Props) {
+    // results / emptyReason はローカル state で保持する。パイプライン追加直後の back では
+    // サーバーが results=null を返す（＝再スコアリングしない・#4）。その場合は既存表示を維持し、
+    // 追加カードのみ「追加済み」に楽観更新する。props が非 null のとき（通常遷移）だけ同期する。
+    const [results, setResults] = useState(resultsProp ?? []);
+    const [emptyReason, setEmptyReason] = useState<MatchingEmptyReason | null>(emptyReasonProp);
+
+    useEffect(() => {
+        if (resultsProp !== null) {
+            setResults(resultsProp);
+            setEmptyReason(emptyReasonProp);
+        }
+    }, [resultsProp, emptyReasonProp]);
+
     // 選択中カードの index（ドロワー開閉）。null で閉じている。
     const [selected, setSelected] = useState<number | null>(null);
 
     const current = selected != null ? results[selected] : null;
+
+    // 追加成功時：サーバー再描画に頼らず、対象案件のカードを「追加済み」に楽観更新する（#4）。
+    // 同一エンジニアのマッチング結果に同じ案件は1件しか出ないため、対象カードのみ更新すれば十分。
+    const handleAdded = (projectId: number) => {
+        setResults((prev) =>
+            prev.map((r) => (r.project.id === projectId ? { ...r, is_in_pipeline: true } : r)),
+        );
+    };
 
     // 工程経験を人材登録・一覧と同じ ProcessCheckboxGroup で表示する（readOnly）。人材は has_experience。
     const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
@@ -168,6 +189,7 @@ export default function Show({ engineer, results, emptyReason }: Props) {
                             key={current.project.id}
                             result={current}
                             engineerId={engineer.id}
+                            onAdded={() => handleAdded(current.project.id)}
                             onClose={() => setSelected(null)}
                         />
                     </div>

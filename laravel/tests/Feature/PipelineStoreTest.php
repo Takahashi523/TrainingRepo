@@ -51,6 +51,8 @@ class PipelineStoreTest extends TestCase
         $response = $this->actingAs($user)->post('/pipelines', $this->payload($engineer, $project));
 
         $response->assertSessionHas('success');
+        // 戻り先の matching でエンジンを再実行させないフラグ（#4）を立てる。
+        $response->assertSessionHas('preserve_matching_results', true);
         $this->assertDatabaseHas('pipelines', [
             'engineer_id' => $engineer->id,
             'project_id' => $project->id,

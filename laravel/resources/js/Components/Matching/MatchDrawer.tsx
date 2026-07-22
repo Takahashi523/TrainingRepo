@@ -8,6 +8,8 @@ import { Ban, Check, Plus, X } from 'lucide-react';
 interface Props {
     result: MatchResult;
     engineerId: number;
+    /** 追加成功時に呼ぶ。親が対象カードを「追加済み」に楽観更新する（サーバー再スコアリングを避ける・#4）。 */
+    onAdded: () => void;
     onClose: () => void;
 }
 
@@ -38,7 +40,7 @@ function AiBlock({ title, children }: { title: string; children: React.ReactNode
  * 追加はスナップショット（マッチング実行時点の値）を POST /pipelines し、成功時はリダイレクトで props 更新＋成功トースト。
  * オーバーレイ・固定パネルは呼び出し元（Pages/Matching/Show）が持つため、ここは中身のみ（h-full の flex カラム）。
  */
-export default function MatchDrawer({ result, engineerId, onClose }: Props) {
+export default function MatchDrawer({ result, engineerId, onAdded, onClose }: Props) {
     const { project } = result;
     const score = result.match_score;
     // スコアバー色はカード（MatchCard）と同じランク配色（RankBadge の SSOT）を共有する。
@@ -56,12 +58,17 @@ export default function MatchDrawer({ result, engineerId, onClose }: Props) {
     });
 
     const handleAdd = () => {
-        // 成功（2xx）時のみドロワーを閉じる。422（重複・上限超過）は onSuccess が発火しないため、
-        // ドロワーは開いたままエラー表示（form.errors.project_id）を保持する。
+        // 成功（2xx）時のみ楽観更新＋ドロワークローズ。422（重複・上限超過）は onSuccess が
+        // 発火しないため、ドロワーは開いたままエラー表示（form.errors.project_id）を保持する。
+        // preserveState でこのページの results ローカル state を維持し、サーバーの再スコアリング
+        // （results=null で返る #4）に依存せず追加カードを「追加済み」に反映する。
         form.post('/pipelines', {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => onClose(),
+            onSuccess: () => {
+                onAdded();
+                onClose();
+            },
         });
     };
 
