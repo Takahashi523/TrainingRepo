@@ -513,7 +513,7 @@ class EngineerControllerTest extends TestCase
     {
         $this->seedFormFieldSettings();
         $user = User::factory()->create();
-        $payload = array_merge($this->validPayload($user->id), ['desired_rate' => 65536]);
+        $payload = array_merge($this->validPayload($user->id), ['desired_rate' => 1000]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
 
@@ -524,7 +524,7 @@ class EngineerControllerTest extends TestCase
     {
         $this->seedFormFieldSettings();
         $user = User::factory()->create();
-        $payload = array_merge($this->validPayload($user->id), ['desired_rate' => 65535]);
+        $payload = array_merge($this->validPayload($user->id), ['desired_rate' => 999]);
 
         $response = $this->actingAs($user)->post('/engineers', $payload);
 
