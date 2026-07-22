@@ -73,7 +73,7 @@ export default function Show({ project }: Props) {
         if (project.rate_note) {
             return project.rate_note;
         }
-        return "非公開";
+        return "—";
     })();
 
     const workLocationLabel =
@@ -128,17 +128,23 @@ export default function Show({ project }: Props) {
                     <p className="break-words text-2xl font-bold text-foreground">
                         {project.name}
                     </p>
-                    <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                        クライアント：{project.client_name || "—"}
-                        {project.commercial_flow && (
-                            <>
-                                　｜　商流：
-                                {COMMERCIAL_FLOW_LABELS[
-                                    project.commercial_flow
-                                ] ?? project.commercial_flow}
-                            </>
-                        )}
-                    </p>
+                    {(project.client_name || project.commercial_flow) && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            {project.client_name &&
+                                `クライアント：${project.client_name}`}
+                            {project.client_name &&
+                                project.commercial_flow &&
+                                "　｜　"}
+                            {project.commercial_flow && (
+                                <>
+                                    商流：
+                                    {COMMERCIAL_FLOW_LABELS[
+                                        project.commercial_flow
+                                    ] ?? project.commercial_flow}
+                                </>
+                            )}
+                        </p>
+                    )}
                     <div className="mt-2.5 flex flex-wrap items-center gap-2">
                         <StatusBadge
                             status={project.status}

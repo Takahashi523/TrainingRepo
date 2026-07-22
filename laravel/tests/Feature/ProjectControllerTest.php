@@ -815,6 +815,49 @@ class ProjectControllerTest extends TestCase
         );
     }
 
+    public function test_show_page_contains_all_resource_scalar_fields(): void
+    {
+        $user    = User::factory()->create();
+        $project = $this->createProject([
+            'main_user_id'          => $user->id,
+            'client_name'           => 'テスト商事',
+            'start_date'            => '2026-08-01',
+            'rate_min'              => 60,
+            'rate_max'              => 80,
+            'commercial_flow'       => 'prime',
+            'work_style'            => 'onsite',
+            'work_location_line'    => 'JR山手線',
+            'work_location_station' => '渋谷',
+            'interview_count'       => 2,
+            'headcount'             => 3,
+            'negotiation_required'  => true,
+            'description'           => '業務内容詳細のテキスト',
+            'work_env'              => '稼働環境のテキスト',
+            'billing_range'         => '精算幅140-180',
+        ]);
+
+        $response = $this->actingAs($user)->get("/projects/{$project->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->component('Projects/Show')
+            ->where('project.client_name', 'テスト商事')
+            ->where('project.start_date', '2026-08-01')
+            ->where('project.start_label', '2026/08/01〜')
+            ->where('project.rate_min', 60)
+            ->where('project.rate_max', 80)
+            ->where('project.commercial_flow', 'prime')
+            ->where('project.work_style', 'onsite')
+            ->where('project.work_location_line', 'JR山手線')
+            ->where('project.work_location_station', '渋谷')
+            ->where('project.interview_count', 2)
+            ->where('project.headcount', 3)
+            ->where('project.negotiation_required', true)
+            ->where('project.description', '業務内容詳細のテキスト')
+            ->where('project.work_env', '稼働環境のテキスト')
+            ->where('project.billing_range', '精算幅140-180')
+        );
+    }
+
     public function test_show_returns_404_for_non_existent_project(): void
     {
         $user = User::factory()->create();
