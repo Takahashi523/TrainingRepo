@@ -5,14 +5,16 @@ export interface MatchProject {
     id: number;
     name: string;
     client_name: string | null;
-    commercial_flow: string | null;
+    /** 商流の表示ラベル（サーバー解決。未設定は null）。 */
+    commercial_flow_label: string | null;
     headcount: number | null;
     rate_min: number | null;
     rate_max: number | null;
     rate_note: string | null;
-    work_style: string | null;
-    /** 掲載状態（open=募集中 / closed=終了 / pending=ペンディング）。 */
-    status: string;
+    /** 勤務形態の表示ラベル（サーバー解決。未設定は null）。 */
+    work_style_label: string | null;
+    /** 掲載状態の表示ラベル（募集中 / 終了 / ペンディング。サーバー解決）。 */
+    status_label: string;
     start_date: string | null;
     start_label: string;
     required_skills: Array<{ label: string }>;

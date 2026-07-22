@@ -1,6 +1,7 @@
 import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
-import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Engineers/ProcessCheckboxGroup';
 import SkillTag from '@/Components/Common/SkillTag';
+import StatusBadge from '@/Components/Common/StatusBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import MatchCard from '@/Components/Matching/MatchCard';
 import MatchDrawer from '@/Components/Matching/MatchDrawer';
@@ -12,13 +13,6 @@ import { AlertTriangle, PackageX, SearchX } from 'lucide-react';
 import { ComponentType, useState } from 'react';
 
 type Props = PageProps<MatchingShowPageProps>;
-
-// ステータスバッジの配色語彙は人材一覧カード（#32 StatusBadge）と揃える。
-const STATUS_STYLES: Record<string, { label: string; badge: string }> = {
-    proposable: { label: '提案可', badge: 'border-green-600 text-green-700 bg-green-50' },
-    interviewing: { label: '面談中', badge: 'border-amber-500 text-amber-700 bg-amber-50' },
-    not_proposable: { label: '提案不可', badge: 'border-gray-400 text-gray-600 bg-gray-50' },
-};
 
 // 結果0件時の空状態を理由ごとに出し分ける（アイコン・見出し・説明）。
 // キーはサーバー MatchingController の EMPTY_* 定数（emptyReason）と一致させる。
@@ -53,12 +47,8 @@ export default function Show({ engineer, results, emptyReason }: Props) {
 
     const current = selected != null ? results[selected] : null;
 
-    // 工程経験を人材登録・一覧と同じ ProcessCheckboxGroup で表示する（readOnly）。
-    const phaseList = engineer.phases.map(({ key, name }) => ({ key, name }));
-    const phaseValues: Record<string, boolean> = Object.fromEntries(
-        engineer.phases.map((p) => [p.key, p.has_experience] as [string, boolean]),
-    );
-
+    // 工程経験を人材登録・一覧と同じ ProcessCheckboxGroup で表示する（readOnly）。人材は has_experience。
+    const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
     return (
         <AuthenticatedLayout>
@@ -84,13 +74,7 @@ export default function Show({ engineer, results, emptyReason }: Props) {
                             text={engineer.name}
                             className="min-w-0 text-base font-bold text-foreground"
                         />
-                        <span
-                            className={`inline-block shrink-0 rounded-full border px-3 py-0.5 text-xs font-bold ${
-                                STATUS_STYLES[engineer.status]?.badge ?? 'border-gray-400 text-gray-600 bg-gray-50'
-                            }`}
-                        >
-                            {STATUS_STYLES[engineer.status]?.label ?? engineer.status}
-                        </span>
+                        <StatusBadge status={engineer.status} className="shrink-0" />
                     </div>
 
                     {/* 年齢・最寄駅・希望単価・勤務形態を、マッチングカードのメタと同じ「ラベルなし・｜区切りの横一列」で表示する。

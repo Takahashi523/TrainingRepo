@@ -1,48 +1,11 @@
 import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
-import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
-import RankBadge from '@/Components/Common/RankBadge';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Engineers/ProcessCheckboxGroup';
+import RankBadge, { RANK_BAR_STYLES, RANK_BAR_FALLBACK_STYLE } from '@/Components/Common/RankBadge';
 import SkillTag from '@/Components/Common/SkillTag';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import { cn } from '@/lib/utils';
 import { MatchResult } from '@/types/matching';
 import { Ban, Check } from 'lucide-react';
-/**
- * ランク別ソリッド色。左端アクセントバーとスコアバーの塗りに共用する。
- * 左端アクセントバーは人材一覧カード（#32）のステータス色バーと同じ役割で、ここではマッチングランクを表す。
- * WF_09 のスコアバーはランク別に濃淡が変わるため、バー塗りも同色を用いて配色を統一する。
- * 配色語彙は RankBadge（緑→赤グラデーション）と揃える（WF はグレースケールだが、製品では配色付き RankBadge を
- * カンバン・ドロワーと共通採用しており、その一貫性を優先）。
- */
-// カード・ドロワーで同じ結果のスコアバー色を揃えるため export（重複定義を避ける SSOT）。
-export const RANK_ACCENT: Record<string, string> = {
-    A: 'bg-green-600',
-    B: 'bg-lime-600',
-    C: 'bg-amber-500',
-    D: 'bg-rose-500',
-};
-export const RANK_ACCENT_FALLBACK = 'bg-gray-400';
-
-/** 商流の表示ラベル（ProjectController の COMMERCIAL_FLOWS と揃える）。 */
-export const COMMERCIAL_FLOW_LABELS: Record<string, string> = {
-    prime: 'プライム',
-    secondary: '2次',
-    tertiary: '3次',
-    other: 'その他',
-};
-
-/** 勤務形態の表示ラベル（Engineer::WORK_STYLES と揃える）。 */
-export const WORK_STYLE_LABELS: Record<string, string> = {
-    onsite: '常駐',
-    hybrid: '一部リモート可',
-    remote: 'フルリモート',
-};
-
-/** 案件ステータスの表示ラベル（ProjectController の STATUSES と揃える）。追加不可（open 以外）の明示に使う。 */
-export const PROJECT_STATUS_LABELS: Record<string, string> = {
-    open: '募集中',
-    closed: '終了',
-    pending: 'ペンディング',
-};
 
 /** 単価レンジの表示（下限〜上限。無ければ備考、それも無ければ —）。 */
 export function formatRate(min: number | null, max: number | null, note: string | null): string {
@@ -66,14 +29,10 @@ interface Props {
 export default function MatchCard({ result, selected, onSelect }: Props) {
     const { project, match_score, match_rank, is_in_pipeline, is_available, is_project_full } =
         result;
-    const accentClass = RANK_ACCENT[match_rank] ?? RANK_ACCENT_FALLBACK;
+    const accentClass = RANK_BAR_STYLES[match_rank] ?? RANK_BAR_FALLBACK_STYLE;
 
-    // 工程はサマリーと同じ共通 ProcessCheckboxGroup で表示する（DRY）。
-    // 案件の phases（key/name/is_target）を、コンポーネントが期待する phases + values に変換する。
-    const phaseList = project.phases.map(({ key, name }) => ({ key, name }));
-    const phaseValues: Record<string, boolean> = Object.fromEntries(
-        project.phases.map((p) => [p.key, p.is_target] as [string, boolean]),
-    );
+    // 工程はサマリーと同じ共通 ProcessCheckboxGroup で表示する（DRY）。案件は is_target フラグ。
+    const { phaseList, phaseValues } = buildProcessPhaseProps(project.phases, 'is_target');
 
     // 単価は下限/上限が無ければ formatRate が備考、それも無ければ '—' を返す。
     // ラベルなしメタでは '—' だと何の項目か伝わらないため、真の未設定（'—'）は「単価未定」に置き換える。
@@ -160,7 +119,7 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                             /* open 以外（closed=終了 / pending=ペンディング）は追加不可。ステータス別ラベル。 */
                             <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
                                 <Ban className="h-2.5 w-2.5" />
-                                {PROJECT_STATUS_LABELS[project.status] ?? '募集停止中'}
+                                {project.status_label}
                             </span>
                         ) : (
                             /* 掲載中だが既存パイプラインが上限（5件）到達で追加不可。 */
@@ -183,21 +142,11 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                             text={project.client_name || 'クライアント未設定'}
                             className="min-w-0 max-w-[12rem]"
                         />
-                        <span>
-                            ｜{' '}
-                            {project.commercial_flow
-                                ? (COMMERCIAL_FLOW_LABELS[project.commercial_flow] ?? project.commercial_flow)
-                                : '商流未設定'}
-                        </span>
+                        <span>｜ {project.commercial_flow_label ?? '商流未設定'}</span>
                         <span>｜ {project.headcount != null ? `${project.headcount}名` : '募集人数未定'}</span>
                         <span>｜ {project.start_date ? project.start_label : '参画開始時期未定'}</span>
                         <span>｜ {rateText === '—' ? '単価未定' : rateText}</span>
-                        <span>
-                            ｜{' '}
-                            {project.work_style
-                                ? (WORK_STYLE_LABELS[project.work_style] ?? project.work_style)
-                                : '勤務形態未定'}
-                        </span>
+                        <span>｜ {project.work_style_label ?? '勤務形態未定'}</span>
                     </div>
 
                     {/* スキルタグ：必須=実線 / 尚可=点線 / 勤務形態=薄枠。

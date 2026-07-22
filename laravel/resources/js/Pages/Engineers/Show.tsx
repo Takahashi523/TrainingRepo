@@ -1,7 +1,7 @@
 import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
-import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Engineers/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -12,12 +12,6 @@ import { ArrowLeftRight, Clock, Pencil, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 type Props = PageProps<EngineerShowPageProps>;
-
-const ENGINEER_STATUS_LABELS: Record<string, string> = {
-    proposable:     '提案可',
-    interviewing:   '面談中',
-    not_proposable: '提案不可',
-};
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -57,6 +51,9 @@ export default function Show({ engineer }: Props) {
     // マッチングは読み取り専用（DB保存なし）のため、途中キャンセルは安全（副作用が残らない）。
     // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する。
     const matchingCancel = useRef<(() => void) | null>(null);
+
+    // 経験工程を共通 ProcessCheckboxGroup で表示する（人材は has_experience フラグ）。
+    const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
     const handleDelete = () => {
         router.delete(`/engineers/${engineer.id}`, {
@@ -169,10 +166,7 @@ export default function Show({ engineer }: Props) {
                             )}
                         </p>
                         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <StatusBadge
-                                status={engineer.status}
-                                label={ENGINEER_STATUS_LABELS[engineer.status] ?? engineer.status}
-                            />
+                            <StatusBadge status={engineer.status} />
                             <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
                                 <Clock className="mr-1 inline h-3 w-3" />{engineer.available_label}
                             </span>
@@ -272,8 +266,8 @@ export default function Show({ engineer }: Props) {
                     </DetailRow>
                     <DetailRow label="経験工程">
                         <ProcessCheckboxGroup
-                            phases={engineer.phases.map(({ key, name }) => ({ key, name }))}
-                            values={Object.fromEntries(engineer.phases.map((p) => [p.key, p.has_experience]))}
+                            phases={phaseList}
+                            values={phaseValues}
                             readOnly
                             className="flex-nowrap gap-x-4"
                         />
@@ -333,10 +327,7 @@ export default function Show({ engineer }: Props) {
                 {/* 管理情報 */}
                 <SectionCard title="管理情報">
                     <DetailRow label="ステータス">
-                        <StatusBadge
-                            status={engineer.status}
-                            label={ENGINEER_STATUS_LABELS[engineer.status] ?? engineer.status}
-                        />
+                        <StatusBadge status={engineer.status} />
                     </DetailRow>
                     <DetailRow label="担当営業">
                         <span>担当：{engineer.users.main.name}</span>

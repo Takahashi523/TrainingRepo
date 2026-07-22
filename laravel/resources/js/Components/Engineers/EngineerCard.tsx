@@ -7,12 +7,6 @@ import { EngineerListItem, Phase } from '@/types/engineer';
 import { router } from '@inertiajs/react';
 import { ArrowLeftRight, Clock } from 'lucide-react';
 
-const ENGINEER_STATUS_LABELS: Record<string, string> = {
-    proposable:     '提案可',
-    interviewing:   '面談中',
-    not_proposable: '提案不可',
-};
-
 const MAX_SKILLS_VISIBLE = 5;
 
 interface Props {
@@ -61,10 +55,7 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                             </p>
                         </div>
                         <div className="ml-auto flex flex-wrap items-center gap-2">
-                            <StatusBadge
-                                status={engineer.status}
-                                label={ENGINEER_STATUS_LABELS[engineer.status] ?? engineer.status}
-                            />
+                            <StatusBadge status={engineer.status} />
                             <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-muted/50 px-2.5 py-0.5 text-[11px]">
                                 <Clock className="h-3 w-3" />
                                 {engineer.available_label}

@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProjectRequest;
 use App\Models\FormFieldSetting;
-use App\Models\User;
 use App\Models\Project;
+use App\Models\User;
 use App\Services\ProjectService;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ProjectController extends Controller
@@ -26,24 +26,35 @@ class ProjectController extends Controller
         ['key' => 'proc_maintenance',   'name' => '保守・運用'],
     ];
 
-    private const WORK_STYLES = [
-        ['key' => 'onsite', 'name' => '常駐'],
-        ['key' => 'hybrid', 'name' => '一部リモート可'],
-        ['key' => 'remote', 'name' => 'フルリモート'],
-    ];
+    /**
+     * フォーム選択肢は Project モデルの ENUM ラベル SSOT から導出する（ラベルの重複定義を避ける）。
+     * work_styles は {key,name}、commercial_flows / statuses は {value,label} のフォーム選択肢形式。
+     *
+     * @return list<array{key: string, name: string}>
+     */
+    private static function workStyleOptions(): array
+    {
+        return array_map(
+            fn (string $key, string $name) => ['key' => $key, 'name' => $name],
+            array_keys(Project::WORK_STYLE_LABELS),
+            array_values(Project::WORK_STYLE_LABELS),
+        );
+    }
 
-    private const COMMERCIAL_FLOWS = [
-        ['value' => 'prime',     'label' => 'プライム'],
-        ['value' => 'secondary', 'label' => '2次'],
-        ['value' => 'tertiary',  'label' => '3次'],
-        ['value' => 'other',     'label' => 'その他'],
-    ];
-
-    private const STATUSES = [
-        ['value' => 'open',    'label' => '募集中'],
-        ['value' => 'closed',  'label' => '終了'],
-        ['value' => 'pending', 'label' => 'ペンディング'],
-    ];
+    /**
+     * value => label のマップを [{value, label}] の選択肢配列へ変換する。
+     *
+     * @param  array<string, string>  $labels
+     * @return list<array{value: string, label: string}>
+     */
+    private static function toValueLabelOptions(array $labels): array
+    {
+        return array_map(
+            fn (string $value, string $label) => ['value' => $value, 'label' => $label],
+            array_keys($labels),
+            array_values($labels),
+        );
+    }
 
     /**
      * Display a listing of the resource.
@@ -80,18 +91,18 @@ class ProjectController extends Controller
             'remarks',
         ];
 
-        $fieldSettings = collect($fieldKeys)->mapWithKeys(fn($key) => [
+        $fieldSettings = collect($fieldKeys)->mapWithKeys(fn ($key) => [
             $key => ['is_required' => (bool) $settings->get($key, 0)],
         ])->toArray();
 
         return Inertia::render('Projects/Create', [
-            'fieldSettings'    => $fieldSettings,
-            'phases'           => self::PHASES,
-            'work_styles'      => self::WORK_STYLES,
-            'commercial_flows' => self::COMMERCIAL_FLOWS,
-            'statuses'         => self::STATUSES,
-            'users'            => User::select('id', 'name')->orderBy('name')->get(),
-            'authUserId'       => auth()->id(),
+            'fieldSettings' => $fieldSettings,
+            'phases' => self::PHASES,
+            'work_styles' => self::workStyleOptions(),
+            'commercial_flows' => self::toValueLabelOptions(Project::COMMERCIAL_FLOW_LABELS),
+            'statuses' => self::toValueLabelOptions(Project::STATUS_LABELS),
+            'users' => User::select('id', 'name')->orderBy('name')->get(),
+            'authUserId' => auth()->id(),
         ]);
     }
 

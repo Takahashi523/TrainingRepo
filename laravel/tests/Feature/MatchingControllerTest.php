@@ -367,8 +367,8 @@ class MatchingControllerTest extends TestCase
             ->where('results.0.is_available', true)
             ->where('results.1.project.id', $closed->id)
             ->where('results.1.is_available', false)
-            // フロントの正確なラベル（終了／ペンディング）表示のため status を返す
-            ->where('results.1.project.status', 'closed')
+            // フロントの正確な表示のため掲載状態ラベルをサーバー解決して返す（closed→終了）
+            ->where('results.1.project.status_label', '終了')
             ->where('emptyReason', null));
     }
 
@@ -390,9 +390,9 @@ class MatchingControllerTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page->has('results', 2)
             ->where('results.0.is_available', false)
-            ->where('results.0.project.status', 'closed')
+            ->where('results.0.project.status_label', '終了')
             ->where('results.1.is_available', false)
-            ->where('results.1.project.status', 'pending')
+            ->where('results.1.project.status_label', 'ペンディング')
             ->where('emptyReason', null));
     }
 

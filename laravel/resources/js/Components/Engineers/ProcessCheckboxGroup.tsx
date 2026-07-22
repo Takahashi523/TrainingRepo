@@ -3,6 +3,21 @@ import { Checkbox } from '@/Components/ui/checkbox';
 import { Label } from '@/Components/ui/label';
 import { Phase } from '@/types/engineer';
 
+/**
+ * phases 配列（key/name + 真偽フラグ）を ProcessCheckboxGroup の props（phases + values）へ変換する
+ * 共通アダプタ。案件（is_target）・人材（has_experience）などフラグのキー名だけが異なる同型の変換を
+ * 一元化する（DRY）。呼び出し側は `const { phaseList, phaseValues } = buildProcessPhaseProps(xs, 'is_target')`。
+ */
+export function buildProcessPhaseProps<T extends Phase>(
+    phases: T[],
+    flagKey: keyof T,
+): { phaseList: Phase[]; phaseValues: Record<string, boolean> } {
+    return {
+        phaseList: phases.map(({ key, name }) => ({ key, name })),
+        phaseValues: Object.fromEntries(phases.map((p) => [p.key, Boolean(p[flagKey])])),
+    };
+}
+
 interface Props {
     phases: Phase[];
     values: Record<string, boolean>;

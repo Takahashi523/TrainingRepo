@@ -48,15 +48,21 @@ class MatchingResource extends JsonResource
                 'id' => $project->id,
                 'name' => $project->name,
                 'client_name' => $project->client_name,
-                'commercial_flow' => $project->commercial_flow,
+                // 表示ラベルは Project の ENUM ラベル SSOT から解決してサーバー側で返す（フロントでの
+                // ラベル再定義をなくす）。未設定（null）は null のまま返し、フロントで「未設定/未定」を出す。
+                'commercial_flow_label' => $project->commercial_flow !== null
+                    ? (Project::COMMERCIAL_FLOW_LABELS[$project->commercial_flow] ?? $project->commercial_flow)
+                    : null,
                 'headcount' => $project->headcount,
                 'rate_min' => $project->rate_min,
                 'rate_max' => $project->rate_max,
                 'rate_note' => $project->rate_note,
-                'work_style' => $project->work_style,
-                // 掲載状態（open=募集中 / closed=終了 / pending=ペンディング）。フロントで
-                // is_available=false のときの正確なラベル（終了／ペンディング）表示に使う。
-                'status' => $project->status,
+                'work_style_label' => $project->work_style !== null
+                    ? (Project::WORK_STYLE_LABELS[$project->work_style] ?? $project->work_style)
+                    : null,
+                // 掲載状態ラベル（open=募集中 / closed=終了 / pending=ペンディング）。フロントで
+                // is_available=false のとき「終了／ペンディング」の正確な表示に使う。
+                'status_label' => Project::STATUS_LABELS[$project->status] ?? $project->status,
                 // start_date は Carbon キャストされていない文字列のため optional()->format() は常に no-op
                 // （常に null→生値フォールバック）になる。Carbon::parse で明示的に Y-m-d へ正規化する
                 // （直下の start_label と同じ生成規則）。null は null のまま返す。

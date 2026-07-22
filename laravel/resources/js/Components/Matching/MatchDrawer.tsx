@@ -1,6 +1,5 @@
-import RankBadge from '@/Components/Common/RankBadge';
+import RankBadge, { RANK_BAR_STYLES, RANK_BAR_FALLBACK_STYLE } from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
-import { PROJECT_STATUS_LABELS, RANK_ACCENT, RANK_ACCENT_FALLBACK } from '@/Components/Matching/MatchCard';
 import { Button } from '@/Components/ui/button';
 import { MatchResult } from '@/types/matching';
 import { useForm } from '@inertiajs/react';
@@ -42,8 +41,8 @@ function AiBlock({ title, children }: { title: string; children: React.ReactNode
 export default function MatchDrawer({ result, engineerId, onClose }: Props) {
     const { project } = result;
     const score = result.match_score;
-    // スコアバー色はカード（MatchCard）と同じランク配色を共有し、カード→ドロワーで色が変わらないようにする。
-    const accentClass = RANK_ACCENT[result.match_rank] ?? RANK_ACCENT_FALLBACK;
+    // スコアバー色はカード（MatchCard）と同じランク配色（RankBadge の SSOT）を共有する。
+    const accentClass = RANK_BAR_STYLES[result.match_rank] ?? RANK_BAR_FALLBACK_STYLE;
 
     // スナップショット（マッチング実行時点の値）をそのまま送信する（サーバーで再計算しない）。
     const form = useForm({
@@ -188,7 +187,7 @@ export default function MatchDrawer({ result, engineerId, onClose }: Props) {
                         // 表示中に別ユーザーが open 以外（終了/ペンディング）にした案件。ステータス別に追加不可を明示する。
                         <Button className="h-9 flex-1" disabled>
                             <Ban className="mr-1.5 h-3.5 w-3.5" />
-                            {PROJECT_STATUS_LABELS[project.status] ?? '募集停止中'}（追加できません）
+                            {project.status_label}（追加できません）
                         </Button>
                     ) : projectFull ? (
                         // 既存パイプラインが上限（5件）到達。クリック前に無効化し理由を明示する。
