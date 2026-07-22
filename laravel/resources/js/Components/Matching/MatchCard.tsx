@@ -72,8 +72,10 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
             {/* 左端：ランク色アクセントバー（人材一覧カードのステータスバーと同じ役割） */}
             <div className={cn('w-1.5 shrink-0', accentClass)} />
 
-            {/* WF_09 準拠：左を「ランク＋スコア」列と「スコアバー」列の横2列に分け、card-main と縦中央で揃える */}
-            <div className="flex flex-1 items-center gap-4 p-4">
+            {/* WF_09 準拠：左を「ランク＋スコア」列と「スコアバー」列の横2列に分け、card-main と縦中央で揃える。
+                min-w-0：ネストした flex 内で案件名（下の TruncatedText）を確実に truncate させるため、
+                中間の flex 親にも min-width:0 を付ける（これが無いと長い案件名が縮まずバッジを押し出す）。 */}
+            <div className="flex min-w-0 flex-1 items-center gap-4 p-4">
                 {/* ランク＋スコア列（WF: rank-badge 52px 相当） */}
                 <div className="flex w-14 shrink-0 flex-col items-center gap-1">
                     <RankBadge rank={match_rank} className="text-[11px]" />
@@ -97,13 +99,14 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
 
                 {/* 右：案件情報 */}
                 <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                        {/* 案件名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（TruncatedText）。
-                            氏名・案件名は同じ行に他項目が無く極端に長くもならない想定のため、max-w は付けない。 */}
+                    <div className="flex items-start gap-2">
+                        {/* 案件名は長くなり得るため flex-1+min-w-0 で残り幅を占有しつつ 1 行省略
+                            （省略時のみ全文ツールチップ）。これによりバッジ（下の shrink-0）を押し出さず、
+                            案件名が長くても「追加済み/掲載停止/上限到達」が常に見えるようにする。 */}
                         <TruncatedText
                             as="p"
                             text={project.name}
-                            className="min-w-0 text-sm font-bold text-foreground"
+                            className="min-w-0 flex-1 text-sm font-bold text-foreground"
                         />
                         {/* 「追加済み」はステータスの分類体系に属さない補助マーカー。
                             ランク・ステータスは“塗りピル”なのに対し、こちらは塗り・枠なしの「✓＋文字」だけにして

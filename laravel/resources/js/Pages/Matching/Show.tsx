@@ -81,7 +81,7 @@ export default function Show({ engineer, results: resultsProp, emptyReason: empt
                 {/* ページヘッダー（WF_09：タイトル＋サブタイトルのみ。アクションボタンは持たない） */}
                 <div className="shrink-0 border-b border-border bg-white px-10 py-4">
                     <h1 className="text-lg font-bold text-foreground">マッチング結果</h1>
-                    <p className="mt-0.5 text-xs text-muted-foreground">人材に合致する案件の一覧</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">対象人材にマッチする案件をAIスコアの高い順に表示します</p>
                 </div>
 
                 {/* 対象人材サマリー（WF_09：薄グレーの帯・下境界のみ */}
@@ -162,16 +162,22 @@ export default function Show({ engineer, results: resultsProp, emptyReason: empt
                             );
                         })()
                     ) : (
-                        <div className="space-y-2.5">
-                            {results.map((result, i) => (
-                                <MatchCard
-                                    key={result.project.id}
-                                    result={result}
-                                    selected={selected === i}
-                                    onSelect={() => setSelected(i)}
-                                />
-                            ))}
-                        </div>
+                        <>
+                            {/* 件数表示：人材一覧・進捗管理完了タブと同じ体裁（一覧先頭の小テキスト・件数を強調）。 */}
+                            <div className="mb-3 text-xs text-muted-foreground">
+                                スコア上位 <strong className="text-foreground">{results.length}</strong> 件を表示
+                            </div>
+                            <div className="space-y-2.5">
+                                {results.map((result, i) => (
+                                    <MatchCard
+                                        key={result.project.id}
+                                        result={result}
+                                        selected={selected === i}
+                                        onSelect={() => setSelected(i)}
+                                    />
+                                ))}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
