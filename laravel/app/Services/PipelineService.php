@@ -14,9 +14,6 @@ use Illuminate\Validation\ValidationException;
  */
 class PipelineService
 {
-    /** 1案件あたりのパイプライン追加上限（QA #50・マッチング表示件数と同数） */
-    private const MAX_PER_PROJECT = 5;
-
     /**
      * マッチング結果からパイプラインを新規生成する（POST /pipelines）。
      *
@@ -41,9 +38,9 @@ class PipelineService
                     ->lockForUpdate()
                     ->count();
 
-                if ($count >= self::MAX_PER_PROJECT) {
+                if ($count >= Pipeline::MAX_PER_PROJECT) {
                     throw ValidationException::withMessages([
-                        'project_id' => 'この案件のパイプラインはすでに上限（'.self::MAX_PER_PROJECT.'件）に達しています。',
+                        'project_id' => 'この案件のパイプラインはすでに上限（'.Pipeline::MAX_PER_PROJECT.'件）に達しています。',
                     ]);
                 }
 

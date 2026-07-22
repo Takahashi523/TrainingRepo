@@ -1,10 +1,10 @@
 import RankBadge from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
-import { RANK_ACCENT, RANK_ACCENT_FALLBACK } from '@/Components/Matching/MatchCard';
+import { PROJECT_STATUS_LABELS, RANK_ACCENT, RANK_ACCENT_FALLBACK } from '@/Components/Matching/MatchCard';
 import { Button } from '@/Components/ui/button';
 import { MatchResult } from '@/types/matching';
 import { useForm } from '@inertiajs/react';
-import { Check, Plus, X } from 'lucide-react';
+import { Ban, Check, Plus, X } from 'lucide-react';
 
 interface Props {
     result: MatchResult;
@@ -67,6 +67,13 @@ export default function MatchDrawer({ result, engineerId, onClose }: Props) {
     };
 
     const added = result.is_in_pipeline;
+    // 掲載停止（closed/pending）は追加不可。追加ボタンを無効化し「掲載停止」表示にする。
+    const unavailable = ! result.is_available;
+    // パイプライン上限（5件）到達済みも追加不可。クリック前に先出しで無効化する。
+    const projectFull = result.is_project_full;
+    // 重複・上限などの 422 は条件が変わらない限り再送しても同じ結果になるため、エラー表示中は
+    // 追加ボタンを非活性にして無駄な再送信を防ぐ（正しい次アクションはドロワーを閉じること）。
+    const hasErrors = Object.keys(form.errors).length > 0;
 
     return (
         <div className="flex h-full w-full flex-col">
@@ -155,12 +162,15 @@ export default function MatchDrawer({ result, engineerId, onClose }: Props) {
                         <p className="text-xs text-muted-foreground">不足条件の指摘はありません</p>
                     )}
                 </AiBlock>
+            </div>
 
-                {/* 追加失敗（422）の全エラーを表示する。project_id だけでなく engineer_id も対象。
-                    例：計算中〜表示中に対象人材や案件が削除されると exists 検証で弾かれるが、特定フィールドだけを
-                    出していると別フィールドのエラーが握りつぶされ Silent Rejection になるため、全 errors を出す。 */}
-                {Object.keys(form.errors).length > 0 && (
-                    <div className="space-y-1">
+            {/* フッタ（PipelineDrawer と同じ体裁：淡色帯＋主ボタン）。
+                追加失敗（422：重複・上限など）は押下の直接の結果のため、ボディ内ではなく常時見える
+                ボタン直上に出す。project_id だけでなく engineer_id 等の全 errors を出す（特定フィールド
+                だけだと別フィールドのエラーを握りつぶし Silent Rejection になるため）。 */}
+            <div className="shrink-0 border-t border-border bg-muted/40 p-4">
+                {hasErrors && (
+                    <div className="mb-2 space-y-1">
                         {(Object.values(form.errors) as string[]).map((message, i) => (
                             <p key={i} className="text-sm font-semibold text-destructive">
                                 {message}
@@ -168,21 +178,35 @@ export default function MatchDrawer({ result, engineerId, onClose }: Props) {
                         ))}
                     </div>
                 )}
-            </div>
-
-            {/* フッタ（PipelineDrawer と同じ体裁：淡色帯＋主ボタン） */}
-            <div className="flex shrink-0 items-center gap-2 border-t border-border bg-muted/40 p-4">
-                {added ? (
-                    <Button className="h-9 flex-1" disabled>
-                        <Check className="mr-1.5 h-3.5 w-3.5" />
-                        パイプライン追加済み
-                    </Button>
-                ) : (
-                    <Button className="h-9 flex-1" onClick={handleAdd} disabled={form.processing}>
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        {form.processing ? '追加中...' : 'パイプラインに追加'}
-                    </Button>
-                )}
+                <div className="flex items-center gap-2">
+                    {added ? (
+                        <Button className="h-9 flex-1" disabled>
+                            <Check className="mr-1.5 h-3.5 w-3.5" />
+                            パイプライン追加済み
+                        </Button>
+                    ) : unavailable ? (
+                        // 表示中に別ユーザーが open 以外（終了/ペンディング）にした案件。ステータス別に追加不可を明示する。
+                        <Button className="h-9 flex-1" disabled>
+                            <Ban className="mr-1.5 h-3.5 w-3.5" />
+                            {PROJECT_STATUS_LABELS[project.status] ?? '募集停止中'}（追加できません）
+                        </Button>
+                    ) : projectFull ? (
+                        // 既存パイプラインが上限（5件）到達。クリック前に無効化し理由を明示する。
+                        <Button className="h-9 flex-1" disabled>
+                            <Ban className="mr-1.5 h-3.5 w-3.5" />
+                            パイプライン上限（5件）に到達
+                        </Button>
+                    ) : (
+                        <Button
+                            className="h-9 flex-1"
+                            onClick={handleAdd}
+                            disabled={form.processing || hasErrors}
+                        >
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            {form.processing ? '追加中...' : 'パイプラインに追加'}
+                        </Button>
+                    )}
+                </div>
             </div>
         </div>
     );

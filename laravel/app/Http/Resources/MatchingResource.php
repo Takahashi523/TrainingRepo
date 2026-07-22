@@ -30,6 +30,8 @@ class MatchingResource extends JsonResource
         /** @var Project $project */
         $project = $this->resource['project'];
         $isInPipeline = (bool) $this->resource['is_in_pipeline'];
+        $isAvailable = (bool) $this->resource['is_available'];
+        $isProjectFull = (bool) $this->resource['is_project_full'];
 
         return [
             // --- カード表示用スコア情報 ---
@@ -52,6 +54,9 @@ class MatchingResource extends JsonResource
                 'rate_max' => $project->rate_max,
                 'rate_note' => $project->rate_note,
                 'work_style' => $project->work_style,
+                // 掲載状態（open=募集中 / closed=終了 / pending=ペンディング）。フロントで
+                // is_available=false のときの正確なラベル（終了／ペンディング）表示に使う。
+                'status' => $project->status,
                 'start_date' => optional($project->start_date)->format('Y-m-d') ?? $project->start_date,
                 // 開始時期ラベルは人材の available_label と同じ生成規則で揃える。
                 'start_label' => $project->start_date
@@ -69,6 +74,10 @@ class MatchingResource extends JsonResource
 
             // --- パイプライン追加状態（追加ボタンの活性制御） ---
             'is_in_pipeline' => $isInPipeline,
+            // --- 追加可否。false（open 以外＝終了/ペンディング）ならステータス表示＋追加無効化（フロント） ---
+            'is_available' => $isAvailable,
+            // --- 上限到達（既存5件）。true なら「上限到達」表示＋追加無効化（フロント） ---
+            'is_project_full' => $isProjectFull,
         ];
     }
 

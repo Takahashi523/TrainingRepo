@@ -10,6 +10,9 @@ class Pipeline extends Model
 {
     use HasFactory;
 
+    /** 1案件あたりのパイプライン追加上限（SSOT・QA #50。マッチング表示件数と同数）。 */
+    public const MAX_PER_PROJECT = 5;
+
     /**
      * ステータス定義（SSOT）。
      * value => [label（表示名）, group（カンバングループキー）, is_terminal（終了か）]

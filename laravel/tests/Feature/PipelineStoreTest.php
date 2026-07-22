@@ -100,6 +100,68 @@ class PipelineStoreTest extends TestCase
         $this->assertSame(5, Pipeline::where('project_id', $project->id)->count());
     }
 
+    /**
+     * 設計書 §3.4：マッチ対象は status='open' に限る。マッチング表示〜追加の間に別ユーザーが
+     * closed / pending にした案件を stale ページから追加しようとしても、書き込み経路で弾く。
+     *
+     * 弾いた案件は戻り先（matching 画面）で status='open' 絞り込みにより一覧から消えるため、
+     * ドロワー内フィールドエラーは表示されない。Silent Rejection を避けるべく flash（トースト）で
+     * 理由を通知することを検証する。
+     */
+    public function test_closed_project_cannot_be_added(): void
+    {
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $closed = Project::factory()->create(['main_user_id' => $user->id, 'status' => 'closed']);
+
+        $response = $this->actingAs($user)
+            ->from("/engineers/{$engineer->id}/matching")
+            ->post('/pipelines', $this->payload($engineer, $closed));
+
+        // フィールドエラーではなく、back＋flash.error（トースト）で通知する。
+        $response->assertRedirect("/engineers/{$engineer->id}/matching");
+        $response->assertSessionHas('error', '選択した案件は現在募集していないため、パイプラインに追加できませんでした。');
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('pipelines', 0);
+    }
+
+    public function test_pending_project_cannot_be_added(): void
+    {
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $pending = Project::factory()->create(['main_user_id' => $user->id, 'status' => 'pending']);
+
+        $response = $this->actingAs($user)
+            ->from("/engineers/{$engineer->id}/matching")
+            ->post('/pipelines', $this->payload($engineer, $pending));
+
+        $response->assertRedirect("/engineers/{$engineer->id}/matching");
+        $response->assertSessionHas('error', '選択した案件は現在募集していないため、パイプラインに追加できませんでした。');
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('pipelines', 0);
+    }
+
+    /**
+     * 案件が削除された場合も同様に、戻り先で一覧から消えるため flash（トースト）で通知する。
+     */
+    public function test_deleted_project_shows_flash_error(): void
+    {
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $project = Project::factory()->create(['main_user_id' => $user->id]);
+
+        $payload = $this->payload($engineer, $project);
+        $project->delete();
+
+        $response = $this->actingAs($user)
+            ->from("/engineers/{$engineer->id}/matching")
+            ->post('/pipelines', $payload);
+
+        $response->assertRedirect("/engineers/{$engineer->id}/matching");
+        $response->assertSessionHas('error', '選択した案件が見つかりません。削除された可能性があります。');
+        $this->assertDatabaseCount('pipelines', 0);
+    }
+
     public function test_validation_rejects_invalid_score_and_rank(): void
     {
         $user = User::factory()->create();

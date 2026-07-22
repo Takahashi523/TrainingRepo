@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Services\Matching\MatchingEngineClient;
 use App\Services\Matching\MatchingEngineException;
 use App\Services\Matching\MatchResult;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,7 +29,17 @@ class MatchingController extends Controller
 
     public const EMPTY_ENGINE_ERROR = 'engine_error'; // エンジン通信失敗（#3・flash.error も併発）
 
-    public const EMPTY_UNAVAILABLE = 'unavailable';   // マッチはあったが対象案件が削除・非掲出で全滅（#4）
+    public const EMPTY_UNAVAILABLE = 'unavailable';   // マッチはあったが対象案件が全てハード削除で全滅（#4）
+
+    /**
+     * マッチング実行を許可する人材ステータス。
+     *
+     * 設計書 §3.4 は「engineers.status='proposable' で絞り込み済みを前提」とするが、面談中
+     * （interviewing）は面談が流れる可能性があり並行して別案件を当たる実務ニーズがあるため許可し、
+     * 提案不可（not_proposable）のみブロックする（提案不可の人材に AI 採点を走らせない）。
+     * 設計書文言との差分は reason.md に記録する。
+     */
+    private const MATCHABLE_ENGINEER_STATUSES = ['proposable', 'interviewing'];
 
     public function __construct(private readonly MatchingEngineClient $engine) {}
 
@@ -36,8 +47,16 @@ class MatchingController extends Controller
      * GET /engineers/{engineer}/matching
      * ページロード時にマッチングを同期実行し、結果を表示する（TBD #4：自動実行を採用）。
      */
-    public function show(Request $request, Engineer $engineer): Response
+    public function show(Request $request, Engineer $engineer): Response|RedirectResponse
     {
+        // 提案不可（not_proposable）の人材はマッチング対象外（設計書 §3.4）。stale ページや直リンク
+        // からの実行もサーバー側で弾き、無駄な Python 呼び出し・提案不可人材のパイプライン化を防ぐ。
+        // フロントのマッチングボタンも同条件で無効化しているが、ここが最終防波堤となる。
+        if (! in_array($engineer->status, self::MATCHABLE_ENGINEER_STATUSES, true)) {
+            return back(fallback: route('engineers.index'))
+                ->with('error', '提案不可の人材はマッチングを実行できません。');
+        }
+
         // 対象人材サマリー（ヘッダー表示）は既存 EngineerResource を再利用する
         // （age / available_label 等の算出を二重定義しない）。skills / 担当営業を Eager Load し N+1 を防ぐ。
         $engineer->load(['skills:id,engineer_id,label,detail', 'mainUser:id,name', 'subUser:id,name']);
@@ -61,9 +80,10 @@ class MatchingController extends Controller
      *  - NoCandidate（候補0件）：結果0件（reason=no_match）として正常表示
      *  - スコア0件：同上（reason=no_match）
      *  - Upstream（400/500/504・接続不可）：flash.error を出しつつ結果0件（reason=engine_error）で描画（Silent Rejection 回避）
-     *  - 突合後全滅：マッチはあったが案件が削除・非掲出で1件も残らない（reason=unavailable）
+     *  - 突合後全滅：マッチはあったが案件が全てハード削除で1件も残らない（reason=unavailable）
+     *    ※掲載停止（closed/pending）は残して is_available=false で無効表示するため、ここには該当しない
      *
-     * @return array{items: list<array{result: MatchResult, project: Project, is_in_pipeline: bool}>, reason: ?string}
+     * @return array{items: list<array{result: MatchResult, project: Project, is_in_pipeline: bool, is_available: bool, is_project_full: bool}>, reason: ?string}
      */
     private function resolveMatches(Engineer $engineer): array
     {
@@ -90,12 +110,17 @@ class MatchingController extends Controller
         $projectIds = array_map(static fn ($m) => $m->projectId, $matches);
 
         // 案件情報を一括取得（N+1 回避）。TEXT（description / work_env / remarks）は取得しない。
+        // status は掲載状態の判定（is_available）に使う。ここでは status で絞り込まず、掲載停止
+        // （closed/pending）の案件も残す：スコアリングロジック設計書 §3.4 のとおり追加可能なのは
+        // status='open' のみだが、Python 採点後〜この突合の間に別ユーザーが非掲出化したレースでも、
+        // ユーザーが注視しているカードを黙って消さず「掲載停止」表示＋追加無効化で見せる
+        // （is_in_pipeline と同じ keep+mark+disable 方針）。表示自体できないハード削除案件のみ突合で除外する。
         $projects = Project::query()
             ->whereIn('id', $projectIds)
             ->with(['projectSkills:id,project_id,skill_type,label'])
             ->get([
                 'id', 'name', 'client_name', 'commercial_flow', 'headcount',
-                'rate_min', 'rate_max', 'rate_note', 'work_style', 'start_date',
+                'rate_min', 'rate_max', 'rate_note', 'work_style', 'start_date', 'status',
                 'proc_requirements', 'proc_basic_design', 'proc_detail_design',
                 'proc_development', 'proc_testing', 'proc_maintenance',
             ])
@@ -108,23 +133,39 @@ class MatchingController extends Controller
             ->pluck('project_id')
             ->flip();
 
-        // エンジンのスコア降順を保ったまま突合する。案件が取得できないもの（削除済み等）は除外。
+        // 案件ごとの既存パイプライン件数（全人材）を1クエリで集計（N+1 回避）。
+        // 上限（Pipeline::MAX_PER_PROJECT）到達済みの案件を読み込み時点で「上限到達」として先出し無効化し、
+        // クリックして初めて 422 で弾かれる導線（閉じる→再オープンで再度押せてしまう）を避ける。
+        $pipelineCounts = Pipeline::query()
+            ->whereIn('project_id', $projectIds)
+            ->selectRaw('project_id, COUNT(*) as aggregate')
+            ->groupBy('project_id')
+            ->pluck('aggregate', 'project_id');
+
+        // エンジンのスコア降順を保ったまま突合する。ハード削除された案件は表示できないため除外し、
+        // 掲載停止（closed/pending）は is_available=false として残す。
         $items = [];
         foreach ($matches as $match) {
             if (! $projects->has($match->projectId)) {
                 continue;
             }
 
+            $project = $projects->get($match->projectId);
+
             $items[] = [
                 'result' => $match,
-                'project' => $projects->get($match->projectId),
+                'project' => $project,
                 'is_in_pipeline' => $inPipeline->has($match->projectId),
+                // 追加可能なのは募集中（open）のみ。closed/pending は「掲載停止」表示＋追加無効化にする。
+                'is_available' => $project->status === 'open',
+                // 上限到達（既存5件）の案件は「上限到達」表示＋追加無効化にする（サーバー enforce の先出し）。
+                'is_project_full' => (int) ($pipelineCounts[$match->projectId] ?? 0) >= Pipeline::MAX_PER_PROJECT,
             ];
         }
 
         // エンジンはマッチを返した（count($matches) > 0）のに突合後に1件も残らない場合は、
-        // スコアリング後に対象案件が削除・非掲出になったレース（#4）。no_match（そもそも候補なし）
-        // とは区別し、unavailable として専用の空状態を出す。
+        // 対象案件が全てハード削除されたレース（#4）。掲載停止（closed/pending）は残して無効表示する
+        // ため、ここには該当しない。no_match（そもそも候補なし）とは区別し unavailable を出す。
         if (count($items) === 0) {
             return ['items' => [], 'reason' => self::EMPTY_UNAVAILABLE];
         }

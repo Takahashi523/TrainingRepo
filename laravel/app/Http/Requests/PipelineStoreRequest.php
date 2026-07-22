@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Engineer;
+use App\Models\Project;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -39,6 +40,35 @@ class PipelineStoreRequest extends FormRequest
         ];
     }
 
+    /**
+     * 案件の掲載状態（status='open'）を追加検証する。
+     *
+     * スコアリングロジック設計書 §3.4 のとおり、マッチ対象は status='open' の案件に限る。
+     * マッチング結果の表示〜追加ボタン押下の間に別ユーザーが案件を closed / pending へ変更した
+     * stale ページからの追加を、書き込み経路（POST）でも弾く（表示側 GET は MatchingController で除外済み）。
+     * exists 検証で既に project_id にエラーがある場合（未指定・存在しない）は二重表示を避けて何もしない。
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $projectId = $this->input('project_id');
+
+            if ($projectId === null || $validator->errors()->has('project_id')) {
+                return;
+            }
+
+            // 存在するが募集中(open)でない案件は追加不可。存在しない場合は exists 側で捕捉済み。
+            $status = Project::whereKey($projectId)->value('status');
+
+            if ($status !== null && $status !== 'open') {
+                $validator->errors()->add(
+                    'project_id',
+                    'この案件は現在募集していないため、パイプラインに追加できません。'
+                );
+            }
+        });
+    }
+
     public function attributes(): array
     {
         return [
@@ -52,13 +82,17 @@ class PipelineStoreRequest extends FormRequest
     /**
      * バリデーション失敗時の遷移先を制御する。
      *
-     * 対象人材が存在しない（マッチング計算中〜結果表示中に管理者が削除した等）場合、既定の back
-     * リダイレクトだと削除済み人材のマッチング画面（/engineers/{engineer}/matching）へ戻り、
-     * route model binding が 404 になってしまう。人材はもう存在しないため、404 ではなく人材一覧へ
-     * 誘導し、フラッシュで理由を通知する（Silent Rejection・不親切な 404 を回避）。
+     * 1. 対象人材が存在しない（計算中〜表示中に管理者が削除した等）場合、既定の back リダイレクトだと
+     *    削除済み人材のマッチング画面へ戻り route model binding が 404 になる。人材一覧へ誘導し
+     *    フラッシュで理由を通知する（不親切な 404 回避）。
+     * 2. 案件が「削除済み」「掲載停止(closed/pending)」の場合、back で戻ると当該案件は
+     *    MatchingController 側の status='open' 絞り込みで一覧から消え、ドロワーも閉じる。このため
+     *    project_id のフィールドエラーはユーザーの目に触れず Silent Rejection になる。フラッシュ
+     *    （トースト）で理由を通知し、一覧は再取得で自動最新化される。
      *
-     * それ以外（案件削除・スコア不正など、人材が存命のケース）は従来どおり back へ戻し、
-     * ドロワー内にフィールドエラーを表示する。
+     * 上記以外（スコア不正など、案件が存命・掲載中のケース）は従来どおり back でフィールドエラーを
+     * ドロワーに表示する（重複・上限は PipelineService 側で field エラーを付与し、案件が一覧に残るため
+     * ドロワー内表示で問題ない）。
      */
     protected function failedValidation(Validator $validator): void
     {
@@ -68,6 +102,20 @@ class PipelineStoreRequest extends FormRequest
             throw new HttpResponseException(
                 redirect()->route('engineers.index')
                     ->with('error', '対象の人材が見つかりません。削除された可能性があります。')
+            );
+        }
+
+        // project_id が送られたうえで弾かれた＝「削除済み」または「掲載停止」で一覧から消えるケース。
+        // フィールドエラーは表示されないため flash（トースト）に振り替える。
+        $projectId = $this->input('project_id');
+
+        if ($projectId !== null && $validator->errors()->has('project_id')) {
+            $message = Project::whereKey($projectId)->exists()
+                ? '選択した案件は現在募集していないため、パイプラインに追加できませんでした。'
+                : '選択した案件が見つかりません。削除された可能性があります。';
+
+            throw new HttpResponseException(
+                redirect()->back()->with('error', $message)
             );
         }
 

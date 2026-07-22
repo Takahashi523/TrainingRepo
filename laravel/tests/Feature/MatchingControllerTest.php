@@ -88,6 +88,10 @@ class MatchingControllerTest extends TestCase
             ->where('results.2.match_score', 47)
             ->where('results.0.project.id', $projects[0]->id)
             ->where('results.0.is_in_pipeline', false)
+            // 募集中（open）案件は追加可能
+            ->where('results.0.is_available', true)
+            // 上限未到達なので追加可能
+            ->where('results.0.is_project_full', false)
             // 結果ありのとき emptyReason は null
             ->where('emptyReason', null)
         );
@@ -136,6 +140,71 @@ class MatchingControllerTest extends TestCase
         $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
 
         $response->assertInertia(fn ($page) => $page->where('results.0.is_in_pipeline', true));
+    }
+
+    public function test_project_at_pipeline_limit_is_marked_full(): void
+    {
+        // 既存パイプラインが上限（Pipeline::MAX_PER_PROJECT=5件）に達した案件は is_project_full=true。
+        // 読み込み時点で「上限到達」として先出し無効化する（クリックして 422 で初めて分かる導線を避ける）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $full = Project::factory()->create(['main_user_id' => $user->id]);
+        $room = Project::factory()->create(['main_user_id' => $user->id]);
+
+        // 別人材5件で $full を上限まで埋める（$room は2件で余裕あり）。
+        Pipeline::factory()->count(5)->create(['project_id' => $full->id]);
+        Pipeline::factory()->count(2)->create(['project_id' => $room->id]);
+
+        $this->fakeEngine([
+            $this->match($full->id, 90, 'A'),
+            $this->match($room->id, 85, 'A'),
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertInertia(fn ($page) => $page->has('results', 2)
+            ->where('results.0.project.id', $full->id)
+            ->where('results.0.is_project_full', true)
+            ->where('results.1.project.id', $room->id)
+            ->where('results.1.is_project_full', false));
+    }
+
+    // -------------------------------------------------------
+    // 人材ステータスによる実行可否（設計書 §3.4）
+    // -------------------------------------------------------
+
+    public function test_not_proposable_engineer_is_blocked_from_matching(): void
+    {
+        // 提案不可の人材はマッチング実行不可。エンジンを呼ばず back＋flash.error で弾く。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'status' => 'not_proposable',
+        ]);
+        Http::fake();
+
+        $response = $this->actingAs($user)
+            ->from('/engineers')
+            ->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertRedirect('/engineers');
+        $response->assertSessionHas('error', '提案不可の人材はマッチングを実行できません。');
+        // AI エンジンは一度も呼ばれない（無駄な採点を防ぐ）。
+        Http::assertNothingSent();
+    }
+
+    public function test_proposable_and_interviewing_engineers_can_run_matching(): void
+    {
+        $user = User::factory()->create();
+        $this->fakeEngine([]);
+
+        foreach (['proposable', 'interviewing'] as $status) {
+            $engineer = Engineer::factory()->create(['main_user_id' => $user->id, 'status' => $status]);
+
+            $this->actingAs($user)
+                ->get("/engineers/{$engineer->id}/matching")
+                ->assertOk();
+        }
     }
 
     // -------------------------------------------------------
@@ -254,10 +323,62 @@ class MatchingControllerTest extends TestCase
             ->where('emptyReason', null));
     }
 
-    public function test_all_matched_projects_unavailable_shows_unavailable_reason(): void
+    public function test_closed_project_is_kept_but_marked_unavailable(): void
     {
-        // #4：エンジンはマッチを返したが、対象案件が全て削除・非掲出で突合できない（レース）。
+        // 設計書 §3.4：追加可能なのは status='open' のみ。ただし Python 採点後〜表示の間に closed 化
+        // した案件は黙って消さず「募集終了」（is_available=false）として残す（is_in_pipeline と同方針）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $open = Project::factory()->create(['main_user_id' => $user->id, 'status' => 'open']);
+        $closed = Project::factory()->create(['main_user_id' => $user->id, 'status' => 'closed']);
+
+        $this->fakeEngine([
+            $this->match($open->id, 90, 'A'),
+            $this->match($closed->id, 85, 'A'),
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        // 両方表示され、open は追加可能・closed は追加不可フラグ。emptyReason は null。
+        $response->assertInertia(fn ($page) => $page->has('results', 2)
+            ->where('results.0.project.id', $open->id)
+            ->where('results.0.is_available', true)
+            ->where('results.1.project.id', $closed->id)
+            ->where('results.1.is_available', false)
+            // フロントの正確なラベル（終了／ペンディング）表示のため status を返す
+            ->where('results.1.project.status', 'closed')
+            ->where('emptyReason', null));
+    }
+
+    public function test_all_closed_projects_are_kept_and_marked_unavailable(): void
+    {
+        // 全件 closed / pending でも空状態にはせず、募集終了（is_available=false）として一覧に残す。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $closed = Project::factory()->create(['main_user_id' => $user->id, 'status' => 'closed']);
+        $pending = Project::factory()->create(['main_user_id' => $user->id, 'status' => 'pending']);
+
+        $this->fakeEngine([
+            $this->match($closed->id, 90, 'A'),
+            $this->match($pending->id, 85, 'A'),
+        ]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->has('results', 2)
+            ->where('results.0.is_available', false)
+            ->where('results.0.project.status', 'closed')
+            ->where('results.1.is_available', false)
+            ->where('results.1.project.status', 'pending')
+            ->where('emptyReason', null));
+    }
+
+    public function test_all_matched_projects_hard_deleted_shows_unavailable_reason(): void
+    {
+        // #4：エンジンはマッチを返したが、対象案件が全てハード削除で突合できない（レース）。
         // no_match（そもそも候補なし）と区別し emptyReason = unavailable。エラーではないので flash なし。
+        // （募集終了 closed/pending は残して無効表示するため、この分岐には該当しない）
         $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 

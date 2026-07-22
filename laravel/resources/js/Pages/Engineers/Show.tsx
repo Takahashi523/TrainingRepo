@@ -123,6 +123,13 @@ export default function Show({ engineer }: Props) {
                                 },
                             )
                         }
+                        // 提案不可の人材はマッチング対象外（サーバー側 MatchingController でも弾く）。
+                        disabled={engineer.status === 'not_proposable'}
+                        title={
+                            engineer.status === 'not_proposable'
+                                ? '提案不可の人材はマッチングを実行できません'
+                                : undefined
+                        }
                     >
                         <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
                         マッチング実行

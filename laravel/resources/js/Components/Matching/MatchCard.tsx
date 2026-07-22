@@ -5,7 +5,7 @@ import SkillTag from '@/Components/Common/SkillTag';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import { cn } from '@/lib/utils';
 import { MatchResult } from '@/types/matching';
-import { Check } from 'lucide-react';
+import { Ban, Check } from 'lucide-react';
 /**
  * ランク別ソリッド色。左端アクセントバーとスコアバーの塗りに共用する。
  * 左端アクセントバーは人材一覧カード（#32）のステータス色バーと同じ役割で、ここではマッチングランクを表す。
@@ -37,6 +37,13 @@ export const WORK_STYLE_LABELS: Record<string, string> = {
     remote: 'フルリモート',
 };
 
+/** 案件ステータスの表示ラベル（ProjectController の STATUSES と揃える）。追加不可（open 以外）の明示に使う。 */
+export const PROJECT_STATUS_LABELS: Record<string, string> = {
+    open: '募集中',
+    closed: '終了',
+    pending: 'ペンディング',
+};
+
 /** 単価レンジの表示（下限〜上限。無ければ備考、それも無ければ —）。 */
 export function formatRate(min: number | null, max: number | null, note: string | null): string {
     if (min != null && max != null) return `${min}万円〜${max}万円`;
@@ -57,7 +64,8 @@ interface Props {
  * D ランクは「見送り推奨」のため opacity を下げる（スコアリングロジック設計書 §3.3）。
  */
 export default function MatchCard({ result, selected, onSelect }: Props) {
-    const { project, match_score, match_rank, is_in_pipeline } = result;
+    const { project, match_score, match_rank, is_in_pipeline, is_available, is_project_full } =
+        result;
     const accentClass = RANK_ACCENT[match_rank] ?? RANK_ACCENT_FALLBACK;
 
     // 工程はサマリーと同じ共通 ProcessCheckboxGroup で表示する（DRY）。
@@ -97,6 +105,9 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                 // ホバー時は進捗管理カード（PipelineCard）と同じく背景色を変える（transition-colors hover:bg-muted/50）
                 'flex w-full cursor-pointer items-stretch overflow-hidden rounded-md border bg-white text-left transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                 selected ? 'border-primary ring-1 ring-primary/40' : 'border-border',
+                // 追加不可（掲載停止 or 上限到達）はカードを淡くして非アクティブを示す（クリックで詳細は開ける）。
+                // 「追加済み」は完了状態として淡色化しない。
+                !is_in_pipeline && (!is_available || is_project_full) && 'opacity-60',
             )}
         >
             {/* 左端：ランク色アクセントバー（人材一覧カードのステータスバーと同じ役割） */}
@@ -134,11 +145,27 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                         {/* 「追加済み」はステータスの分類体系に属さない補助マーカー。
                             ランク・ステータスは“塗りピル”なのに対し、こちらは塗り・枠なしの「✓＋文字」だけにして
                             別カテゴリと一目で分かるようにする（色相での衝突議論から外す）。 */}
-                        {is_in_pipeline && (
+                        {/* 追加不可の理由マーカー（優先度：追加済み > 掲載停止 > 上限到達）。
+                            いずれも「追加済み」と体裁を揃える（枠なし・アイコン＋文字・muted）。 */}
+                        {is_in_pipeline ? (
                             <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
                                 <Check className="h-2.5 w-2.5" />
                                 パイプライン追加済み
                             </span>
+                        ) : !is_available ? (
+                            /* open 以外（closed=終了 / pending=ペンディング）は追加不可。ステータス別ラベル。 */
+                            <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
+                                <Ban className="h-2.5 w-2.5" />
+                                {PROJECT_STATUS_LABELS[project.status] ?? '募集停止中'}
+                            </span>
+                        ) : (
+                            /* 掲載中だが既存パイプラインが上限（5件）到達で追加不可。 */
+                            is_project_full && (
+                                <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
+                                    <Ban className="h-2.5 w-2.5" />
+                                    上限到達
+                                </span>
+                            )
                         )}
                     </div>
 

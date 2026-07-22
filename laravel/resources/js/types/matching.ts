@@ -11,6 +11,8 @@ export interface MatchProject {
     rate_max: number | null;
     rate_note: string | null;
     work_style: string | null;
+    /** 掲載状態（open=募集中 / closed=終了 / pending=ペンディング）。 */
+    status: string;
     start_date: string | null;
     start_label: string;
     required_skills: Array<{ label: string }>;
@@ -27,6 +29,10 @@ export interface MatchResult {
     ai_missing: string | null;
     project: MatchProject;
     is_in_pipeline: boolean;
+    /** 募集中(open)か。false（掲載停止 closed/pending）なら「掲載停止」表示＋追加無効化。 */
+    is_available: boolean;
+    /** パイプライン上限（5件）到達済みか。true なら「上限到達」表示＋追加無効化。 */
+    is_project_full: boolean;
 }
 
 /**
@@ -34,7 +40,7 @@ export interface MatchResult {
  * サーバー MatchingController の EMPTY_* 定数と一致させること。
  *  - no_match     : 候補案件なし / スコア0件
  *  - engine_error : エンジン通信失敗（flash.error も併発）
- *  - unavailable  : マッチはあったが対象案件が削除・非掲出で全滅
+ *  - unavailable  : マッチはあったが対象案件が全てハード削除で全滅（掲載停止は残して無効表示するため該当しない）
  */
 export type MatchingEmptyReason = 'no_match' | 'engine_error' | 'unavailable';
 
