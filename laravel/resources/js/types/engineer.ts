@@ -151,9 +151,5 @@ export type EngineerListPageProps = {
     statusOptions: StatusOption[];
     workStyleOptions: WorkTypeOption[];
     phaseOptions: Phase[];
-<<<<<<< HEAD
-};
-=======
     sortOptions: SortOption[];
 };
->>>>>>> 6161345f (fix: engineer sort ssot)

@@ -142,6 +142,57 @@
     cursor: pointer;
   }
 
+  /* ===== MULTI-SELECT DROPDOWN（ランク・ステータスの複数選択。WF_03 と共通パターン） ===== */
+  .wf-checkbox {
+    width: 14px; height: 14px;
+    border: 1.5px solid #888; background: #fff;
+    display: inline-block; flex-shrink: 0;
+  }
+  .ms-wrap { position: relative; display: inline-block; }
+  .ms-btn {
+    height: 32px; padding: 0 10px;
+    border: 1.5px solid #999; background: #fff;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #444; cursor: pointer; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 5px;
+    white-space: nowrap;
+  }
+  .ms-wrap.open .ms-btn { border-color: #333; background: #f5f5f5; }
+  .ms-badge {
+    display: none;
+    background: #333; color: #fff;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 5px; border-radius: 8px;
+  }
+  .ms-badge.visible { display: inline-block; }
+  .ms-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px); left: 0;
+    min-width: 160px;
+    background: #fff;
+    border: 1.5px solid #999;
+    border-radius: 4px;
+    padding: 6px 0;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .ms-wrap.open .ms-panel { display: block; }
+  .ms-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    font-size: 12px; color: #333; cursor: pointer;
+  }
+  .ms-item:hover { background: #f5f5f5; }
+  .ms-item input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; }
+  .ms-group-label {
+    font-size: 10px; font-weight: 700; color: #999;
+    padding: 8px 12px 3px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    border-top: 1px solid #eee; margin-top: 2px;
+  }
+  .ms-group-label:first-child { border-top: none; margin-top: 0; }
+
   .wf-input {
     height: 32px;
     border: 1.5px solid #999; background: #fff;
@@ -722,36 +773,42 @@
           <option value="鈴木">鈴木 営業</option>
           <option value="佐藤">佐藤 営業</option>
         </select>
-        <select class="wf-select" style="width:120px;" id="filter-rank" onchange="updateSummary()">
-          <option value="">ランク（全て）</option>
-          <option value="A">A（80点以上）</option>
-          <option value="B">B（65〜79点）</option>
-          <option value="C">C（50〜64点）</option>
-          <option value="D">D（49点以下）</option>
-        </select>
-        <select class="wf-select" style="width:160px;" id="filter-status" onchange="updateSummary()">
-          <option value="">ステータス（全て）</option>
-          <optgroup label="応募前">
-            <option>上位提案</option>
-            <option>求職者応募済み</option>
-            <option>応募中</option>
-          </optgroup>
-          <optgroup label="一次選考">
-            <option>一次調整中</option>
-            <option>一次待ち</option>
-            <option>一次結果待ち</option>
-          </optgroup>
-          <optgroup label="最終選考">
-            <option>最終調整中</option>
-            <option>最終待ち</option>
-            <option>最終結果待ち</option>
-          </optgroup>
-          <optgroup label="オファー">
-            <option>オファー</option>
-            <option>アサイン承諾待ち</option>
-            <option>成約</option>
-          </optgroup>
-        </select>
+        <!-- ランク（マルチセレクト＝複数選択可。API rank: string[] と整合） -->
+        <div class="ms-wrap" id="ms-rank">
+          <button class="ms-btn" onclick="toggleMs('ms-rank')">
+            ランク <span class="ms-badge" id="badge-rank"></span> ▾
+          </button>
+          <div class="ms-panel">
+            <label class="ms-item"><input type="checkbox" value="A" data-label="A" onchange="updateSummary()"> A（80点以上）</label>
+            <label class="ms-item"><input type="checkbox" value="B" data-label="B" onchange="updateSummary()"> B（65〜79点）</label>
+            <label class="ms-item"><input type="checkbox" value="C" data-label="C" onchange="updateSummary()"> C（50〜64点）</label>
+            <label class="ms-item"><input type="checkbox" value="D" data-label="D" onchange="updateSummary()"> D（49点以下）</label>
+          </div>
+        </div>
+        <!-- ステータス（マルチセレクト＝複数選択可。API status: string[] と整合） -->
+        <div class="ms-wrap" id="ms-status">
+          <button class="ms-btn" onclick="toggleMs('ms-status')">
+            ステータス <span class="ms-badge" id="badge-status"></span> ▾
+          </button>
+          <div class="ms-panel">
+            <div class="ms-group-label">エントリー</div>
+            <label class="ms-item"><input type="checkbox" data-label="上位提案" onchange="updateSummary()"> 上位提案</label>
+            <label class="ms-item"><input type="checkbox" data-label="求職者応募済み" onchange="updateSummary()"> 求職者応募済み</label>
+            <label class="ms-item"><input type="checkbox" data-label="応募中" onchange="updateSummary()"> 応募中</label>
+            <div class="ms-group-label">一次選考</div>
+            <label class="ms-item"><input type="checkbox" data-label="一次調整中" onchange="updateSummary()"> 一次調整中</label>
+            <label class="ms-item"><input type="checkbox" data-label="一次待ち" onchange="updateSummary()"> 一次待ち</label>
+            <label class="ms-item"><input type="checkbox" data-label="一次結果待ち" onchange="updateSummary()"> 一次結果待ち</label>
+            <div class="ms-group-label">最終選考</div>
+            <label class="ms-item"><input type="checkbox" data-label="最終調整中" onchange="updateSummary()"> 最終調整中</label>
+            <label class="ms-item"><input type="checkbox" data-label="最終待ち" onchange="updateSummary()"> 最終待ち</label>
+            <label class="ms-item"><input type="checkbox" data-label="最終結果待ち" onchange="updateSummary()"> 最終結果待ち</label>
+            <div class="ms-group-label">オファー</div>
+            <label class="ms-item"><input type="checkbox" data-label="オファー" onchange="updateSummary()"> オファー</label>
+            <label class="ms-item"><input type="checkbox" data-label="アサイン承諾待ち" onchange="updateSummary()"> アサイン承諾待ち</label>
+            <label class="ms-item"><input type="checkbox" data-label="成約" onchange="updateSummary()"> 成約</label>
+          </div>
+        </div>
       </div>
       <!-- 絞り込み条件バッジ行 -->
       <div class="filter-row" style="margin-top:8px;display:none;" id="filter-active-tags">
@@ -806,10 +863,10 @@
     <div id="view-active" class="kanban-wrapper">
       <div class="kanban-board">
 
-        <!-- カラム1：応募前 -->
+        <!-- カラム1：エントリー（旧「応募前」・2026-07-02 改称） -->
         <div class="kanban-col">
           <div class="col-header">
-            <span class="col-title">応募前</span>
+            <span class="col-title">エントリー</span>
             <span class="col-count">2</span>
           </div>
           <div style="padding:3px 8px;background:#e8e8e8;border-bottom:1px solid #ccc;font-size:9px;color:#666;">
@@ -887,7 +944,7 @@
             </div>
 
           </div>
-        </div><!-- /応募前 -->
+        </div><!-- /エントリー -->
 
         <!-- カラム2：一次選考 -->
         <div class="kanban-col">
@@ -943,7 +1000,6 @@
             <select class="wf-select" style="width:180px;height:28px;">
               <option>終了日（新しい順）</option>
               <option>終了日（古い順）</option>
-              <option>スコア（高い順）</option>
             </select>
           </div>
         </div>
@@ -951,18 +1007,20 @@
           <thead>
             <tr>
               <th>人材名</th>
+              <th>顧客名</th>
               <th>案件名</th>
               <th>ステータス</th>
               <th>担当営業</th>
               <th>終了日</th>
-              <th>NG理由 / 備考</th>
+              <th>NG理由</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td><strong>鈴木 一郎</strong></td>
-              <td>QRS社 / PHP開発</td>
+              <td>QRS社</td>
+              <td>PHP開発</td>
               <td><span class="status-chip">不成立</span></td>
               <td>田中</td>
               <td>2026/04/08</td>
@@ -973,7 +1031,8 @@
             </tr>
             <tr>
               <td><strong>山田 佳子</strong></td>
-              <td>TUV社 / インフラ移行</td>
+              <td>TUV社</td>
+              <td>インフラ移行</td>
               <td><span class="status-chip">募集終了</span></td>
               <td>鈴木</td>
               <td>2026/04/05</td>
@@ -984,7 +1043,8 @@
             </tr>
             <tr>
               <td><strong>岡 太郎</strong></td>
-              <td>WXY社 / Salesforce開発</td>
+              <td>WXY社</td>
+              <td>Salesforce開発</td>
               <td><span class="status-chip">辞退</span></td>
               <td>佐藤</td>
               <td>2026/04/02</td>
@@ -1192,7 +1252,7 @@
       <div>
         <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:6px;">⚠ 設計決定事項・v16変更点</div>
         <ul style="font-size:11px;color:#555;line-height:2;padding-left:16px;">
-          <li>カンバン構造：4単一カラム（応募前 / 一次選考 / 最終選考 / オファー）</li>
+          <li>カンバン構造：4単一カラム（エントリー / 一次選考 / 最終選考 / オファー）※第1グループは旧「応募前」から改称（2026-07-02）</li>
           <li>各カードに現在の詳細ステータスバッジを表示。ステータス変更はドロワーのプルダウンのみで行う</li>
           <li>終了ステータス選択時は完了済みタブへ自動移動</li>
           <li>初期表示：自分がメイン担当またはサブ担当のカードを表示（QA #70）</li>
@@ -1256,16 +1316,47 @@ function switchTab(tab) {
   }
 }
 
+/* ===== マルチセレクトドロップダウン（ランク・ステータス。WF_03 と共通） ===== */
+function toggleMs(id) {
+  var wrap = document.getElementById(id);
+  var isOpen = wrap.classList.contains('open');
+  document.querySelectorAll('.ms-wrap').forEach(function(w){ w.classList.remove('open'); });
+  if (!isOpen) wrap.classList.add('open');
+}
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.ms-wrap')) {
+    document.querySelectorAll('.ms-wrap').forEach(function(w){ w.classList.remove('open'); });
+  }
+});
+/* マルチセレクトで選択中のラベル配列を返す */
+function getMsLabels(wrapId) {
+  return Array.prototype.slice.call(
+    document.querySelectorAll('#' + wrapId + ' input[type=checkbox]:checked')
+  ).map(function(cb){ return cb.getAttribute('data-label'); });
+}
+/* 選択数バッジを更新 */
+function updateMsBadge(wrapId, badgeId) {
+  var n = document.querySelectorAll('#' + wrapId + ' input[type=checkbox]:checked').length;
+  var b = document.getElementById(badgeId);
+  b.textContent = n;
+  b.classList.toggle('visible', n > 0);
+}
+
 /* 条件サマリー更新 */
 function updateSummary() {
-  var keyword = document.getElementById('filter-keyword').value.trim();
-  var sales   = document.getElementById('filter-sales').value;
-  var rank    = document.getElementById('filter-rank').value;
+  var keyword  = document.getElementById('filter-keyword').value.trim();
+  var sales    = document.getElementById('filter-sales').value;
+  var ranks    = getMsLabels('ms-rank');
+  var statuses = getMsLabels('ms-status');
+
+  updateMsBadge('ms-rank', 'badge-rank');
+  updateMsBadge('ms-status', 'badge-status');
 
   var conditions = [];
-  if (keyword) conditions.push('キーワード: ' + keyword);
-  if (sales)   conditions.push('担当: ' + sales);
-  if (rank)    conditions.push('ランク: ' + rank);
+  if (keyword)         conditions.push('キーワード: ' + keyword);
+  if (sales)           conditions.push('担当: ' + sales);
+  if (ranks.length)    conditions.push('ランク: ' + ranks.join('・'));
+  if (statuses.length) conditions.push('ステータス: ' + statuses.length + '件');
 
   var summary = document.getElementById('filter-summary');
   if (conditions.length === 0) {
@@ -1294,7 +1385,22 @@ function updateSummary() {
 function clearAll() {
   document.getElementById('filter-keyword').value = '';
   document.getElementById('filter-sales').value = '';
-  document.getElementById('filter-rank').value = '';
+  document.querySelectorAll('#ms-rank input[type=checkbox], #ms-status input[type=checkbox]')
+    .forEach(function(cb){ cb.checked = false; });
+  updateSummary();
+}
+
+/* サマリーバッジ行の✕から条件種別ごとに個別解除 */
+function clearCondition(type) {
+  if (type === 'キーワード') {
+    document.getElementById('filter-keyword').value = '';
+  } else if (type === '担当') {
+    document.getElementById('filter-sales').value = '';
+  } else if (type === 'ランク') {
+    document.querySelectorAll('#ms-rank input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+  } else if (type === 'ステータス') {
+    document.querySelectorAll('#ms-status input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+  }
   updateSummary();
 }
 

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Project extends Model
 {
+    use HasFactory;
+    
     public const PHASES = [
         ['key' => 'proc_requirements',  'name' => '要件定義'],
         ['key' => 'proc_basic_design',  'name' => '基本設計'],
@@ -66,12 +69,12 @@ class Project extends Model
     ];
 
     protected $casts = [
-        'proc_requirements'    => 'boolean',
-        'proc_basic_design'    => 'boolean',
-        'proc_detail_design'   => 'boolean',
-        'proc_development'     => 'boolean',
-        'proc_testing'         => 'boolean',
-        'proc_maintenance'     => 'boolean',
+        'proc_requirements' => 'boolean',
+        'proc_basic_design' => 'boolean',
+        'proc_detail_design' => 'boolean',
+        'proc_development' => 'boolean',
+        'proc_testing' => 'boolean',
+        'proc_maintenance' => 'boolean',
         'negotiation_required' => 'boolean',
     ];
 
