@@ -73,4 +73,9 @@ class ProjectService
             );
         }
     }
+
+    public function destroy(Project $project): void
+    {
+        $project->delete();
+    }
 }
