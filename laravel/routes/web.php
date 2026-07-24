@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\EngineerController;
+use App\Http\Controllers\Master\FormSettingController;
+use App\Http\Controllers\Master\MasterController;
+use App\Http\Controllers\Master\UserController as MasterUserController;
 use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\ProjectController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +27,15 @@ Route::middleware('auth')->group(function () {
     Route::get('pipelines/{pipeline}', [PipelineController::class, 'show'])->name('pipelines.show');
     Route::patch('pipelines/{pipeline}', [PipelineController::class, 'update'])->name('pipelines.update');
     Route::delete('pipelines/{pipeline}', [PipelineController::class, 'destroy'])->name('pipelines.destroy');
+});
+
+// マスタ管理（管理者専用）。全エンドポイントに admin ミドルウェアを適用する（docs/api/09）。
+Route::middleware(['auth', 'admin'])->prefix('master')->name('master.')->group(function () {
+    Route::get('/', [MasterController::class, 'index'])->name('index');
+    Route::post('users', [MasterUserController::class, 'store'])->name('users.store');
+    Route::put('users/{user}', [MasterUserController::class, 'update'])->name('users.update');
+    Route::delete('users/{user}', [MasterUserController::class, 'destroy'])->name('users.destroy');
+    Route::put('form-settings', [FormSettingController::class, 'update'])->name('form-settings.update');
 });
 
 require __DIR__.'/auth.php';

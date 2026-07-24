@@ -2,24 +2,39 @@ import { Toaster } from '@/Components/ui/toaster';
 import AppSidebar from '@/Components/Navigation/AppSidebar';
 import { useToast } from '@/hooks/use-toast';
 import { PageProps } from '@/types';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { PropsWithChildren, ReactNode, useEffect } from 'react';
 
 export default function Authenticated({
     header,
     children,
 }: PropsWithChildren<{ header?: ReactNode }>) {
-    const { flash } = usePage<PageProps>().props;
+    const page = usePage<PageProps>();
     const { toast } = useToast();
 
     useEffect(() => {
-        if (flash.success) {
-            toast({ description: flash.success, variant: 'success', duration: 3000 });
-        }
-        if (flash.error) {
-            toast({ description: flash.error, variant: 'destructive', duration: 5000 });
-        }
-    }, [flash.success, flash.error]);
+        const showFlash = (flash?: PageProps['flash']) => {
+            if (!flash) return;
+            if (flash.success) {
+                toast({ description: flash.success, variant: 'success', duration: 3000 });
+            }
+            if (flash.error) {
+                toast({ description: flash.error, variant: 'destructive', duration: 5000 });
+            }
+        };
+
+        // 初回描画時（POST 後のリダイレクトで最初に表示された場合など）の flash。
+        showFlash(page.props.flash);
+
+        // 以降の遷移では success イベントで検知する。
+        // useEffect の依存に flash 文字列を使うと、同一メッセージが連続した際に
+        // 値が変わらず再表示されない（例：同じユーザーを続けて更新）ため、
+        // Inertia の成功レスポンスごとに確実に表示する。
+        return router.on('success', (event) => {
+            showFlash((event.detail.page.props as unknown as PageProps).flash);
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         // レイヤー① 最外殻: 100vh で固定し、外へ溢れさせない
