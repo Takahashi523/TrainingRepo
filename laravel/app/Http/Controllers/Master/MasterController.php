@@ -22,6 +22,7 @@ class MasterController extends Controller
         $users = User::query()
             ->select(['id', 'name', 'email', 'role', 'last_login_at'])
             ->orderBy('name')
+            ->orderBy('id') // 同名時のタイブレーク（順序を決定的にする）
             ->get();
 
         $settings = FormFieldSetting::query()

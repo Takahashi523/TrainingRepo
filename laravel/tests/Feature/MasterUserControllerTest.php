@@ -89,6 +89,20 @@ class MasterUserControllerTest extends TestCase
             );
     }
 
+    public function test_index_users_are_ordered_by_name_then_id(): void
+    {
+        $admin = $this->admin(['name' => '同名 太郎', 'email' => 'a@example.com']);
+        $second = $this->general(['name' => '同名 太郎', 'email' => 'b@example.com']);
+        $this->general(['name' => 'あ 花子', 'email' => 'c@example.com']);
+
+        // 同名（同名 太郎）は id 昇順でタイブレークされ、決定的な順序になる
+        $this->actingAs($admin)->get('/master')
+            ->assertInertia(fn ($page) => $page
+                ->where('users.1.id', $admin->id)
+                ->where('users.2.id', $second->id)
+            );
+    }
+
     // -------------------------------------------------------
     // 追加（store）
     // -------------------------------------------------------

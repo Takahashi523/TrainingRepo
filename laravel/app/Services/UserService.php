@@ -23,12 +23,16 @@ class UserService
     public function store(array $data): User
     {
         return DB::transaction(function () use ($data) {
-            return User::create([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'password' => Hash::make($data['password']),
-                'role' => $data['role'],
-            ]);
+            try {
+                return User::create([
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'password' => Hash::make($data['password']),
+                    'role' => $data['role'],
+                ]);
+            } catch (QueryException $e) {
+                $this->rethrowDuplicateEmail($e, $data['email']);
+            }
         });
     }
 
@@ -53,7 +57,11 @@ class UserService
                 $attributes['password'] = Hash::make($data['password']);
             }
 
-            $user->update($attributes);
+            try {
+                $user->update($attributes);
+            } catch (QueryException $e) {
+                $this->rethrowDuplicateEmail($e, $data['email']);
+            }
 
             return $user;
         });
@@ -75,6 +83,27 @@ class UserService
                 ]);
             }
         });
+    }
+
+    /**
+     * DB の一意制約違反（メール重複）をユーザー向けの 422 に変換する。
+     * FormRequest の unique チェックと DB 制約の間に生じる並行競合
+     *（2管理者が同一メールを同時作成/更新）を吸収し、500 を防ぐ。
+     *
+     * SQLSTATE（23000）で判定しない：23000 は UNIQUE 違反だけでなく FK 違反も含み、
+     * ドライバ依存コード（MySQL 1062 等）は SQLite テストで動かないため。
+     * 代わりに **同一メールの行が実在するか** で判定する（ドライバ非依存・PR #48 と同方針）。
+     * 重複でなければ元の例外を再送出する。
+     */
+    private function rethrowDuplicateEmail(QueryException $e, string $email): never
+    {
+        if (User::where('email', $email)->exists()) {
+            throw ValidationException::withMessages([
+                'email' => 'このメールアドレスはすでに使用されています。',
+            ]);
+        }
+
+        throw $e;
     }
 
     /**
