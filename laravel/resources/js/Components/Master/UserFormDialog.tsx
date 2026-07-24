@@ -33,7 +33,6 @@ interface FormData {
     password: string;
     password_confirmation: string;
     role: UserRole | '';
-    [key: string]: string;
 }
 
 /** 人材登録・案件登録フォームと同じ必須バッジ（rose の小ピル） */
@@ -129,6 +128,20 @@ export default function UserFormDialog({ open, user, onClose }: Props) {
         }
     };
 
+    // <form> を使わない（Inertia 方針）ため、テキスト入力上での Enter 送信を補助する。
+    // select やボタン（ロール選択・目のトグル）上の Enter は対象外にする。
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (
+            e.key === 'Enter' &&
+            !e.nativeEvent.isComposing &&
+            (e.target as HTMLElement).tagName === 'INPUT' &&
+            !processing
+        ) {
+            e.preventDefault();
+            handleSubmit();
+        }
+    };
+
     return (
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent
@@ -141,7 +154,7 @@ export default function UserFormDialog({ open, user, onClose }: Props) {
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4 py-2">
+                <div className="space-y-4 py-2" onKeyDown={handleKeyDown}>
                     <div className="space-y-1.5">
                         <Label htmlFor="user-name" className="flex items-center gap-1.5">
                             <RequiredBadge />

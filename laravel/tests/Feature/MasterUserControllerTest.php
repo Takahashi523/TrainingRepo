@@ -156,6 +156,21 @@ class MasterUserControllerTest extends TestCase
             ->assertSessionHasErrors('password_confirmation');
     }
 
+    public function test_password_exceeding_max_length_is_rejected(): void
+    {
+        $admin = $this->admin();
+        // 256文字（英字+数字を含むので max:255 のみ違反する）
+        $long = str_repeat('ab12', 64);
+        $this->assertSame(256, strlen($long));
+
+        $this->actingAs($admin)
+            ->post('/master/users', $this->validPayload([
+                'password' => $long,
+                'password_confirmation' => $long,
+            ]))
+            ->assertSessionHasErrors('password');
+    }
+
     public function test_invalid_role_is_rejected(): void
     {
         $admin = $this->admin();
@@ -260,6 +275,36 @@ class MasterUserControllerTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $this->assertTrue(Hash::check('brandnew123', $target->fresh()->password));
+    }
+
+    public function test_update_requires_confirmation_when_password_provided(): void
+    {
+        $admin = $this->admin();
+        $target = $this->general();
+
+        // パスワードを入力したのに確認欄が空 → password_confirmation にエラー
+        $this->actingAs($admin)->put("/master/users/{$target->id}", [
+            'name' => $target->name,
+            'email' => $target->email,
+            'role' => 'general',
+            'password' => 'newpass123',
+            'password_confirmation' => '',
+        ])->assertSessionHasErrors('password_confirmation');
+    }
+
+    public function test_update_password_exceeding_max_length_is_rejected(): void
+    {
+        $admin = $this->admin();
+        $target = $this->general();
+        $long = str_repeat('ab12', 64); // 256文字
+
+        $this->actingAs($admin)->put("/master/users/{$target->id}", [
+            'name' => $target->name,
+            'email' => $target->email,
+            'role' => 'general',
+            'password' => $long,
+            'password_confirmation' => $long,
+        ])->assertSessionHasErrors('password');
     }
 
     public function test_updating_own_email_is_not_treated_as_duplicate(): void
