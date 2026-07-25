@@ -245,7 +245,7 @@
 | rate | 単価（下限〜上限） | false | 必須 |
 | start_date | 参画開始時期 | false | 必須 |
 | work_style | 稼働形態 | false | 必須 |
-| work_location | 勤務地 | false | 必須 |
+| work_location | 勤務地（路線名） | false | 必須 |
 | commercial_flow | 商流 | false | 必須 |
 | interview_count | 面談回数 | false | 任意 |
 | headcount | 募集人数 | false | 任意 |
@@ -256,6 +256,12 @@
 | description | 業務内容詳細 | false | 任意 |
 | remarks | 特記事項 | false | 任意 |
 
+> **`work_location`（勤務地）ラベルについて**
+> 案件フォームの勤務地は「路線名（`work_location_line`）」と「最寄駅（`work_location_station`）」の 2 入力に分かれるが、
+> `form_field_settings` の `work_location` トグルが制御するのは **路線名の必須/任意のみ**。
+> 最寄駅は稼働形態が常駐/一部リモートのとき**常に必須**（業務ルール固定・マスタ設定の対象外、`ProjectRequest` 参照）。
+> このため必須トグルの実効範囲を正確に示す目的でラベルを「**勤務地（路線名）**」としている。
+
 ---
 
 ## 3. 確定事項（旧 TBD・2026-07-23 確定）
@@ -264,5 +270,5 @@
 |---|------|------|
 | 1 | 自分自身の削除防止 | **削除不可・422**。「自分自身のアカウントは削除できません」 |
 | 2 | パスワードの要件 | **`Password::min(8)->letters()->numbers()`**（8文字以上＋英字・数字）。`AppServiceProvider::boot()` の `Password::defaults()` に集約し、FormRequest から参照 |
-| 3 | 社内メールアドレスのドメイン | **環境変数 `ALLOWED_EMAIL_DOMAINS`（カンマ区切り・複数可）→ `config/master.php`** で保持し、`ends_with:@domain1,@domain2,...` で検証。未設定時はドメイン制限なし（形式チェックのみ）。ハードコードしない |
+| 3 | 社内メールアドレスのドメイン | **環境変数 `ALLOWED_EMAIL_DOMAINS`（カンマ区切り・複数可）→ `config/organization.php`** で保持し、`ends_with:@domain1,@domain2,...` で検証。未設定時はドメイン制限なし（形式チェックのみ）。ハードコードしない。組織横断のアカウント方針のため、マスタ管理専用ではなく組織方針 config に配置（今後のログイン/認証からも参照） |
 | 4 | 最後の管理者のロール変更・削除 | **ガードあり・422**。最後の admin を general 化／削除しようとするとエラー（更新は `lockForUpdate` で並行時も再検査） |

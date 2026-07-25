@@ -62,20 +62,6 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
     );
 }
 
-// 必須/任意の小バッジ。1行に複数入力が並ぶ項目（氏名/カナ・最寄駅/路線）で、
-// 入力ごとに個別の必須/任意を示すために使う。
-function RequiredTag({ required }: { required: boolean }) {
-    return required ? (
-        <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold leading-tight text-rose-600">
-            必須
-        </span>
-    ) : (
-        <span className="rounded border border-border px-1.5 py-0.5 text-[9px] font-semibold leading-tight text-muted-foreground">
-            任意
-        </span>
-    );
-}
-
 function FormRow({
     label,
     required = false,
@@ -146,32 +132,23 @@ export default function EngineerForm({
             {/* ==================== 基本情報 ==================== */}
             <SectionHeading>基本情報</SectionHeading>
 
-            {/* 氏名・氏名カナは別カラム。エラーは各 Input 直下に個別表示（片方が隠れないように） */}
-            <FormRow label="氏名 / カナ" required>
-                <div className="flex gap-2">
-                    <div className="flex-1 space-y-1">
-                        <Input
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
-                            placeholder="例：山田 太郎"
-                            className={errors.name ? 'border-destructive' : ''}
-                        />
-                        {errors.name && (
-                            <p className="text-xs text-destructive">{errors.name}</p>
-                        )}
-                    </div>
-                    <div className="flex-1 space-y-1">
-                        <Input
-                            value={data.name_kana}
-                            onChange={(e) => setData('name_kana', e.target.value)}
-                            placeholder="例：ヤマダ タロウ"
-                            className={errors.name_kana ? 'border-destructive' : ''}
-                        />
-                        {errors.name_kana && (
-                            <p className="text-xs text-destructive">{errors.name_kana}</p>
-                        )}
-                    </div>
-                </div>
+            {/* 氏名・氏名カナは登録フィールドが別のため、他項目と同じく独立した行として並べる。 */}
+            <FormRow label="氏名" required error={errors.name}>
+                <Input
+                    value={data.name}
+                    onChange={(e) => setData('name', e.target.value)}
+                    placeholder="例：山田 太郎"
+                    className={`w-64 ${errors.name ? 'border-destructive' : ''}`}
+                />
+            </FormRow>
+
+            <FormRow label="カナ" required error={errors.name_kana}>
+                <Input
+                    value={data.name_kana}
+                    onChange={(e) => setData('name_kana', e.target.value)}
+                    placeholder="例：ヤマダ タロウ"
+                    className={`w-64 ${errors.name_kana ? 'border-destructive' : ''}`}
+                />
             </FormRow>
 
             <FormRow
@@ -194,72 +171,35 @@ export default function EngineerForm({
                 </div>
             </FormRow>
 
-            {/* 最寄駅・路線は別カラム・別バリデーション。必須/任意は field_key ごとに独立、
-                エラーも各 Input 直下に個別表示する（横並びレイアウトは維持） */}
-            <div className="flex items-start border-b border-border/50 py-3">
-                <div className="flex w-44 shrink-0 items-start pr-4 pt-1.5">
-                    <span className="text-xs font-semibold text-foreground">
-                        最寄駅 / 路線
-                    </span>
-                </div>
-                <div className="min-w-0 flex-1 space-y-1.5">
-                    <div className="flex gap-2">
-                        <div className="w-48 space-y-1">
-                            <div className="flex items-center gap-1.5">
-                                <RequiredTag
-                                    required={fieldSettings.nearest_station.is_required}
-                                />
-                                <span className="text-[11px] text-muted-foreground">
-                                    最寄駅
-                                </span>
-                            </div>
-                            <Input
-                                value={data.nearest_station}
-                                onChange={(e) =>
-                                    setData('nearest_station', e.target.value)
-                                }
-                                placeholder="駅名（例：新宿）"
-                                className={
-                                    errors.nearest_station ? 'border-destructive' : ''
-                                }
-                            />
-                            {errors.nearest_station && (
-                                <p className="text-xs text-destructive">
-                                    {errors.nearest_station}
-                                </p>
-                            )}
-                        </div>
-                        <div className="w-48 space-y-1">
-                            <div className="flex items-center gap-1.5">
-                                <RequiredTag
-                                    required={fieldSettings.nearest_line.is_required}
-                                />
-                                <span className="text-[11px] text-muted-foreground">
-                                    路線
-                                </span>
-                            </div>
-                            <Input
-                                value={data.nearest_line}
-                                onChange={(e) =>
-                                    setData('nearest_line', e.target.value)
-                                }
-                                placeholder="路線名（例：JR中央線）"
-                                className={
-                                    errors.nearest_line ? 'border-destructive' : ''
-                                }
-                            />
-                            {errors.nearest_line && (
-                                <p className="text-xs text-destructive">
-                                    {errors.nearest_line}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        出社が必要な案件との通勤条件の判定に使用します。駅名・路線名をそれぞれ自由入力（例：新宿 / JR中央線）
-                    </p>
-                </div>
-            </div>
+            {/* 最寄駅・路線は登録フィールドが別で必須/任意も独立するため、他項目と同じく
+                独立した行（左カラムに必須/任意バッジ）として並べる。 */}
+            <FormRow
+                label="最寄駅"
+                required={fieldSettings.nearest_station.is_required}
+                hint="出社が必要な案件との通勤条件の判定に使用します。駅名を自由入力（例：新宿）"
+                error={errors.nearest_station}
+            >
+                <Input
+                    value={data.nearest_station}
+                    onChange={(e) => setData('nearest_station', e.target.value)}
+                    placeholder="駅名（例：新宿）"
+                    className={`w-64 ${errors.nearest_station ? 'border-destructive' : ''}`}
+                />
+            </FormRow>
+
+            <FormRow
+                label="路線"
+                required={fieldSettings.nearest_line.is_required}
+                hint="路線名を自由入力（例：JR中央線）"
+                error={errors.nearest_line}
+            >
+                <Input
+                    value={data.nearest_line}
+                    onChange={(e) => setData('nearest_line', e.target.value)}
+                    placeholder="路線名（例：JR中央線）"
+                    className={`w-64 ${errors.nearest_line ? 'border-destructive' : ''}`}
+                />
+            </FormRow>
 
             <FormRow
                 label="稼働可能時期"

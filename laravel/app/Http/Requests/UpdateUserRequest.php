@@ -45,10 +45,10 @@ class UpdateUserRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
+        return array_merge($this->emailMessages(), [
             'password_confirmation.same' => '確認用のパスワードが一致しません。',
             'password_confirmation.required_with' => '確認用のパスワードを入力してください。',
-        ];
+        ]);
     }
 
     /**

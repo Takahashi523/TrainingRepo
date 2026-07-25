@@ -41,7 +41,7 @@ class FormFieldSetting extends Model
             'rate' => '単価（月額）',
             'start_date' => '参画開始時期',
             'work_style' => '稼働形態',
-            'work_location' => '勤務地',
+            'work_location' => '勤務地（路線名）',
             'commercial_flow' => '商流',
             'interview_count' => '面談回数',
             'headcount' => '募集人数',

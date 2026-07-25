@@ -39,9 +39,9 @@ class StoreUserRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
+        return array_merge($this->emailMessages(), [
             'password_confirmation.same' => '確認用のパスワードが一致しません。',
-        ];
+        ]);
     }
 
     /**

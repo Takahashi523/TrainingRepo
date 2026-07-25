@@ -51,7 +51,7 @@ class CreateAdminUserCommandTest extends TestCase
 
     public function test_enforces_email_domain_when_configured(): void
     {
-        config(['master.allowed_email_domains' => ['nexus.example.com']]);
+        config(['organization.allowed_email_domains' => ['nexus.example.com']]);
 
         $this->artisan('app:create-admin', [
             '--name' => 'X',

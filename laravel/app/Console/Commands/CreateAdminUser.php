@@ -42,7 +42,7 @@ class CreateAdminUser extends Command
             'name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email'), ...$this->domainRule()],
             'password' => ['required', 'max:255', Password::defaults()],
-        ], [], [
+        ], $this->domainMessage(), [
             'name' => '氏名',
             'email' => 'メールアドレス',
             'password' => 'パスワード',
@@ -75,12 +75,30 @@ class CreateAdminUser extends Command
      */
     private function domainRule(): array
     {
-        $domains = config('master.allowed_email_domains');
+        $domains = config('organization.allowed_email_domains');
 
         if (empty($domains)) {
             return [];
         }
 
         return ['ends_with:'.implode(',', array_map(fn ($d) => '@'.$d, $domains))];
+    }
+
+    /**
+     * 許容ドメインを明示する ends_with のカスタムメッセージ（マスタ管理の登録と揃える）。
+     *
+     * @return array<string, string>
+     */
+    private function domainMessage(): array
+    {
+        $domains = config('organization.allowed_email_domains');
+
+        if (empty($domains)) {
+            return [];
+        }
+
+        $list = implode('、', array_map(fn ($d) => '@'.$d, $domains));
+
+        return ['email.ends_with' => "社内メールアドレス（{$list}）で登録してください。"];
     }
 }

@@ -194,17 +194,19 @@ class MasterUserControllerTest extends TestCase
 
     public function test_email_domain_restriction_rejects_disallowed_domain(): void
     {
-        config(['master.allowed_email_domains' => ['nexus.example.com']]);
+        config(['organization.allowed_email_domains' => ['nexus.example.com']]);
         $admin = $this->admin();
 
         $this->actingAs($admin)
             ->post('/master/users', $this->validPayload(['email' => 'user@gmail.com']))
-            ->assertSessionHasErrors('email');
+            ->assertSessionHasErrors([
+                'email' => '社内メールアドレス（@nexus.example.com）で登録してください。',
+            ]);
     }
 
     public function test_email_domain_restriction_allows_configured_domain(): void
     {
-        config(['master.allowed_email_domains' => ['nexus.example.com']]);
+        config(['organization.allowed_email_domains' => ['nexus.example.com']]);
         $admin = $this->admin();
 
         $this->actingAs($admin)
@@ -215,7 +217,7 @@ class MasterUserControllerTest extends TestCase
 
     public function test_no_domain_restriction_when_unset(): void
     {
-        config(['master.allowed_email_domains' => []]);
+        config(['organization.allowed_email_domains' => []]);
         $admin = $this->admin();
 
         $this->actingAs($admin)
