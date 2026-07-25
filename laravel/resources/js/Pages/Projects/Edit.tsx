@@ -1,5 +1,9 @@
 import ProjectForm from "@/Components/Projects/ProjectForm";
-import { Project, ProjectEditPageProps, ProjectFormData } from "@/types/project";
+import {
+    Project,
+    ProjectEditPageProps,
+    ProjectFormData,
+} from "@/types/project";
 import { Button } from "@/Components/ui/button";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
@@ -20,9 +24,13 @@ function toFormData(project: Project): ProjectFormData {
         client_name: project.client_name ?? "",
         headcount: project.headcount != null ? String(project.headcount) : "",
         start_date: project.start_date ?? "",
-        // rate_min/rate_max が両方nullならスキル見合い（rate_note使用）とみなす
+        // rate_min/rate_max が両方nullかつrate_noteが入っている場合のみスキル見合いとみなす
+        // （rate_noteはProjectService側でrate_is_negotiable=falseの場合は必ずnullになる保証があるため、
+        //  「単価未入力（非スキル見合い）」と「スキル見合い」を判別できる）
         rate_is_negotiable:
-            project.rate_min === null && project.rate_max === null,
+            project.rate_min === null &&
+            project.rate_max === null &&
+            project.rate_note !== null,
         rate_min: project.rate_min != null ? String(project.rate_min) : "",
         rate_max: project.rate_max != null ? String(project.rate_max) : "",
         rate_note: project.rate_note ?? "",
