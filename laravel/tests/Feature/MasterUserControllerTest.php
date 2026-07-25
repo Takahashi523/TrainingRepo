@@ -70,6 +70,7 @@ class MasterUserControllerTest extends TestCase
 
     public function test_index_returns_users_and_form_settings_props(): void
     {
+        config(['organization.allowed_email_domains' => []]);
         $this->seed(FormFieldSettingSeeder::class);
         $admin = $this->admin(['name' => 'アルファ管理者', 'email' => 'alpha@example.com']);
 
@@ -86,6 +87,20 @@ class MasterUserControllerTest extends TestCase
                 ->where('form_settings.engineer.0.field_label', fn ($label) => filled($label))
                 ->has('form_settings.project')
                 ->where('form_settings.project.0.field_label', fn ($label) => filled($label))
+                // 未設定時はドメインヒント用の配列が空で渡る
+                ->where('allowed_email_domains', [])
+            );
+    }
+
+    public function test_index_exposes_allowed_email_domains_when_configured(): void
+    {
+        // 管理者専用画面に限りヒント表示用のドメインを渡す（公開画面には出さない方針）。
+        config(['organization.allowed_email_domains' => ['nexus.co.jp', 'nexus.example.com']]);
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->get('/master')
+            ->assertInertia(fn ($page) => $page
+                ->where('allowed_email_domains', ['nexus.co.jp', 'nexus.example.com'])
             );
     }
 

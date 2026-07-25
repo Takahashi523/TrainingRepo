@@ -15,7 +15,12 @@ type Props = PageProps<MasterPageProps>;
 
 type TabKey = 'users' | 'form';
 
-export default function Index({ users, form_settings, auth }: Props) {
+export default function Index({
+    users,
+    form_settings,
+    allowed_email_domains,
+    auth,
+}: Props) {
     const [activeTab, setActiveTab] = useState<TabKey>('users');
 
     // ユーザー追加・編集モーダル（editingUser=null で新規追加）
@@ -141,6 +146,7 @@ export default function Index({ users, form_settings, auth }: Props) {
             <UserFormDialog
                 open={userDialogOpen}
                 user={editingUser}
+                allowedEmailDomains={allowed_email_domains}
                 onClose={() => setUserDialogOpen(false)}
             />
 

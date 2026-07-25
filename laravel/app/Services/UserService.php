@@ -71,10 +71,19 @@ class UserService
      * ユーザーを物理削除する。
      * 主担当（main_user_id）が残っている場合は FK RESTRICT で例外となるため、
      * これを捕捉して 422 に変換する（COUNT→DELETE 間の並行に対する最終防波堤）。
+     *
+     * 管理者を削除する場合は「最後の管理者」でないかを行ロック付きで再検査する。
+     * DeleteUserRequest のロック無し COUNT と DELETE の間に入る並行
+     *（2管理者を同時削除、または一方を降格＋他方を削除）で管理者が不在になるのを防ぐ。
+     * 降格側 guardLastAdminOnDemotion と同一述語（role='admin'）をロックし、
+     * かつ両経路とも「admin セットをロック → 対象行を変更」の順序を揃えることで、
+     * 相互に直列化しつつデッドロック（逆順ロック）を回避する。
      */
     public function delete(User $user): void
     {
         DB::transaction(function () use ($user) {
+            $this->guardLastAdminOnDelete($user);
+
             try {
                 $user->delete();
             } catch (QueryException $e) {
@@ -120,6 +129,25 @@ class UserService
         if ($adminCount <= 1) {
             throw ValidationException::withMessages([
                 'role' => '最後の管理者を一般に変更できません。',
+            ]);
+        }
+    }
+
+    /**
+     * 最後の管理者を削除しようとしていないかを、行ロック付きで検査する。
+     * 降格ガードと同一述語（role='admin'）をロックすることで、削除と降格を相互に直列化する。
+     */
+    private function guardLastAdminOnDelete(User $user): void
+    {
+        if ($user->role !== 'admin') {
+            return;
+        }
+
+        $adminCount = User::where('role', 'admin')->lockForUpdate()->count();
+
+        if ($adminCount <= 1) {
+            throw ValidationException::withMessages([
+                'delete' => '管理者が不在になるため、最後の管理者は削除できません。',
             ]);
         }
     }

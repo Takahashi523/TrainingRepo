@@ -31,5 +31,7 @@ export interface MasterPageProps {
         engineer: FormSetting[];
         project: FormSetting[];
     };
+    /** 許容メールドメイン（@なし・例: ["nexus.co.jp"]）。未設定時は空配列＝制限なし */
+    allowed_email_domains: string[];
     [key: string]: unknown;
 }

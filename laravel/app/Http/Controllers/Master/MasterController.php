@@ -39,6 +39,10 @@ class MasterController extends Controller
                 'engineer' => FormSettingResource::collection($this->orderedSettings($settings->get('engineer')))->resolve(),
                 'project' => FormSettingResource::collection($this->orderedSettings($settings->get('project')))->resolve(),
             ],
+            // 許容メールドメイン（ユーザー登録フォームのヒント表示用）。
+            // 管理者専用画面に限定して渡す。ログイン等の公開画面には出さない
+            // （未認証にドメインを晒すと列挙のヒントになりうるため）。未設定なら空配列。
+            'allowed_email_domains' => config('organization.allowed_email_domains'),
         ]);
     }
 

@@ -24,6 +24,11 @@ interface Props {
     open: boolean;
     /** 編集対象。null の場合は新規追加モード */
     user: MasterUser | null;
+    /**
+     * 許容メールドメイン（@なし）。設定時のみヒントに明示する。
+     * 管理者専用画面に限定して渡される（公開画面には出さない）。
+     */
+    allowedEmailDomains: string[];
     onClose: () => void;
 }
 
@@ -49,8 +54,22 @@ function RequiredBadge() {
  * 新規は POST /master/users、編集は PUT /master/users/{id}。
  * 編集時にパスワードを空にすると変更なし（サーバ側で nullable）。
  */
-export default function UserFormDialog({ open, user, onClose }: Props) {
+export default function UserFormDialog({
+    open,
+    user,
+    allowedEmailDomains,
+    onClose,
+}: Props) {
     const isEdit = user !== null;
+
+    // 許容ドメインが設定されていれば入力前に明示してエラーの往復を減らす。
+    // 未設定時はドメイン制限がないため、ログインID用途のみ案内する。
+    const emailHint =
+        allowedEmailDomains.length > 0
+            ? `社内メールアドレス（${allowedEmailDomains
+                  .map((d) => `@${d}`)
+                  .join('、')}）で登録してください。ログインIDとして使用します。`
+            : 'メールアドレスをログインIDとして使用します。';
 
     const {
         data,
@@ -188,9 +207,7 @@ export default function UserFormDialog({ open, user, onClose }: Props) {
                             maxLength={255}
                             className={errors.email ? 'border-destructive' : ''}
                         />
-                        <p className="text-xs text-muted-foreground">
-                            社内メールアドレスのみ使用可。ログインIDとして使用します。
-                        </p>
+                        <p className="text-xs text-muted-foreground">{emailHint}</p>
                         {errors.email && (
                             <p className="text-xs text-destructive">{errors.email}</p>
                         )}
