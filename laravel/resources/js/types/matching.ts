@@ -46,6 +46,23 @@ export interface MatchResult {
  */
 export type MatchingEmptyReason = 'no_match' | 'engine_error' | 'unavailable';
 
+/**
+ * 追加失敗の back で返す「試行した案件1件の最新状態」。フロントは該当カードのフラグを差分更新する。
+ * エンジンは再実行しないため、掲載停止/上限到達/追加済みをこの1件だけ反映してボタンを無効化する。
+ *  - exists=false：ハード削除済み → カードを一覧から除去
+ *  - exists=true ：現在のフラグ（is_available / is_in_pipeline / is_project_full）と掲載状態ラベル
+ */
+export type MatchTargetState =
+    | { project_id: number; exists: false }
+    | {
+          project_id: number;
+          exists: true;
+          is_in_pipeline: boolean;
+          is_available: boolean;
+          is_project_full: boolean;
+          status_label: string;
+      };
+
 export type MatchingShowPageProps = {
     engineer: Engineer;
     /**
@@ -54,4 +71,6 @@ export type MatchingShowPageProps = {
      */
     results: MatchResult[] | null;
     emptyReason: MatchingEmptyReason | null;
+    /** 追加失敗の back でのみ非 null。試行した案件カードを最新状態へ差分更新する。 */
+    targetState: MatchTargetState | null;
 };

@@ -41,7 +41,12 @@ const EMPTY_STATES: Record<
     },
 };
 
-export default function Show({ engineer, results: resultsProp, emptyReason: emptyReasonProp }: Props) {
+export default function Show({
+    engineer,
+    results: resultsProp,
+    emptyReason: emptyReasonProp,
+    targetState,
+}: Props) {
     // results / emptyReason はローカル state で保持する。パイプライン追加直後の back では
     // サーバーが results=null を返す（＝再スコアリングしない・#4）。その場合は既存表示を維持し、
     // 追加カードのみ「追加済み」に楽観更新する。props が非 null のとき（通常遷移）だけ同期する。
@@ -57,6 +62,35 @@ export default function Show({ engineer, results: resultsProp, emptyReason: empt
 
     // 選択中カードの index（ドロワー開閉）。null で閉じている。
     const [selected, setSelected] = useState<number | null>(null);
+
+    // 追加失敗の back：エンジンを再実行しない代わりに、試行した案件1件だけ最新状態へ差分更新する。
+    // これで掲載停止・上限到達・追加済みがカードに反映され、ドロワーの追加ボタンも無効化される
+    // （古い addable 表示のまま再度押せてしまう問題を防ぐ・#4 楽観更新の失敗パス版）。
+    useEffect(() => {
+        if (!targetState) return;
+
+        if (!targetState.exists) {
+            // ハード削除された案件は表示できないため一覧から除去し、開いていたドロワーは閉じる
+            // （selected は index のため、要素除去でズレる前に閉じる）。
+            setResults((prev) => prev.filter((r) => r.project.id !== targetState.project_id));
+            setSelected(null);
+            return;
+        }
+
+        setResults((prev) =>
+            prev.map((r) =>
+                r.project.id === targetState.project_id
+                    ? {
+                          ...r,
+                          is_in_pipeline: targetState.is_in_pipeline,
+                          is_available: targetState.is_available,
+                          is_project_full: targetState.is_project_full,
+                          project: { ...r.project, status_label: targetState.status_label },
+                      }
+                    : r,
+            ),
+        );
+    }, [targetState]);
 
     const current = selected != null ? results[selected] : null;
 

@@ -70,6 +70,9 @@ class MatchingController extends Controller
                 'engineer' => EngineerResource::make($engineer),
                 'results' => null,
                 'emptyReason' => null,
+                // 追加失敗時のみ、試行した案件1件の最新状態を渡す（フロントが該当カードを差分更新する）。
+                // 成功時は null（既存の楽観更新 onAdded がカードを「追加済み」にする）。
+                'targetState' => session()->pull('pipeline_target_state'),
             ]);
         }
 
@@ -82,6 +85,8 @@ class MatchingController extends Controller
             // 結果0件のとき、その理由（no_match / engine_error / unavailable）をフロントへ渡し
             // 空状態の文言・アイコンを出し分ける。結果ありのときは null。
             'emptyReason' => $emptyReason,
+            // 通常ロードでは対象カードの差分更新は不要（追加失敗の back でのみ非 null）。
+            'targetState' => null,
         ]);
     }
 

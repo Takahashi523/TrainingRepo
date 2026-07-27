@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Engineer;
 use App\Models\Project;
+use App\Services\Matching\MatchTargetStateResolver;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -127,13 +128,27 @@ class PipelineStoreRequest extends FormRequest
         $projectId = $this->input('project_id');
 
         if ($projectId !== null && $validator->errors()->has('project_id')) {
-            $message = Project::whereKey($projectId)->exists()
+            $exists = Project::whereKey($projectId)->exists();
+            $message = $exists
                 ? '選択した案件は現在募集していないため、パイプラインに追加できませんでした。'
                 : '選択した案件が見つかりません。削除された可能性があります。';
 
-            throw new HttpResponseException(
-                redirect()->back()->withErrors(['project_id' => $message])
+            // 戻り先で対象カードを最新状態へ差分更新させる（掲載停止/削除を反映し、追加ボタンを無効化する）。
+            session()->flash(
+                'pipeline_target_state',
+                MatchTargetStateResolver::resolve((int) $projectId, (int) $engineerId)
             );
+
+            // field エラーで返す（onError を発火させ、誤「追加済み」＝onSuccess を防ぐ）。
+            $redirect = redirect()->back()->withErrors(['project_id' => $message]);
+
+            // 掲載停止（closed/pending）はカードが残りドロワーも開いたままなので、field エラーがそのまま見える。
+            // 一方ハード削除はカードを除去しドロワーも閉じるため field エラーが不可視になる。トーストでも通知する。
+            if (! $exists) {
+                $redirect->with('error', $message);
+            }
+
+            throw new HttpResponseException($redirect);
         }
 
         parent::failedValidation($validator);

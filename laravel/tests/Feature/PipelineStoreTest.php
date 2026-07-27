@@ -77,6 +77,12 @@ class PipelineStoreTest extends TestCase
         $response->assertSessionHasErrors('project_id');
         // 失敗時も戻り先 matching でエンジンを再実行しない（10-7 を失敗パスにも適用）。
         $response->assertSessionHas('preserve_matching_results', true);
+        // 対象カードを最新状態へ差分更新させる：重複なので is_in_pipeline=true。
+        $response->assertSessionHas('pipeline_target_state', fn ($s) => $s['project_id'] === $project->id
+            && $s['exists'] === true
+            && $s['is_in_pipeline'] === true
+            && $s['is_available'] === true
+            && $s['is_project_full'] === false);
         $this->assertSame(1, Pipeline::where('project_id', $project->id)->count());
     }
 
@@ -102,6 +108,11 @@ class PipelineStoreTest extends TestCase
 
         $response->assertSessionHasErrors('project_id');
         $response->assertSessionHas('preserve_matching_results', true);
+        // 上限到達なので is_project_full=true をカードへ反映させる。
+        $response->assertSessionHas('pipeline_target_state', fn ($s) => $s['project_id'] === $project->id
+            && $s['exists'] === true
+            && $s['is_project_full'] === true
+            && $s['is_in_pipeline'] === false);
         $this->assertSame(5, Pipeline::where('project_id', $project->id)->count());
     }
 
@@ -129,6 +140,12 @@ class PipelineStoreTest extends TestCase
         $response->assertSessionHasErrors(['project_id' => '選択した案件は現在募集していないため、パイプラインに追加できませんでした。']);
         // 失敗時も戻り先 matching でエンジンを再実行しない（10-7 を失敗パスにも適用）。
         $response->assertSessionHas('preserve_matching_results', true);
+        // 掲載停止をカードへ反映：is_available=false・ラベルは「終了」。ドロワーは開いたままなので field エラーで通知。
+        $response->assertSessionHas('pipeline_target_state', fn ($s) => $s['project_id'] === $closed->id
+            && $s['exists'] === true
+            && $s['is_available'] === false
+            && $s['status_label'] === '終了');
+        $response->assertSessionMissing('error');
         $this->assertDatabaseCount('pipelines', 0);
     }
 
@@ -145,6 +162,10 @@ class PipelineStoreTest extends TestCase
         $response->assertRedirect("/engineers/{$engineer->id}/matching");
         $response->assertSessionHasErrors(['project_id' => '選択した案件は現在募集していないため、パイプラインに追加できませんでした。']);
         $response->assertSessionHas('preserve_matching_results', true);
+        $response->assertSessionHas('pipeline_target_state', fn ($s) => $s['project_id'] === $pending->id
+            && $s['exists'] === true
+            && $s['is_available'] === false
+            && $s['status_label'] === 'ペンディング');
         $this->assertDatabaseCount('pipelines', 0);
     }
 
@@ -167,6 +188,11 @@ class PipelineStoreTest extends TestCase
         $response->assertRedirect("/engineers/{$engineer->id}/matching");
         $response->assertSessionHasErrors(['project_id' => '選択した案件が見つかりません。削除された可能性があります。']);
         $response->assertSessionHas('preserve_matching_results', true);
+        // ハード削除は exists=false（カードを一覧から除去する）。ドロワーが閉じ field エラーが見えないため、
+        // トースト（flash.error）でも理由を通知する。
+        $response->assertSessionHas('pipeline_target_state', fn ($s) => $s['project_id'] === $project->id
+            && $s['exists'] === false);
+        $response->assertSessionHas('error', '選択した案件が見つかりません。削除された可能性があります。');
         $this->assertDatabaseCount('pipelines', 0);
     }
 

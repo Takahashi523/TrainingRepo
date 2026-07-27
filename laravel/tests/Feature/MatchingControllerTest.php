@@ -202,7 +202,41 @@ class MatchingControllerTest extends TestCase
         Http::assertNothingSent();
         $response->assertInertia(fn ($page) => $page->component('Matching/Show')
             ->where('results', null)
-            ->where('emptyReason', null));
+            ->where('emptyReason', null)
+            // 追加「成功」の back には対象カード差分更新は不要（null）。
+            ->where('targetState', null));
+    }
+
+    public function test_failed_add_back_passes_target_state_and_skips_engine(): void
+    {
+        // 追加「失敗」の back：エンジンを再実行せず（results=null）、試行した案件1件の最新状態を
+        // targetState として渡す（フロントが該当カードを差分更新し、追加ボタンを無効化する）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $targetState = [
+            'project_id' => 123,
+            'exists' => true,
+            'is_in_pipeline' => true,
+            'is_available' => false,
+            'is_project_full' => false,
+            'status_label' => '終了',
+        ];
+        Http::fake();
+
+        $response = $this->actingAs($user)
+            ->withSession([
+                'preserve_matching_results' => true,
+                'pipeline_target_state' => $targetState,
+            ])
+            ->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        Http::assertNothingSent();
+        $response->assertInertia(fn ($page) => $page->component('Matching/Show')
+            ->where('results', null)
+            ->where('targetState.project_id', 123)
+            ->where('targetState.is_available', false)
+            ->where('targetState.status_label', '終了'));
     }
 
     // -------------------------------------------------------
