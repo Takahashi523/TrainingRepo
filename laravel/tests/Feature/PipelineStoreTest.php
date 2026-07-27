@@ -75,6 +75,8 @@ class PipelineStoreTest extends TestCase
             ->post('/pipelines', $this->payload($engineer, $project));
 
         $response->assertSessionHasErrors('project_id');
+        // 失敗時も戻り先 matching でエンジンを再実行しない（10-7 を失敗パスにも適用）。
+        $response->assertSessionHas('preserve_matching_results', true);
         $this->assertSame(1, Pipeline::where('project_id', $project->id)->count());
     }
 
@@ -99,6 +101,7 @@ class PipelineStoreTest extends TestCase
             ->post('/pipelines', $this->payload($engineer6, $project));
 
         $response->assertSessionHasErrors('project_id');
+        $response->assertSessionHas('preserve_matching_results', true);
         $this->assertSame(5, Pipeline::where('project_id', $project->id)->count());
     }
 
@@ -124,6 +127,8 @@ class PipelineStoreTest extends TestCase
         // flash ではなく field エラー（onError 発火 → 誤「追加済み」を防ぐ）。
         $response->assertRedirect("/engineers/{$engineer->id}/matching");
         $response->assertSessionHasErrors(['project_id' => '選択した案件は現在募集していないため、パイプラインに追加できませんでした。']);
+        // 失敗時も戻り先 matching でエンジンを再実行しない（10-7 を失敗パスにも適用）。
+        $response->assertSessionHas('preserve_matching_results', true);
         $this->assertDatabaseCount('pipelines', 0);
     }
 
@@ -139,6 +144,7 @@ class PipelineStoreTest extends TestCase
 
         $response->assertRedirect("/engineers/{$engineer->id}/matching");
         $response->assertSessionHasErrors(['project_id' => '選択した案件は現在募集していないため、パイプラインに追加できませんでした。']);
+        $response->assertSessionHas('preserve_matching_results', true);
         $this->assertDatabaseCount('pipelines', 0);
     }
 
@@ -160,6 +166,7 @@ class PipelineStoreTest extends TestCase
 
         $response->assertRedirect("/engineers/{$engineer->id}/matching");
         $response->assertSessionHasErrors(['project_id' => '選択した案件が見つかりません。削除された可能性があります。']);
+        $response->assertSessionHas('preserve_matching_results', true);
         $this->assertDatabaseCount('pipelines', 0);
     }
 

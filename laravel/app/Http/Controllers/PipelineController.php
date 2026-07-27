@@ -59,12 +59,11 @@ class PipelineController extends Controller
     {
         $this->pipelineService->create($request->validated());
 
-        // 追加後は同画面（マッチング結果）に留まる。ただし戻り先の show でマッチングエンジンを
-        // 再実行させない（#4：再スコアリングによる並び替わり・コスト・成功直後の空状態化を防ぐ）。
-        // preserve_matching_results フラグを立て、フロントは既存表示を保持しつつ追加カードのみ楽観更新する。
+        // 追加後は同画面（マッチング結果）に留まる。戻り先 show でのエンジン再実行抑止フラグは
+        // 成功・失敗で一貫させるため PipelineStoreRequest::prepareForValidation() がリクエスト単位で立てる
+        // （#4 / tasklist 10-7：再スコアリングによる並び替わり・コスト・成功直後の空状態化を防ぐ）。
         return redirect()->back()
-            ->with('success', 'パイプラインに追加しました。')
-            ->with('preserve_matching_results', true);
+            ->with('success', 'パイプラインに追加しました。');
     }
 
     /**

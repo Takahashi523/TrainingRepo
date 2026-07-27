@@ -26,6 +26,22 @@ class PipelineStoreRequest extends FormRequest
         return true;
     }
 
+    /**
+     * 戻り先（マッチング結果画面）で AI エンジンを再実行させないフラグをリクエスト単位で立てる。
+     *
+     * POST /pipelines は成功・失敗いずれも back で matching 画面へ戻る（成功＝back＋成功トースト、
+     * 失敗＝掲載停止/削除の field エラー・重複/上限の ValidationException とも back＋errors）。
+     * そのたびに戻り先 MatchingController@show でエンジンが再実行されると、tasklist 10-7 で
+     * 「追加後の再スコアリング」を止めた狙い——スコア未保存（QA#45）ゆえの並び替わり・AI 再実行コスト・
+     * 失敗が engine_error 空状態に化ける事象——が失敗パスで再燃する。成功時だけ立てても失敗パスが漏れる
+     * ため、成功/失敗で分岐せずリクエスト単位で一律に立てる（DRY）。show 側は1回限り pull して消費する。
+     * ※ engineer 不在時のみ engineers.index へ遷移するが、そこでは pull されず flash として自然消滅する。
+     */
+    protected function prepareForValidation(): void
+    {
+        session()->flash('preserve_matching_results', true);
+    }
+
     public function rules(): array
     {
         return [
