@@ -42,7 +42,7 @@ export default function SkillTagDetail({ label, detail }: Props) {
                 )}
             </span>
             {open && detail && (
-                <div className="absolute left-0 top-full z-10 mt-1 min-w-48 max-w-xs rounded border border-border bg-white p-2 text-xs leading-relaxed text-muted-foreground shadow-md">
+                <div className="absolute left-0 top-full z-10 mt-1 min-w-48 max-w-xs break-words rounded border border-border bg-white p-2 text-xs leading-relaxed text-muted-foreground shadow-md">
                     {detail}
                 </div>
             )}

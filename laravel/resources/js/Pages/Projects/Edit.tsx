@@ -1,5 +1,9 @@
 import ProjectForm from "@/Components/Projects/ProjectForm";
-import { ProjectFormData, ProjectCreatePageProps } from "@/types/project";
+import {
+    Project,
+    ProjectEditPageProps,
+    ProjectFormData,
+} from "@/types/project";
 import { Button } from "@/Components/ui/button";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
@@ -7,48 +11,77 @@ import { Head, router, useForm } from "@inertiajs/react";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 
-type Props = PageProps<ProjectCreatePageProps>;
+type Props = PageProps<ProjectEditPageProps>;
 
-export default function Create({
+function toFormData(project: Project): ProjectFormData {
+    // phases は [{key, name, is_target}] で来るので proc_* の真偽値に変換する
+    const procValuesByKey = Object.fromEntries(
+        project.phases.map((phase) => [phase.key, phase.is_target]),
+    ) as Record<string, boolean>;
+
+    return {
+        name: project.name,
+        client_name: project.client_name ?? "",
+        headcount: project.headcount != null ? String(project.headcount) : "",
+        start_date: project.start_date ?? "",
+        // rate_min/rate_max が両方nullかつrate_noteが入っている場合のみスキル見合いとみなす
+        // （rate_noteはProjectService側でrate_is_negotiable=falseの場合は必ずnullになる保証があるため、
+        //  「単価未入力（非スキル見合い）」と「スキル見合い」を判別できる）
+        rate_is_negotiable:
+            project.rate_min === null &&
+            project.rate_max === null &&
+            project.rate_note !== null,
+        rate_min: project.rate_min != null ? String(project.rate_min) : "",
+        rate_max: project.rate_max != null ? String(project.rate_max) : "",
+        rate_note: project.rate_note ?? "",
+        commercial_flow: project.commercial_flow ?? "",
+        work_style: project.work_style ?? "",
+        interview_count:
+            project.interview_count != null
+                ? String(project.interview_count)
+                : "",
+        work_location_line: project.work_location_line ?? "",
+        work_location_station: project.work_location_station ?? "",
+        required_skills:
+            project.required_skills.length > 0
+                ? project.required_skills.map((s) => ({
+                      id: crypto.randomUUID(),
+                      label: s.label ?? "",
+                      detail: s.detail,
+                  }))
+                : [{ id: crypto.randomUUID(), label: "", detail: "" }],
+        preferred_skills: project.preferred_skills.map((s) => ({
+            id: crypto.randomUUID(),
+            label: s.label ?? "",
+            detail: s.detail,
+        })),
+        proc_requirements: procValuesByKey.proc_requirements ?? false,
+        proc_basic_design: procValuesByKey.proc_basic_design ?? false,
+        proc_detail_design: procValuesByKey.proc_detail_design ?? false,
+        proc_development: procValuesByKey.proc_development ?? false,
+        proc_testing: procValuesByKey.proc_testing ?? false,
+        proc_maintenance: procValuesByKey.proc_maintenance ?? false,
+        negotiation_required: project.negotiation_required ?? false,
+        description: project.description ?? "",
+        work_env: project.work_env ?? "",
+        status: project.status,
+        main_user_id: String(project.users.main.id),
+        sub_user_id: project.users.sub ? String(project.users.sub.id) : "",
+        billing_range: project.billing_range ?? "",
+        remarks: project.remarks ?? "",
+    };
+}
+
+export default function Edit({
+    project,
     fieldSettings,
     phases,
     work_styles,
     commercial_flows,
     statuses,
     users,
-    authUserId,
 }: Props) {
-    const form = useForm<ProjectFormData>({
-        name: "",
-        client_name: "",
-        headcount: "",
-        start_date: "",
-        rate_is_negotiable: false,
-        rate_min: "",
-        rate_max: "",
-        rate_note: "",
-        commercial_flow: "",
-        work_style: "",
-        interview_count: "",
-        work_location_line: "",
-        work_location_station: "",
-        required_skills: [{ id: crypto.randomUUID(), label: "", detail: "" }],
-        preferred_skills: [],
-        proc_requirements: false,
-        proc_basic_design: false,
-        proc_detail_design: false,
-        proc_development: false,
-        proc_testing: false,
-        proc_maintenance: false,
-        negotiation_required: false,
-        description: "",
-        work_env: "",
-        status: "open",
-        main_user_id: String(authUserId),
-        sub_user_id: "",
-        billing_range: "",
-        remarks: "",
-    });
+    const form = useForm<ProjectFormData>(toFormData(project));
 
     const { processing, errors } = form;
 
@@ -103,27 +136,27 @@ export default function Create({
                 .map(({ label, detail }) => ({ label, detail })),
         }));
 
-        form.post(route("projects.store"));
+        form.put(route("projects.update", project.id));
     };
 
     return (
         <AuthenticatedLayout>
-            <Head title="案件登録" />
+            <Head title="案件編集" />
 
             <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between border-b border-border bg-white px-10 py-4">
                 <div>
                     <h1 className="text-lg font-bold text-foreground">
-                        案件登録
+                        案件編集
                     </h1>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                        新規案件情報を登録します
+                        登録済みの案件情報を編集します
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => router.get("/projects")}
+                        onClick={() => router.get(`/projects/${project.id}`)}
                     >
                         キャンセル
                     </Button>

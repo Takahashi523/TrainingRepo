@@ -2,80 +2,18 @@ import { Button } from "@/Components/ui/button";
 import SkillTagDetail from "@/Components/Common/SkillTagDetail";
 import StatusBadge from "@/Components/Common/StatusBadge";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import {
+    COMMERCIAL_FLOW_LABELS,
+    PROJECT_STATUS_LABELS,
+    ProjectShowPageProps,
+    WORK_STYLE_LABELS,
+} from "@/types/project";
 import { PageProps } from "@/types";
 import { Head, router, usePage } from "@inertiajs/react";
 import { Check, Clock, Pencil, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 
-type Skill = {
-    label: string;
-    detail: string | null;
-};
-
-type Phase = {
-    key: string;
-    name: string;
-    is_target: boolean;
-};
-
-type ProjectUser = {
-    id: number;
-    name: string;
-};
-
-type Project = {
-    id: number;
-    name: string;
-    client_name: string | null;
-    status: string;
-    commercial_flow: string | null;
-    headcount: number | null;
-    start_date: string | null;
-    start_label: string;
-    rate_min: number | null;
-    rate_max: number | null;
-    rate_note: string | null;
-    work_style: string | null;
-    work_location_line: string | null;
-    work_location_station: string | null;
-    interview_count: number | null;
-    negotiation_required: boolean | null;
-    description: string | null;
-    work_env: string | null;
-    billing_range: string | null;
-    remarks: string | null;
-    users: {
-        main: ProjectUser;
-        sub: ProjectUser | null;
-    };
-    required_skills: Skill[];
-    preferred_skills: Skill[];
-    phases: Phase[];
-    updated_at: string;
-};
-
-type Props = PageProps<{
-    project: Project;
-}>;
-
-const PROJECT_STATUS_LABELS: Record<string, string> = {
-    open: "募集中",
-    pending: "ペンディング",
-    closed: "終了",
-};
-
-const COMMERCIAL_FLOW_LABELS: Record<string, string> = {
-    prime: "プライム",
-    secondary: "2次",
-    tertiary: "3次",
-    other: "その他",
-};
-
-const WORK_STYLE_LABELS: Record<string, string> = {
-    onsite: "常駐",
-    hybrid: "一部リモート可",
-    remote: "フルリモート",
-};
+type Props = PageProps<ProjectShowPageProps>;
 
 function SectionCard({
     title,
@@ -106,7 +44,7 @@ function DetailRow({
             <div className="w-44 shrink-0 pr-4 pt-0.5 text-xs font-semibold text-muted-foreground">
                 {label}
             </div>
-            <div className="min-w-0 flex-1 text-sm text-foreground">
+            <div className="min-w-0 flex-1 break-words text-sm text-foreground">
                 {children}
             </div>
         </div>
@@ -187,7 +125,7 @@ export default function Show({ project }: Props) {
             <div className="max-w-3xl">
                 {/* 案件サマリー */}
                 <div className="mb-6 border-b border-border pb-6">
-                    <p className="text-2xl font-bold text-foreground">
+                    <p className="break-words text-2xl font-bold text-foreground">
                         {project.name}
                     </p>
                     {(project.client_name || project.commercial_flow) && (
@@ -315,7 +253,7 @@ export default function Show({ project }: Props) {
                                 {project.required_skills.map((skill, i) => (
                                     <SkillTagDetail
                                         key={i}
-                                        label={skill.label}
+                                        label={skill.label ?? ""}
                                         detail={skill.detail}
                                     />
                                 ))}
@@ -330,7 +268,7 @@ export default function Show({ project }: Props) {
                                 {project.preferred_skills.map((skill, i) => (
                                     <SkillTagDetail
                                         key={i}
-                                        label={skill.label}
+                                        label={skill.label ?? ""}
                                         detail={skill.detail}
                                     />
                                 ))}
@@ -426,7 +364,7 @@ export default function Show({ project }: Props) {
                         <h2 className="mb-2 text-base font-bold text-foreground">
                             案件情報を削除しますか？
                         </h2>
-                        <p className="mb-5 text-sm text-muted-foreground">
+                        <p className="mb-5 break-words text-sm text-muted-foreground">
                             <strong>{project.name}</strong>{" "}
                             の情報を物理削除します。この操作は取り消せません。
                         </p>
