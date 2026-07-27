@@ -85,14 +85,15 @@ class PipelineStoreRequest extends FormRequest
      * 1. 対象人材が存在しない（計算中〜表示中に管理者が削除した等）場合、既定の back リダイレクトだと
      *    削除済み人材のマッチング画面へ戻り route model binding が 404 になる。人材一覧へ誘導し
      *    フラッシュで理由を通知する（不親切な 404 回避）。
-     * 2. 案件が「削除済み」「掲載停止(closed/pending)」の場合、back で戻ると当該案件は
-     *    MatchingController 側の status='open' 絞り込みで一覧から消え、ドロワーも閉じる。このため
-     *    project_id のフィールドエラーはユーザーの目に触れず Silent Rejection になる。フラッシュ
-     *    （トースト）で理由を通知し、一覧は再取得で自動最新化される。
+     * 2. 案件が「削除済み」「掲載停止(closed/pending)」の場合、既定の exists / after エラー文言より
+     *    分かりやすい専用メッセージへ差し替える。ただし transport は field エラー（withErrors）に
+     *    統一する：フロント（MatchDrawer）は errors バッグが空だと Inertia の onSuccess が発火して
+     *    「追加済み」に楽観更新してしまうため、flash のみで返すと DB 未作成なのに成功扱いになる
+     *    （Silent Success ＝誤「追加済み」）。マッチング結果は楽観更新（back時 results=null＋
+     *    preserveState）でカードを消さずに保持するため、field エラーはドロワー内にそのまま表示され、
+     *    重複・上限（PipelineService 側で withMessages）と挙動が揃う。
      *
-     * 上記以外（スコア不正など、案件が存命・掲載中のケース）は従来どおり back でフィールドエラーを
-     * ドロワーに表示する（重複・上限は PipelineService 側で field エラーを付与し、案件が一覧に残るため
-     * ドロワー内表示で問題ない）。
+     * 上記以外（スコア不正など）も従来どおり back でフィールドエラーをドロワーに表示する。
      */
     protected function failedValidation(Validator $validator): void
     {
@@ -105,8 +106,8 @@ class PipelineStoreRequest extends FormRequest
             );
         }
 
-        // project_id が送られたうえで弾かれた＝「削除済み」または「掲載停止」で一覧から消えるケース。
-        // フィールドエラーは表示されないため flash（トースト）に振り替える。
+        // project_id が送られたうえで弾かれた＝「削除済み」または「掲載停止」。専用文言に差し替えつつ、
+        // field エラー（withErrors）で返す。flash のみだと onSuccess が発火し誤「追加済み」になるため。
         $projectId = $this->input('project_id');
 
         if ($projectId !== null && $validator->errors()->has('project_id')) {
@@ -115,7 +116,7 @@ class PipelineStoreRequest extends FormRequest
                 : '選択した案件が見つかりません。削除された可能性があります。';
 
             throw new HttpResponseException(
-                redirect()->back()->with('error', $message)
+                redirect()->back()->withErrors(['project_id' => $message])
             );
         }
 

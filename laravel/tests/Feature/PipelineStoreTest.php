@@ -106,9 +106,10 @@ class PipelineStoreTest extends TestCase
      * 設計書 §3.4：マッチ対象は status='open' に限る。マッチング表示〜追加の間に別ユーザーが
      * closed / pending にした案件を stale ページから追加しようとしても、書き込み経路で弾く。
      *
-     * 弾いた案件は戻り先（matching 画面）で status='open' 絞り込みにより一覧から消えるため、
-     * ドロワー内フィールドエラーは表示されない。Silent Rejection を避けるべく flash（トースト）で
-     * 理由を通知することを検証する。
+     * 弾いた案件は戻り先（matching 画面）でも楽観更新（results=null＋preserveState）でカードが
+     * 保持されるため、project_id の field エラーがドロワー内に表示される。flash のみで返すと
+     * errors バッグが空になり Inertia の onSuccess が発火して誤「追加済み」になるため、必ず field
+     * エラー（withErrors）で返し、かつ pipelines が作成されないことを検証する（PR #48 レビュー指摘）。
      */
     public function test_closed_project_cannot_be_added(): void
     {
@@ -120,10 +121,9 @@ class PipelineStoreTest extends TestCase
             ->from("/engineers/{$engineer->id}/matching")
             ->post('/pipelines', $this->payload($engineer, $closed));
 
-        // フィールドエラーではなく、back＋flash.error（トースト）で通知する。
+        // flash ではなく field エラー（onError 発火 → 誤「追加済み」を防ぐ）。
         $response->assertRedirect("/engineers/{$engineer->id}/matching");
-        $response->assertSessionHas('error', '選択した案件は現在募集していないため、パイプラインに追加できませんでした。');
-        $response->assertSessionHasNoErrors();
+        $response->assertSessionHasErrors(['project_id' => '選択した案件は現在募集していないため、パイプラインに追加できませんでした。']);
         $this->assertDatabaseCount('pipelines', 0);
     }
 
@@ -138,15 +138,14 @@ class PipelineStoreTest extends TestCase
             ->post('/pipelines', $this->payload($engineer, $pending));
 
         $response->assertRedirect("/engineers/{$engineer->id}/matching");
-        $response->assertSessionHas('error', '選択した案件は現在募集していないため、パイプラインに追加できませんでした。');
-        $response->assertSessionHasNoErrors();
+        $response->assertSessionHasErrors(['project_id' => '選択した案件は現在募集していないため、パイプラインに追加できませんでした。']);
         $this->assertDatabaseCount('pipelines', 0);
     }
 
     /**
-     * 案件が削除された場合も同様に、戻り先で一覧から消えるため flash（トースト）で通知する。
+     * 案件が削除された場合も同様に、field エラー（withErrors）で返し誤「追加済み」を防ぐ。
      */
-    public function test_deleted_project_shows_flash_error(): void
+    public function test_deleted_project_shows_field_error(): void
     {
         $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
@@ -160,7 +159,7 @@ class PipelineStoreTest extends TestCase
             ->post('/pipelines', $payload);
 
         $response->assertRedirect("/engineers/{$engineer->id}/matching");
-        $response->assertSessionHas('error', '選択した案件が見つかりません。削除された可能性があります。');
+        $response->assertSessionHasErrors(['project_id' => '選択した案件が見つかりません。削除された可能性があります。']);
         $this->assertDatabaseCount('pipelines', 0);
     }
 
