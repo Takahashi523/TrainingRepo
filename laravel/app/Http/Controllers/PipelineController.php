@@ -3,17 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PipelineCompletedRequest;
+use App\Http\Requests\PipelineStoreRequest;
 use App\Http\Requests\PipelineUpdateRequest;
 use App\Http\Resources\PipelineCardResource;
 use App\Http\Resources\PipelineCompletedResource;
 use App\Http\Resources\PipelineDetailResource;
 use App\Models\Pipeline;
 use App\Models\User;
+use App\Services\Matching\MatchTargetStateResolver;
 use App\Services\PipelineService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -47,6 +50,36 @@ class PipelineController extends Controller
     public function index(Request $request): Response
     {
         return Inertia::render('Pipelines/Index', $this->buildActiveProps($request));
+    }
+
+    /**
+     * POST /pipelines：マッチング結果画面からのパイプライン生成（WF_09 の追加ボタン）。
+     * 重複・上限（1案件5件）チェックと生成は PipelineService@create がトランザクションで担う。
+     * 追加後は同画面に留まる想定のため back リダイレクト＋成功フラッシュを返す。
+     */
+    public function store(PipelineStoreRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+
+        try {
+            $this->pipelineService->create($data);
+        } catch (ValidationException $e) {
+            // 重複・上限で弾かれた場合、戻り先で対象カードを最新状態へ差分更新させる
+            // （「追加済み」「上限到達」を反映し、追加ボタンを無効化して無駄な再送信を防ぐ）。
+            // 掲載停止/削除は PipelineStoreRequest 側で同様に flash 済み。
+            session()->flash(
+                'pipeline_target_state',
+                MatchTargetStateResolver::resolve((int) $data['project_id'], (int) $data['engineer_id'])
+            );
+
+            throw $e;
+        }
+
+        // 追加後は同画面（マッチング結果）に留まる。戻り先 show でのエンジン再実行抑止フラグは
+        // 成功・失敗で一貫させるため PipelineStoreRequest::prepareForValidation() がリクエスト単位で立てる
+        // （#4 / tasklist 10-7：再スコアリングによる並び替わり・コスト・成功直後の空状態化を防ぐ）。
+        return redirect()->back()
+            ->with('success', 'パイプラインに追加しました。');
     }
 
     /**
