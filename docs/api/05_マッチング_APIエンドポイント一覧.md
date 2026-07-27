@@ -1,8 +1,12 @@
 # マッチング（Matching）APIエンドポイント一覧
 
 > 技術方針：Laravel + Inertia.js + React  
-> 最終更新：2026-05-27  
+> 最終更新：2026-07-27  
 > 前提・凡例・SharedProps・共通HTTPレスポンスは `00_共通仕様_APIエンドポイント一覧.md` を参照すること。
+
+> **【2026-07-27 確定/修正】マッチング結果機能とパイプライン追加の実装（PR #48）に合わせて Props・レスポンスを実装と一致させた。**
+> **背景：** 本書は 2026-05-27 版のまま実装より古く、`results[]` に `is_available` / `is_project_full`、`emptyReason`、`results: null`（追加直後は再スコアリングしない）、ラベルのサーバー解決、`targetState`（追加失敗時のカード差分更新）が未反映で、POST /pipelines のレスポンスも Inertia の実挙動（back リダイレクト）と乖離していた。
+> **理由：** 永続ドキュメントを北極星として実装と一致させ続けるため（機能単位 diff では抜けやすい横断挙動＝並行制御・stale 操作・失敗時 UX を明文化する）。
 
 ---
 
@@ -97,64 +101,74 @@ WF_09は「一覧＋右ドロワー方式」を採用する。カード1枚ク�
     ]
   },
 
-  // マッチング結果（Pythonエンジンが返した上位5件固定）
-  // カード表示・ドロワー表示に必要な情報をすべて含める
-  // ドロワー専用GETエンドポイントは設けないため、AIテキストも一覧Propsに含める
+  // マッチング結果（Pythonエンジンが返した上位5件固定）。カード・ドロワー表示に必要な情報を全て含める。
+  // ★ null になる場合：パイプライン追加直後の back では再スコアリングしない（#4 / 楽観的更新）。
+  //   その場合 results=null を返し、フロントは既存表示を preserveState で保持したまま追加カードのみ
+  //   楽観更新する。通常のページロード時は配列。
   "results": [
     {
       // --- カード表示用スコア情報 ---
       "match_score": "int",                    // AIスコア（0〜100）
       "match_rank": "string",                  // A | B | C | D
 
-      // --- ドロワー表示用AIテキスト ---
-      // カードクリック時にドロワーが開く（WF_09確定）
-      // 再度Pythonエンジンを呼び出すコストを避けるため一覧Propsに含める
-      "ai_score_reason": "string",             // AIスコア算出理由テキスト
-      "ai_comment": "string",                  // AI推薦理由テキスト
-      "ai_missing": "string",                  // 不足条件テキスト（null許容：不足条件なしの場合）
+      // --- ドロワー表示用AIテキスト（null許容） ---
+      // カードクリックでドロワーが開く（WF_09）。再度Pythonエンジンを呼ばないため一覧Propsに含める。
+      "ai_score_reason": "string|null",        // AIスコア算出理由
+      "ai_comment": "string|null",             // AI推薦理由
+      "ai_missing": "string|null",             // 不足条件（不足なしは null）
 
-      // --- 案件情報（カード・ドロワー共通表示用） ---
+      // --- 案件情報（カード・ドロワー共通表示用。ENUM はサーバーで表示ラベルに解決して返す） ---
       "project": {
         "id": "int",
         "name": "string",                      // 案件名
-        "client_name": "string",               // 顧客名
-        "commercial_flow": "string",           // prime | secondary | tertiary | other
-        "headcount": "int",                    // 募集人数
-        "rate_min": "int",                     // 単価下限（万円）
-        "rate_max": "int",                     // 単価上限（万円）
-        "rate_note": "string",                 // 単価備考（"スキル見合い"等）
-        "work_style": "string",                // onsite | hybrid | remote（単一値）
-        "start_date": "date(YYYY-MM-DD)",
+        "client_name": "string|null",          // 顧客名
+        "commercial_flow_label": "string|null",// 商流ラベル（サーバー解決。未設定は null）
+        "headcount": "int|null",               // 募集人数
+        "rate_min": "int|null",                // 単価下限（万円）
+        "rate_max": "int|null",                // 単価上限（万円）
+        "rate_note": "string|null",            // 単価備考（"スキル見合い"等）
+        "work_style_label": "string|null",     // 勤務形態ラベル（サーバー解決。未設定は null）
+        "status_label": "string",              // 掲載状態ラベル（募集中 / 終了 / ペンディング）
+        "start_date": "date(YYYY-MM-DD)|null",
         "start_label": "string",               // 表示用ラベル（生成ルールは案件一覧Propsと同じ）
-        // 必須スキル（skill_type = required）
-        "required_skills": [
-          { "label": "string" }                // detailは表示対象外のため含めない
-        ],
-        // 尚可スキル（skill_type = preferred）
-        "preferred_skills": [
-          { "label": "string" }
-        ],
-        // 対象工程（6固定）
-        "phases": [
-          {
-            "key": "string",
-            "name": "string",
-            "is_target": "bool"
-          }
-        ]
+        "required_skills": [ { "label": "string" } ], // 必須（skill_type=required）。detail は含めない
+        "preferred_skills": [ { "label": "string" } ],// 尚可（skill_type=preferred）
+        "phases": [ { "key": "string", "name": "string", "is_target": "bool" } ] // 対象工程（6固定）
       },
 
-      // --- パイプライン追加状態 ---
-      // すでにパイプラインに追加済みかどうか（追加ボタンの活性/非活性制御に使用）
-      // ドロワー内の「＋ パイプラインに追加」ボタンの表示制御にも使用する
-      "is_in_pipeline": "bool"
+      // --- パイプライン追加可否（カード表示・追加ボタンの活性制御） ---
+      "is_in_pipeline": "bool",                 // 追加済みか（true→「追加済み」表示・ボタン非活性）
+      "is_available": "bool",                   // 募集中(open)か（false=掲載停止 closed/pending→追加無効表示）
+      "is_project_full": "bool"                 // 進行中5件到達か（true→「上限到達」表示・追加無効）
     }
-  ]
+  ],
+
+  // 結果0件のときの理由。空状態の文言・アイコンを出し分ける（結果ありのときは null）。
+  //  no_match     : 候補案件なし / スコア0件
+  //  engine_error : エンジン通信失敗（flash.error のトーストも併発）
+  //  unavailable  : マッチはあったが対象案件が全てハード削除で全滅（掲載停止は残して無効表示するため非該当）
+  "emptyReason": "string|null",
+
+  // パイプライン追加「失敗」の back でのみ非 null（成功時・通常ロードは null）。
+  // 試行した案件1件の最新状態を返し、フロントが該当カードのフラグ（is_in_pipeline / is_available /
+  // is_project_full / status_label）を差分更新して追加ボタンを無効化する（★エンジンは再実行しない）。
+  //   exists=false … ハード削除済み＝カードを一覧から除去（他フィールドは含めない）
+  //   exists=true  … 以下のフラグ・ラベルを同梱
+  "targetState": {
+    "project_id": "int",
+    "exists": "bool",
+    "is_in_pipeline": "bool",
+    "is_available": "bool",
+    "is_project_full": "bool",
+    "status_label": "string"
+  }
 }
 ```
 
 > **実装注意（Pythonエンジン連携）**：Controller はエンジニア情報をDBから取得した後、PythonエンジンにAIマッチングリクエストを送信し、スコア・ランク・AIテキスト付きの上位5件を受け取る。その結果と案件情報（DBから取得）を合わせてPropsを組み立てる。  
-> **実装注意（`is_in_pipeline`）**：`pipelines` テーブルを `(engineer_id, project_id)` で検索し、既存レコードの有無を確認してセットする。Eager Loading または `whereIn` でN+1を防ぐこと。  
+> **実装注意（追加可否フラグ）**：`is_in_pipeline` は `pipelines` を `(engineer_id, project_id)` で検索して既存有無を、`is_available` は案件 `status==='open'` を、`is_project_full` は同一案件の**進行中（アクティブ）**パイプライン件数が上限（5件）以上かをセットする。いずれも `whereIn` 一括取得でN+1を防ぐこと。掲載停止（closed/pending）・上限到達の案件も一覧から消さず、無効表示（追加ボタン非活性）で残す（ユーザーが注視するカードを黙って消さない）。ハード削除された案件のみ突合で除外する。  
+> **実装注意（`results: null` / 楽観的更新）**：パイプライン追加（成功・失敗とも）後の back では、戻り先 `show` は AI エンジンを再実行せず `results=null` を返す（`preserve_matching_results` セッションフラグを1回限り pull）。再スコアリングによる並び替わり・AI 再実行コスト・成功直後の空状態化を防ぐため（#4）。フロントは `preserveState` で既存表示を保持し、成功は当該カードを楽観更新、失敗は `targetState` で当該カードを差分更新する。  
+> **実装注意（`targetState`）**：追加失敗（掲載停止/削除/重複/上限）の back でのみ、試行した案件1件の最新状態を返す。フロントはエンジン非実行のまま該当カードのフラグ・ラベルを更新して追加ボタンを無効化し、「古い addable 表示のまま再度押せてしまう」ことを防ぐ。  
 > **実装注意（TEXT除外不適用）**：`ai_score_reason` / `ai_comment` / `ai_missing` はTEXTカラム相当だが、マッチング結果はDBから取得するのではなくPythonエンジンから都度受け取る値のため、通常のTEXT除外ルールは適用しない。上位5件固定のためデータ量も許容範囲内。  
 > **実装注意（同期処理）**：AI処理は同期処理（QA #47確定）のため、タイムアウト設計（応答目標：詳細2秒以内 QA #27確定）に注意すること。レスポンスが遅延する場合はローディング表示をフロントで実装する。  
 > **実装注意（案件TEXT除外）**：案件の `description` / `work_env` / `remarks` はカード・ドロワーいずれの表示対象でもないため取得しないこと。  
@@ -182,12 +196,16 @@ WF_09は「一覧＋右ドロワー方式」を採用する。カード1枚ク�
 
 #### レスポンス
 
+> Inertia のため成功・失敗とも matching 画面へ **back リダイレクト**する（REST の 201/422 ボディは返さない）。いずれの back でも戻り先 `show` は AI エンジンを再実行しない（`preserve_matching_results`）。失敗は原則 `errors.project_id`（field エラー）で返し、`useForm` の `onError` を発火させて誤「追加済み」（`onSuccess` 誤発火）を防ぐ。カードの見た目・追加ボタンの無効化は `targetState`（当該案件1件の最新状態）で差分更新する。
+
 | 条件 | 動作 |
 |---|---|
-| 成功時 | 201 Created。フロント側で当該カードの `is_in_pipeline` を `true` に更新し、ドロワー内の追加ボタンを非活性にする |
-| 重複追加（すでにパイプライン登録済み） | 422。エラーメッセージ：「この人材はすでにこの案件のパイプラインに追加されています」 |
-| 上限超過（1案件あたり5件超） | 422。エラーメッセージ：「この案件のパイプラインはすでに上限（5件）に達しています」 |
-| 対象エンジニア / 案件が存在しない | 404 |
+| 成功 | back＋`flash.success`。フロントは当該カードの `is_in_pipeline` を `true` に楽観更新し、ドロワーを閉じる |
+| 重複追加（すでに登録済み） | `errors.project_id`「この人材はすでにこの案件のパイプラインに追加されています。」＋ `targetState`(is_in_pipeline=true)。ドロワーは開いたまま、カードを「追加済み」に更新しボタン非活性 |
+| 上限超過（進行中5件到達） | `errors.project_id`「この案件のパイプラインはすでに上限（5件）に達しています。」＋ `targetState`(is_project_full=true)。カードを「上限到達」に更新しボタン非活性 |
+| 掲載停止（closed / pending） | `errors.project_id`「選択した案件は現在募集していないため、パイプラインに追加できませんでした。」＋ `targetState`(is_available=false, status_label)。カードを「掲載停止」に更新しボタン非活性 |
+| 案件がハード削除済み | `errors.project_id`＋`flash.error`（トースト）＋ `targetState`(exists=false)。カードを一覧から除去しドロワーを閉じる（ドロワーが閉じ field エラーが不可視になるためトーストでも通知） |
+| 対象人材が存在しない | 人材一覧（`engineers.index`）へ back＋`flash.error`（削除済み人材の matching へ戻ると route model binding が 404 になるため誘導） |
 
 ---
 
@@ -221,9 +239,9 @@ WF_05（人材詳細画面）からマッチング画面へ遷移する動線が
 
 ## 4. 未確定事項（TBD）
 
-| # | 項目 | QA# | 理由 |
-|---|------|-----|------|
-| 1 | Pythonエンジンとの通信仕様（API形式・認証方法・タイムアウト値） | - | LaravelからPythonエンジンへのリクエスト方法（HTTP / キュー等）・エンドポイントURL・認証方式が未定義。Pythonチームとの調整が必要 |
-| 2 | Pythonエンジンがタイムアウト・エラーを返した場合のフォールバック | QA #47 | 同期処理確定（QA #47）だが、エラー時にユーザーへ何を表示するかが未定義 |
-| 3 | `ai_score_reason` / `ai_comment` / `ai_missing` の文字数上限 | - | DBがTEXT型のためDB上限なし。Pythonエンジンの返却値に依存する。バリデーション上の制限値を設けるか確認が必要 |
-| 4 | マッチング実行のトリガー（画面遷移時に自動実行 or 「マッチング実行」ボタン押下） | - | WF_09ではページを開いた時点で結果が表示されているが、ボタン押下トリガーかページロードトリガーかが設計書に明記されていない。UX・パフォーマンスの観点から確認が必要 |
+| # | 項目 | QA# | 状態 | 理由 |
+|---|------|-----|------|------|
+| 1 | Pythonエンジンとの通信仕様（API形式・タイムアウト値） | - | **確定（2026-07-27）** | HTTP 同期呼び出しで実装（`POST {MATCHING_ENGINE_URL}/api/v1/matching/calculate`・body は `engineer_id` のみ）。接続先・タイムアウトは `config/services.php`（`matching_engine.url` / `timeout`）＋ env に外部化し、実↔ローカル代替エンジンを URL 差し替えのみで切替可。4xx/5xx・不正 200 応答は例外種別へマップ（下表 #2 参照）。認証方式は社内ネットワーク前提で当面なし（必要時に追加） |
+| 2 | Pythonエンジンがタイムアウト・エラーを返した場合のフォールバック | QA #47 | **確定（2026-07-27）** | 404（人材なし）→404、候補0件/スコア0件→空状態 `no_match`、上流障害（400/500/504・接続不可・不正応答）→`flash.error` トースト＋空状態 `engine_error` で描画（Silent Rejection を回避しつつ画面は保つ）、突合後に案件が全滅→`unavailable` |
+| 3 | `ai_score_reason` / `ai_comment` / `ai_missing` の文字数上限 | - | TBD | DBがTEXT型のためDB上限なし。Pythonエンジンの返却値に依存する。バリデーション上の制限値を設けるか確認が必要 |
+| 4 | マッチング実行のトリガー（画面遷移時に自動実行 or 「マッチング実行」ボタン押下） | - | **確定（2026-07-27）** | ページロード時に同期自動実行し結果を表示する（WF_09 準拠）。追加直後の back では再実行しない（`preserve_matching_results`）。明示的な「再マッチング（更新）」導線は別 issue で検討 |
