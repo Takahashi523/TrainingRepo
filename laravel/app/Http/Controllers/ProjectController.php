@@ -3,13 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProjectRequest;
+use App\Http\Resources\ProjectResource;
 use App\Models\FormFieldSetting;
-use App\Models\Project;
 use App\Models\User;
+use App\Models\Project;
 use App\Services\ProjectService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ProjectController extends Controller
 {
@@ -17,53 +19,23 @@ class ProjectController extends Controller
         private readonly ProjectService $projectService
     ) {}
 
-    private const PHASES = [
-        ['key' => 'proc_requirements',  'name' => '要件定義'],
-        ['key' => 'proc_basic_design',  'name' => '基本設計'],
-        ['key' => 'proc_detail_design', 'name' => '詳細設計'],
-        ['key' => 'proc_development',   'name' => '開発'],
-        ['key' => 'proc_testing',       'name' => 'テスト'],
-        ['key' => 'proc_maintenance',   'name' => '保守・運用'],
-    ];
-
-    /**
-     * フォーム選択肢は Project モデルの ENUM ラベル SSOT から導出する（ラベルの重複定義を避ける）。
-     * work_styles は {key,name}、commercial_flows / statuses は {value,label} のフォーム選択肢形式。
-     *
-     * @return list<array{key: string, name: string}>
-     */
-    private static function workStyleOptions(): array
-    {
-        return array_map(
-            fn (string $key, string $name) => ['key' => $key, 'name' => $name],
-            array_keys(Project::WORK_STYLE_LABELS),
-            array_values(Project::WORK_STYLE_LABELS),
-        );
-    }
-
-    /**
-     * value => label のマップを [{value, label}] の選択肢配列へ変換する。
-     *
-     * @param  array<string, string>  $labels
-     * @return list<array{value: string, label: string}>
-     */
-    private static function toValueLabelOptions(array $labels): array
-    {
-        return array_map(
-            fn (string $value, string $label) => ['value' => $value, 'label' => $label],
-            array_keys($labels),
-            array_values($labels),
-        );
-    }
-
     /**
      * Display a listing of the resource.
+     * 
+     * @todo 削除後の遷移確認用の暫定実装。案件名のみ表示。
+     *       検索・絞り込み・ページネーションは別途実装する。
      */
     public function index()
     {
-        //
+        $projects = Project::select('id', 'name')
+            ->orderBy('id', 'desc')
+            ->get();
+ 
+        return Inertia::render('Projects/Index', [
+            'projects' => $projects,
+        ]);
     }
-
+    
     /**
      * Show the form for creating a new resource.
      */
@@ -91,18 +63,18 @@ class ProjectController extends Controller
             'remarks',
         ];
 
-        $fieldSettings = collect($fieldKeys)->mapWithKeys(fn ($key) => [
+        $fieldSettings = collect($fieldKeys)->mapWithKeys(fn($key) => [
             $key => ['is_required' => (bool) $settings->get($key, 0)],
         ])->toArray();
 
         return Inertia::render('Projects/Create', [
-            'fieldSettings' => $fieldSettings,
-            'phases' => self::PHASES,
-            'work_styles' => self::workStyleOptions(),
-            'commercial_flows' => self::toValueLabelOptions(Project::COMMERCIAL_FLOW_LABELS),
-            'statuses' => self::toValueLabelOptions(Project::STATUS_LABELS),
-            'users' => User::select('id', 'name')->orderBy('name')->get(),
-            'authUserId' => auth()->id(),
+            'fieldSettings'    => $fieldSettings,
+            'phases'           => Project::PHASES,
+            'work_styles'      => Project::WORK_STYLES,
+            'commercial_flows' => Project::COMMERCIAL_FLOWS,
+            'statuses'         => Project::STATUSES,
+            'users'            => User::select('id', 'name')->orderBy('name')->get(),
+            'authUserId'       => auth()->id(),
         ]);
     }
 
@@ -119,9 +91,13 @@ class ProjectController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Project $project): Response
     {
-        //
+        $project->loadMissing(['projectSkills', 'mainUser', 'subUser']);
+
+        return Inertia::render('Projects/Show', [
+            'project' => ProjectResource::make($project),
+        ]);
     }
 
     /**
@@ -143,8 +119,12 @@ class ProjectController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Project $project)
     {
-        //
+        $this->authorize('delete', $project);
+
+        $this->projectService->destroy($project);
+
+        return redirect('/projects')->with('success', '案件情報を削除しました。');
     }
 }

@@ -10,6 +10,34 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Project extends Model
 {
     use HasFactory;
+    
+    public const PHASES = [
+        ['key' => 'proc_requirements',  'name' => '要件定義'],
+        ['key' => 'proc_basic_design',  'name' => '基本設計'],
+        ['key' => 'proc_detail_design', 'name' => '詳細設計'],
+        ['key' => 'proc_development',   'name' => '開発'],
+        ['key' => 'proc_testing',       'name' => 'テスト'],
+        ['key' => 'proc_maintenance',   'name' => '保守・運用'],
+    ];
+
+    public const WORK_STYLES = [
+        ['key' => 'onsite', 'name' => '常駐'],
+        ['key' => 'hybrid', 'name' => '一部リモート可'],
+        ['key' => 'remote', 'name' => 'フルリモート'],
+    ];
+
+    public const COMMERCIAL_FLOWS = [
+        ['value' => 'prime',     'label' => 'プライム'],
+        ['value' => 'secondary', 'label' => '2次'],
+        ['value' => 'tertiary',  'label' => '3次'],
+        ['value' => 'other',     'label' => 'その他'],
+    ];
+
+    public const STATUSES = [
+        ['value' => 'open',    'label' => '募集中'],
+        ['value' => 'closed',  'label' => '終了'],
+        ['value' => 'pending', 'label' => 'ペンディング'],
+    ];
 
     /**
      * 案件 ENUM の表示ラベル（SSOT）。value => label。
