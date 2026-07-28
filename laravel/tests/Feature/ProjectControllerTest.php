@@ -1145,6 +1145,36 @@ class ProjectControllerTest extends TestCase
         );
     }
 
+    public function test_index_sort_by_rate_max_desc_tiebreaks_by_rate_min_desc(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'A', 'rate_min' => 50, 'rate_max' => 100]);
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'B', 'rate_min' => 80, 'rate_max' => 100]);
+
+        $response = $this->actingAs($user)->get('/projects?sort=rate_max&order=desc');
+
+        // rate_maxが同率(100)の場合、rate_maxと同じ向き（高い順）でrate_minも高い順に並ぶべき
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', 'B')   // rate_min=80
+            ->where('projects.data.1.name', 'A')   // rate_min=50
+        );
+    }
+
+    public function test_index_sort_by_rate_max_asc_tiebreaks_by_rate_min_asc(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'A', 'rate_min' => 50, 'rate_max' => 100]);
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'B', 'rate_min' => 80, 'rate_max' => 100]);
+
+        $response = $this->actingAs($user)->get('/projects?sort=rate_max&order=asc');
+
+        // rate_maxが同率(100)の場合、rate_maxと同じ向き（低い順）でrate_minも低い順に並ぶべき
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', 'A')   // rate_min=50
+            ->where('projects.data.1.name', 'B')   // rate_min=80
+        );
+    }
+
     public function test_index_sort_by_updated_at_desc(): void
     {
         $user = User::factory()->create();

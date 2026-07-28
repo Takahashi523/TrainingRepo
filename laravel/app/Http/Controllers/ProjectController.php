@@ -122,7 +122,8 @@ class ProjectController extends Controller
                 ->orderBy('start_date', $order);
         } elseif ($sort === 'rate_max') {
             $query->orderByRaw('rate_max IS NULL ASC')
-                ->orderBy('rate_max', $order);
+                ->orderBy('rate_max', $order)
+                ->orderBy('rate_min', $order);
         } else {
             $query->orderBy($sort, $order);
         }
