@@ -1335,7 +1335,7 @@ class ProjectControllerTest extends TestCase
             ->where('filters.status', ['open'])
             ->where('filters.work_style', ['remote'])
             ->where('filters.commercial_flow', ['prime'])
-            ->where('filters.interview_count', ['1'])
+            ->where('filters.interview_count', [1])
             ->where('filters.keyword', 'Java')
             ->where('filters.sort', 'start_date')
             ->where('filters.order', 'asc')

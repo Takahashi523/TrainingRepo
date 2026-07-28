@@ -51,9 +51,9 @@ class ProjectController extends Controller
             (array) $request->input('commercial_flow', []), array_column(Project::COMMERCIAL_FLOWS, 'value')
         ));
 
-        $interviewCounts = array_values(array_intersect(
+        $interviewCounts = array_map('intval', array_values(array_intersect(
             (array) $request->input('interview_count', []), array_column(Project::INTERVIEW_COUNTS, 'value')
-        ));
+        )));
 
         $keyword = trim((string) $request->input('keyword', ''));
 
@@ -94,10 +94,10 @@ class ProjectController extends Controller
             // 対象にする必要がある。そのため「3を除いた値の完全一致」と「3以上」を
             // ORで結合する。closureで囲むことで、他の絞り込み条件（status等）との
             // AND結合時にOR条件が漏れ出さないようにしている。
-            if (in_array(3, $interviewCounts)) {
+            if (in_array(3, $interviewCounts, true)) {
                 $query->where(function ($q) use ($interviewCounts) {
-                    $q->whereIn('interview_count', array_diff($interviewCounts, ['3']));
-                    $q->orWhere('interview_count', '>=', '3');
+                    $q->whereIn('interview_count', array_diff($interviewCounts, [3]));
+                    $q->orWhere('interview_count', '>=', 3);
                 });
             } else {
                 // 3が選択されていない場合は、選択値との完全一致でよい
