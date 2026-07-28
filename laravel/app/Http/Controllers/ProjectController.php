@@ -90,7 +90,19 @@ class ProjectController extends Controller
         }
 
         if ($interviewCounts) {
-            $query->whereIn('interview_count', $interviewCounts);
+            // interview_count=3（「3回以上」の意）が選択された場合、4回・5回…の案件も
+            // 対象にする必要がある。そのため「3を除いた値の完全一致」と「3以上」を
+            // ORで結合する。closureで囲むことで、他の絞り込み条件（status等）との
+            // AND結合時にOR条件が漏れ出さないようにしている。
+            if (in_array(3, $interviewCounts)) {
+                $query->where(function ($q) use ($interviewCounts) {
+                    $q->whereIn('interview_count', array_diff($interviewCounts, ['3']));
+                    $q->orWhere('interview_count', '>=', '3');
+                });
+            } else {
+                // 3が選択されていない場合は、選択値との完全一致でよい
+                $query->whereIn('interview_count', $interviewCounts);
+            }
         }
 
         if ($keyword !== '') {
