@@ -33,11 +33,11 @@
 | status | string[] | 任意 | ステータス配列 | proposable / interviewing / not_proposable |
 | work_styles | string[] | 任意 | 勤務形態キー配列 | onsite / hybrid / remote |
 | phases | string[] | 任意 | 工程経験キー配列 | proc_requirements / proc_basic_design / proc_detail_design / proc_development / proc_testing / proc_maintenance |
-| keyword | string | 任意 | フリーワード検索 | 氏名・スキルラベル・アピールポイントに対して部分一致。検索対象項目はTBD |
+| keyword | string | 任意 | フリーワード検索 | 氏名（部分一致）・スキルラベル（前方一致）が対象。アピールポイントは対象外 |
 | sort | string | 任意 | ソート項目 | デフォルト：created_at |
 | order | string | 任意 | 並び順 | asc / desc（デフォルト：desc） |
 | page | int | 任意 | ページ番号 | デフォルト：1 |
-| per_page | int | 任意 | 1ページあたり件数 | デフォルト：20・上限はTBD |
+| per_page | int | 任意 | 1ページあたり件数 | デフォルト：20・上限：100件 |
 
 > 異なる項目間はAND条件。例：`(提案可) AND (フルリモート)`  
 > スキル検索は `keyword` のフリーワード検索（スキルラベル前方一致）で対応する。スキルマスタ廃止のため `skill_ids[]` は廃止（WF_03 v3.0確定）
@@ -64,7 +64,7 @@
                                               // available_from が null → "未定"
                                               // available_from に日付あり → "YYYY/MM/DD〜"
                                               // Controller内で生成する
-                                              // ※ 過去日付の扱い（そのまま表示 or "即日〜"）はTBD
+                                              // 過去日付でも特別扱いせず、そのまま"YYYY/MM/DD〜"と表示する
         "users": {
           "main": { "id": "int", "name": "string" },
           "sub":  { "id": "int", "name": "string" } // null許容：未設定の場合null
@@ -311,13 +311,3 @@
 | 成功時 | `/engineers` へリダイレクトし SharedProps の `flash.success` を返す |
 | 権限不足時 | 前画面へリダイレクトし SharedProps の `flash.error` を返す |
 | 対象データなし | 404 を返す |
-
----
-
-## 未確定事項（TBD）
-
-| # | 項目 | QA# | 理由 |
-|---|------|-----|------|
-| 1 | 人材一覧フリーワード検索の検索対象項目 | - | スキルラベル前方一致を含む方針だが、氏名以外の対象項目が未確定 |
-| 2 | 人材一覧ページの1ページあたり件数上限値 | - | デフォルト20は確定。上限値（推奨：100件）は未決定 |
-| 3 | available_label の過去日付の扱い | - | 過去日付をそのまま"YYYY/MM/DD〜"と表示するか"即日〜"に変換するかが未確定 |
