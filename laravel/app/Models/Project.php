@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Project extends Model
 {
     use HasFactory;
-    
+
     public const PHASES = [
         ['key' => 'proc_requirements',  'name' => '要件定義'],
         ['key' => 'proc_basic_design',  'name' => '基本設計'],
@@ -91,5 +92,17 @@ class Project extends Model
     public function subUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sub_user_id');
+    }
+
+    /**
+     * 指定ユーザーがメインまたはサブで担当している案件に絞り込む。
+     * ダッシュボードの「自分担当」集計軸（QA #70）で使用する共通スコープ。
+     */
+    public function scopeAssignedTo(Builder $query, int $userId): Builder
+    {
+        return $query->where(function (Builder $q) use ($userId) {
+            $q->where('main_user_id', $userId)
+                ->orWhere('sub_user_id', $userId);
+        });
     }
 }

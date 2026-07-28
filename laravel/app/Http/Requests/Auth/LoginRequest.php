@@ -34,6 +34,34 @@ class LoginRequest extends FormRequest
     }
 
     /**
+     * バリデーションメッセージ内の :attribute を日本語表示名に置き換える。
+     * （lang/ja/validation.php の attributes は空で、各 FormRequest 側で定義する規約）
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'email' => 'メールアドレス',
+            'password' => 'パスワード',
+        ];
+    }
+
+    /**
+     * ルール個別のメッセージ上書き。
+     * email 形式エラーは共通文言だと「メールアドレスに有効なメールアドレスを…」と冗長になるため、
+     * ログイン画面では :attribute を含まない簡潔な文言にする。
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.email' => '有効なメールアドレスを入力してください。',
+        ];
+    }
+
+    /**
      * Attempt to authenticate the request's credentials.
      *
      * @throws ValidationException
