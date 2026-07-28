@@ -757,7 +757,7 @@ class ProjectControllerTest extends TestCase
         $response->assertRedirect('/login');
     }
 
-    public function test_authenticated_user_can_view_index_page(): void
+    public function test_index_page_renders_with_expected_props(): void
     {
         $user = User::factory()->create();
         $this->createProject(['name' => 'A案件', 'main_user_id' => $user->id]);
@@ -768,22 +768,652 @@ class ProjectControllerTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->component('Projects/Index')
-            ->has('projects', 2)
+            ->has('projects.data', 2)
+            ->has('projects.meta')
+            ->where('projects.meta.per_page', 20)
+            ->has('filters')
+            ->has('statusOptions')
+            ->has('workStyleOptions')
+            ->has('commercialFlowOptions')
+            ->has('interviewCountOptions')
+            ->has('sortOptions')
         );
     }
 
-    public function test_index_projects_are_ordered_by_id_desc(): void
+    public function test_index_filters_by_status(): void
     {
-        $user   = User::factory()->create();
-        $first  = $this->createProject(['name' => '先に作成', 'main_user_id' => $user->id]);
-        $second = $this->createProject(['name' => '後に作成', 'main_user_id' => $user->id]);
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'open']);
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'pending']);
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'closed']);
+
+        $response = $this->actingAs($user)->get('/projects?status[]=open');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 1)
+            ->where('projects.data.0.status', 'open')
+        );
+    }
+
+    public function test_index_filters_status_with_or_logic(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'open']);
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'pending']);
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'closed']);
+
+        $response = $this->actingAs($user)
+            ->get('/projects?status[]=open&status[]=pending');
+
+        // open OR pending の2件のみヒット（closed は除外）
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 2)
+            ->where('projects.data', fn ($data) => collect($data)
+                ->pluck('status')->sort()->values()->all() === ['open', 'pending'])
+        );
+    }
+
+    public function test_index_filters_by_work_style_with_or_logic(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'work_style' => 'onsite']);
+        $this->createProject(['main_user_id' => $user->id, 'work_style' => 'remote']);
+        $this->createProject(['main_user_id' => $user->id, 'work_style' => 'hybrid']);
+
+        $response = $this->actingAs($user)
+            ->get('/projects?work_style[]=onsite&work_style[]=remote');
+
+        // onsite OR remote の2件のみヒット（hybrid は除外）
+        $response->assertInertia(fn ($page) => $page->count('projects.data', 2));
+    }
+
+    public function test_index_filters_by_commercial_flow(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'commercial_flow' => 'prime']);
+        $this->createProject(['main_user_id' => $user->id, 'commercial_flow' => 'secondary']);
+
+        $response = $this->actingAs($user)->get('/projects?commercial_flow[]=prime');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 1)
+            ->where('projects.data.0.commercial_flow', 'prime')
+        );
+    }
+
+    public function test_index_filters_by_interview_count(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'interview_count' => 1]);
+        $this->createProject(['main_user_id' => $user->id, 'interview_count' => 2]);
+
+        $response = $this->actingAs($user)->get('/projects?interview_count[]=1');
+
+        // value=1・2は完全一致
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 1)
+            ->where('projects.data.0.interview_count', 1)
+        );
+    }
+
+    public function test_index_filters_by_interview_count_3_or_more_includes_higher_counts(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'interview_count' => 2]);
+        $this->createProject(['main_user_id' => $user->id, 'interview_count' => 3]);
+        $this->createProject(['main_user_id' => $user->id, 'interview_count' => 5]);
+
+        $response = $this->actingAs($user)->get('/projects?interview_count[]=3');
+
+        // value=3（「3回以上」）は3以上すべてにヒットする。interview_count=2は除外。
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 2)
+            ->where('projects.data', fn ($data) => collect($data)
+                ->pluck('interview_count')->sort()->values()->all() === [3, 5])
+        );
+    }
+
+    public function test_index_filters_by_interview_count_combines_exact_and_or_more_with_or_logic(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'interview_count' => 1]);
+        $this->createProject(['main_user_id' => $user->id, 'interview_count' => 2]);
+        $this->createProject(['main_user_id' => $user->id, 'interview_count' => 4]);
+
+        $response = $this->actingAs($user)
+            ->get('/projects?interview_count[]=1&interview_count[]=3');
+
+        // 「1回」OR「3回以上」：interview_count=1と4がヒット、2は除外
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 2)
+            ->where('projects.data', fn ($data) => collect($data)
+                ->pluck('interview_count')->sort()->values()->all() === [1, 4])
+        );
+    }
+
+    public function test_index_interview_count_or_more_does_not_leak_past_other_filters(): void
+    {
+        $user = User::factory()->create();
+        // status=open かつ interview_count>=3 の1件のみヒットさせたい
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'open', 'interview_count' => 3]);
+        // status違いなので、interview_count>=3の条件を満たしてもヒットしてはいけない
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'closed', 'interview_count' => 5]);
+
+        $response = $this->actingAs($user)
+            ->get('/projects?status[]=open&interview_count[]=3');
+
+        // closureで条件をグループ化しているため、OR条件がstatusのAND条件の外に漏れ出さないことを確認
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 1)
+            ->where('projects.data.0.status', 'open')
+        );
+    }
+
+    public function test_index_combines_different_filter_types_with_and_logic(): void
+    {
+        $user = User::factory()->create();
+        // AND条件確認用：status一致・work_style不一致のパターンを混在させる
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'open', 'work_style' => 'remote']);
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'open', 'work_style' => 'onsite']);
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'closed', 'work_style' => 'remote']);
+
+        $response = $this->actingAs($user)
+            ->get('/projects?status[]=open&work_style[]=remote');
+
+        // status=open かつ work_style=remote の1件のみ（異なる項目間はAND条件）
+        $response->assertInertia(fn ($page) => $page->count('projects.data', 1));
+    }
+
+    public function test_index_ignores_invalid_filter_values(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'open']);
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'closed']);
+
+        // 未定義の値はホワイトリスト(array_intersect)で除外され、絞り込み条件なし
+        // （フィルタ未適用＝全件対象）として扱われるべき。エラーにもならない。
+        $response = $this->actingAs($user)->get('/projects?status[]=invalid_value');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 2)
+            ->where('filters.status', [])
+        );
+    }
+
+    public function test_index_searches_keyword_by_name(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'name' => '金融システム開発']);
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'ECサイト構築']);
+
+        $response = $this->actingAs($user)->get('/projects?keyword=金融');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 1)
+            ->where('projects.data.0.name', '金融システム開発')
+        );
+    }
+
+    public function test_index_searches_keyword_by_skill_prefix(): void
+    {
+        $user = User::factory()->create();
+        $p1 = $this->createProject(['main_user_id' => $user->id, 'name' => 'A案件']);
+        $p1->projectSkills()->create(['skill_type' => 'required', 'label' => 'JavaScript', 'detail' => null]);
+
+        $p2 = $this->createProject(['main_user_id' => $user->id, 'name' => 'B案件']);
+        $p2->projectSkills()->create(['skill_type' => 'required', 'label' => 'Python', 'detail' => null]);
+
+        $response = $this->actingAs($user)->get('/projects?keyword=Java');
+
+        // スキル前方一致：JavaScript はヒット、Python は非ヒット
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 1)
+            ->where('projects.data.0.name', 'A案件')
+        );
+    }
+
+    public function test_index_does_not_search_skill_by_partial_match(): void
+    {
+        $user = User::factory()->create();
+        // 案件名は 'Native' を含まない。スキルは前方一致のみのため 'ReactNative' は 'Native' で非ヒットになるべき。
+        $p = $this->createProject(['main_user_id' => $user->id, 'name' => 'C案件']);
+        $p->projectSkills()->create(['skill_type' => 'required', 'label' => 'ReactNative', 'detail' => null]);
+
+        $response = $this->actingAs($user)->get('/projects?keyword=Native');
+
+        $response->assertInertia(fn ($page) => $page->count('projects.data', 0));
+    }
+
+    public function test_index_searches_keyword_by_name_or_skill(): void
+    {
+        $user = User::factory()->create();
+
+        // A：案件名で部分一致（%Ruby%）／スキルは無関係
+        $a = $this->createProject(['main_user_id' => $user->id, 'name' => 'RubyDev案件']);
+        $a->projectSkills()->create(['skill_type' => 'required', 'label' => 'COBOL', 'detail' => null]);
+
+        // B：案件名は非ヒット／スキルで前方一致（Ruby%）
+        $b = $this->createProject(['main_user_id' => $user->id, 'name' => 'Sato案件']);
+        $b->projectSkills()->create(['skill_type' => 'preferred', 'label' => 'Ruby', 'detail' => null]);
+
+        // C（対照）：案件名・スキルとも非ヒット
+        $c = $this->createProject(['main_user_id' => $user->id, 'name' => 'Tanaka案件']);
+        $c->projectSkills()->create(['skill_type' => 'required', 'label' => 'Java', 'detail' => null]);
+
+        $response = $this->actingAs($user)->get('/projects?keyword=Ruby');
+
+        // 案件名一致(A) と スキル一致(B) の OR が同一クエリで両立し、両方ヒット・C は除外
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 2)
+            ->where('projects.data', fn ($data) => collect($data)
+                ->pluck('name')->sort()->values()->all() === ['RubyDev案件', 'Sato案件'])
+        );
+    }
+
+    public function test_index_escapes_backslash_in_keyword(): void
+    {
+        // LIKE のバックスラッシュエスケープは DB の「LIKE 既定エスケープ文字」に依存する。
+        // 本番の MySQL は既定エスケープが '\' のため、パターン中の '\\' は \ リテラルにマッチする。
+        // 一方テスト用の SQLite は ESCAPE 句なしでは '\' をエスケープ扱いしない検証は本番と同じ MySQL 接続でのみ意味を持つ。
+        if (\DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('LIKE のバックスラッシュエスケープ検証は MySQL でのみ有効（SQLite は LIKE の既定エスケープを持たない）。');
+        }
+
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'a\\b案件']);
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'ab案件']);
+
+        $response = $this->actingAs($user)->get('/projects?keyword='.urlencode('a\\b'));
+
+        // バックスラッシュがリテラルとして扱われ、'a\b案件' のみヒット（'ab案件' は非ヒット）
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 1)
+            ->where('projects.data.0.name', 'a\\b案件')
+        );
+    }
+
+    public function test_index_accepts_keyword_at_max_length_255(): void
+    {
+        $user = User::factory()->create();
+
+        // 255文字（案件名 max:255 と同上限）は許容される
+        $keyword = str_repeat('a', 255);
+        $response = $this->actingAs($user)->get('/projects?keyword='.$keyword);
+
+        $response->assertOk();
+        $response->assertSessionHasNoErrors();
+        $response->assertInertia(fn ($page) => $page->where('filters.keyword', $keyword));
+    }
+
+    public function test_index_rejects_keyword_over_255(): void
+    {
+        $user = User::factory()->create();
+
+        // 256文字はサーバ側 FormRequest で弾く（フロント maxLength の安全網）
+        $response = $this->actingAs($user)->get('/projects?keyword='.str_repeat('a', 256));
+
+        $response->assertSessionHasErrors('keyword');
+    }
+
+    public function test_index_does_not_search_keyword_by_description(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject([
+            'main_user_id' => $user->id,
+            'name'         => 'A案件',
+            'description'  => 'バックエンド開発が中心の業務内容です',
+        ]);
+        $this->createProject([
+            'main_user_id' => $user->id,
+            'name'         => 'B案件',
+            'description'  => 'デザイン業務が中心です',
+        ]);
+
+        $response = $this->actingAs($user)->get('/projects?keyword=バックエンド');
+
+        // 業務内容詳細（description）は検索対象外のため0件
+        $response->assertInertia(fn ($page) => $page->count('projects.data', 0));
+    }
+
+    public function test_index_keyword_filter_does_not_leak_past_other_filters(): void
+    {
+        $user = User::factory()->create();
+        // status=open かつ 案件名に「金融」を含む1件のみヒットさせたい
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'open', 'name' => '金融システム開発']);
+        // status違いなので、名前が一致してもヒットしてはいけない
+        $this->createProject(['main_user_id' => $user->id, 'status' => 'closed', 'name' => '金融システム保守']);
+
+        $response = $this->actingAs($user)
+            ->get('/projects?status[]=open&keyword=金融');
+
+        // closureで条件をグループ化しているため、keywordのOR条件がstatusのAND条件の外に漏れ出さないことを確認
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 1)
+            ->where('projects.data.0.status', 'open')
+        );
+    }
+
+    public function test_index_default_sort_is_created_at_desc(): void
+    {
+        $user = User::factory()->create();
+        $old = $this->createProject(['main_user_id' => $user->id, 'name' => '古い']);
+        $old->created_at = now()->subDays(5);
+        $old->save();
+        $new = $this->createProject(['main_user_id' => $user->id, 'name' => '新しい']);
+        $new->created_at = now();
+        $new->save();
 
         $response = $this->actingAs($user)->get('/projects');
 
         $response->assertInertia(fn ($page) => $page
-            ->where('projects.0.id', $second->id)
-            ->where('projects.1.id', $first->id)
+            ->where('projects.data.0.name', '新しい')
+            ->where('projects.data.1.name', '古い')
         );
+    }
+
+    public function test_index_sort_by_start_date_places_nulls_last(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'A', 'start_date' => '2026-08-01']);
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'B', 'start_date' => null]);
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'C', 'start_date' => '2026-07-01']);
+
+        $response = $this->actingAs($user)->get('/projects?sort=start_date&order=asc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', 'C')   // 2026-07-01
+            ->where('projects.data.1.name', 'A')   // 2026-08-01
+            ->where('projects.data.2.name', 'B')   // NULL（未定）は末尾
+        );
+    }
+
+    public function test_index_sort_by_rate_max_places_nulls_last(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'A', 'rate_min' => 50, 'rate_max' => 60]);
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'B', 'rate_min' => null, 'rate_max' => null]);
+        $this->createProject(['main_user_id' => $user->id, 'name' => 'C', 'rate_min' => 70, 'rate_max' => 90]);
+
+        $response = $this->actingAs($user)->get('/projects?sort=rate_max&order=desc');
+
+        // 高い順（desc）でも、単価未設定（NULL）は order の向きにかかわらず常に末尾に来るべき
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', 'C')   // rate_max=90
+            ->where('projects.data.1.name', 'A')   // rate_max=60
+            ->where('projects.data.2.name', 'B')   // NULL は末尾
+        );
+    }
+
+    public function test_index_sort_by_updated_at_desc(): void
+    {
+        $user = User::factory()->create();
+        $p1 = $this->createProject(['main_user_id' => $user->id, 'name' => '古い更新']);
+        $p1->updated_at = now()->subDays(3);
+        $p1->saveQuietly();
+        $p2 = $this->createProject(['main_user_id' => $user->id, 'name' => '新しい更新']);
+        $p2->updated_at = now();
+        $p2->saveQuietly();
+
+        $response = $this->actingAs($user)->get('/projects?sort=updated_at&order=desc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', '新しい更新')
+            ->where('projects.data.1.name', '古い更新')
+        );
+    }
+
+    public function test_index_tiebreak_by_id_asc_when_sort_key_is_equal(): void
+    {
+        $user = User::factory()->create();
+        $now = now()->toDateTimeString();
+
+        // created_at を同値に揃えて id の昇順が効くことを確認する
+        $p1 = $this->createProject(['main_user_id' => $user->id, 'name' => '先に登録']);
+        $p2 = $this->createProject(['main_user_id' => $user->id, 'name' => '後に登録']);
+        \DB::table('projects')->whereIn('id', [$p1->id, $p2->id])->update(['created_at' => $now]);
+
+        $response = $this->actingAs($user)->get('/projects?sort=created_at&order=desc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', '先に登録')   // id が小さい方が先
+            ->where('projects.data.1.name', '後に登録')
+        );
+    }
+
+    public function test_index_invalid_sort_key_falls_back_to_created_at_desc(): void
+    {
+        $user = User::factory()->create();
+        $old = $this->createProject(['main_user_id' => $user->id, 'name' => '古い']);
+        $old->created_at = now()->subDays(5);
+        $old->saveQuietly();
+        $this->createProject(['main_user_id' => $user->id, 'name' => '新しい']);
+
+        // sort が無効なので created_at DESC にフォールバック → 新しい方が先
+        $response = $this->actingAs($user)->get('/projects?sort=invalid_key');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', '新しい')
+            ->where('filters.sort', 'created_at')
+            ->where('filters.order', 'desc')
+        );
+    }
+
+    public function test_index_invalid_order_falls_back_to_desc(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/projects?sort=created_at&order=INVALID');
+
+        $response->assertInertia(fn ($page) => $page->where('filters.order', 'desc'));
+    }
+
+    public function test_index_disallowed_sort_order_pair_falls_back_to_default(): void
+    {
+        $user = User::factory()->create();
+
+        // start_date:desc は SORT_OPTIONS に存在しない仕様外の組み合わせ（許可は start_date:asc のみ）。
+        $response = $this->actingAs($user)->get('/projects?sort=start_date&order=desc');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('filters.sort', 'created_at')
+            ->where('filters.order', 'desc')
+        );
+    }
+
+    public function test_index_provides_sort_options_from_backend_as_ssot(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/projects');
+
+        // 許可組はバックエンド一本化（SSOT）。DB設計書§8 の6組＋labelが props で渡り、先頭がデフォルト。
+        $response->assertInertia(fn ($page) => $page
+            ->has('sortOptions', 6)
+            ->where('sortOptions.0.sort', 'created_at')
+            ->where('sortOptions.0.order', 'desc')
+            ->where('sortOptions.0.label', '登録日順（新しい順）')
+            ->where('sortOptions.5.sort', 'rate_max')
+            ->where('sortOptions.5.order', 'asc')
+        );
+    }
+
+    public function test_index_paginates_with_per_page(): void
+    {
+        $user = User::factory()->create();
+        for ($i = 0; $i < 5; $i++) {
+            $this->createProject(['main_user_id' => $user->id]);
+        }
+
+        $response = $this->actingAs($user)->get('/projects?per_page=2');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 2)
+            ->where('projects.meta.total', 5)
+            ->where('projects.meta.per_page', 2)
+            ->where('projects.meta.last_page', 3)
+        );
+    }
+
+    public function test_index_clamps_per_page_to_max_100(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/projects?per_page=500');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.meta.per_page', 100)
+            ->where('filters.per_page', 100)
+        );
+    }
+
+    public function test_index_clamps_per_page_to_min_1(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/projects?per_page=0');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.meta.per_page', 1)
+            ->where('filters.per_page', 1)
+        );
+    }
+
+    public function test_index_returns_empty_when_no_match(): void
+    {
+        $user = User::factory()->create();
+        $this->createProject(['main_user_id' => $user->id, 'name' => '案件A']);
+
+        $response = $this->actingAs($user)->get('/projects?keyword=該当なしのキーワード');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data', 0)
+            ->where('projects.meta.total', 0)
+        );
+    }
+
+    public function test_index_echoes_query_params_into_filters(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(
+            '/projects?status[]=open&work_style[]=remote&commercial_flow[]=prime&interview_count[]=1'
+            .'&keyword=Java&sort=start_date&order=asc&per_page=10&page=1'
+        );
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('filters.status', ['open'])
+            ->where('filters.work_style', ['remote'])
+            ->where('filters.commercial_flow', ['prime'])
+            ->where('filters.interview_count', ['1'])
+            ->where('filters.keyword', 'Java')
+            ->where('filters.sort', 'start_date')
+            ->where('filters.order', 'asc')
+            ->where('filters.per_page', 10)
+        );
+    }
+
+    public function test_index_does_not_return_excluded_columns(): void
+    {
+        $user = User::factory()->create();
+        $project = $this->createProject([
+            'main_user_id'         => $user->id,
+            'description'          => 'これは表示されないはず',
+            'work_env'             => '稼働環境も表示されないはず',
+            'remarks'              => '特記事項も表示されないはず',
+            'billing_range'        => '精算幅も表示されないはず',
+            'work_location_line'   => '勤務地の路線も一覧では非表示',
+            'work_location_station' => '最寄駅も一覧では非表示',
+        ]);
+        $project->projectSkills()->create(['skill_type' => 'required', 'label' => 'PHP', 'detail' => 'Laravel 5年']);
+
+        $response = $this->actingAs($user)->get('/projects');
+
+        $response->assertInertia(fn ($page) => $page
+            ->missing('projects.data.0.description')
+            ->missing('projects.data.0.work_env')
+            ->missing('projects.data.0.remarks')
+            ->missing('projects.data.0.billing_range')
+            ->missing('projects.data.0.work_location_line')
+            ->missing('projects.data.0.work_location_station')
+            ->where('projects.data.0.required_skills.0.label', 'PHP')
+            ->missing('projects.data.0.required_skills.0.detail')
+        );
+    }
+
+    public function test_index_returns_main_and_sub_user(): void
+    {
+        // main_user_id/sub_user_id をselectし忘れるとmainUserがnullになりクラッシュしていた不具合の回帰テスト
+        $mainUser = User::factory()->create(['name' => '田中太郎']);
+        $subUser  = User::factory()->create(['name' => '鈴木花子']);
+        $this->createProject([
+            'main_user_id' => $mainUser->id,
+            'sub_user_id'  => $subUser->id,
+        ]);
+
+        $response = $this->actingAs($mainUser)->get('/projects');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.users.main.name', '田中太郎')
+            ->where('projects.data.0.users.sub.name', '鈴木花子')
+        );
+    }
+
+    public function test_index_returns_null_sub_user_when_not_assigned(): void
+    {
+        // sub_user_id未設定の案件で、users.subがnullとして返ることを確認
+        $mainUser = User::factory()->create();
+        $this->createProject([
+            'main_user_id' => $mainUser->id,
+            'sub_user_id'  => null,
+        ]);
+
+        $response = $this->actingAs($mainUser)->get('/projects');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.users.sub', null)
+        );
+    }
+
+    public function test_index_splits_skills_by_required_and_preferred(): void
+    {
+        // eager load時にskill_typeをselectし忘れると必須/尚可が両方とも空配列になっていた不具合の回帰テスト
+        $user = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+        $project->projectSkills()->create(['skill_type' => 'required', 'label' => 'Java', 'detail' => null]);
+        $project->projectSkills()->create(['skill_type' => 'preferred', 'label' => 'AWS', 'detail' => null]);
+
+        $response = $this->actingAs($user)->get('/projects');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('projects.data.0.required_skills', 1)
+            ->where('projects.data.0.required_skills.0.label', 'Java')
+            ->count('projects.data.0.preferred_skills', 1)
+            ->where('projects.data.0.preferred_skills.0.label', 'AWS')
+        );
+    }
+
+    public function test_index_eager_loads_relations_to_avoid_n_plus_one(): void
+    {
+        $user = User::factory()->create();
+        for ($i = 0; $i < 5; $i++) {
+            $project = $this->createProject(['main_user_id' => $user->id]);
+            $project->projectSkills()->create(['skill_type' => 'required', 'label' => 'PHP', 'detail' => null]);
+            $project->projectSkills()->create(['skill_type' => 'preferred', 'label' => 'Vue', 'detail' => null]);
+        }
+
+        \DB::enableQueryLog();
+
+        $this->actingAs($user)->get('/projects');
+
+        $queries = \DB::getQueryLog();
+        \DB::disableQueryLog();
+
+        // セッション・ユーザー・count・projects本体・projectSkills・mainUser・subUser を含む。
+        // N+1 が起きた場合は 5件 × 3リレーション分で大きく増えるので 20 件以内で十分検出できる
+        $this->assertLessThanOrEqual(20, count($queries));
     }
 
     // -------------------------------------------------------
