@@ -1,21 +1,17 @@
+import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
-import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Engineers/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerShowPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import { ArrowLeftRight, Clock, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 type Props = PageProps<EngineerShowPageProps>;
-
-const ENGINEER_STATUS_LABELS: Record<string, string> = {
-    proposable:     '提案可',
-    interviewing:   '面談中',
-    not_proposable: '提案不可',
-};
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -47,6 +43,18 @@ export default function Show({ engineer }: Props) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    // マッチング実行は遷移先描画前にサーバーで Python AI を同期呼び出しするため数秒待つ。
+    // その間、遷移元のこの画面に AI 計算中オーバーレイを被せる（onStart で表示・onFinish で解除）。
+    const [isMatching, setIsMatching] = useState(false);
+    const { toast } = useToast();
+
+    // マッチングは読み取り専用（DB保存なし）のため、途中キャンセルは安全（副作用が残らない）。
+    // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する。
+    const matchingCancel = useRef<(() => void) | null>(null);
+
+    // 経験工程を共通 ProcessCheckboxGroup で表示する（人材は has_experience フラグ）。
+    const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
+
     const handleDelete = () => {
         router.delete(`/engineers/${engineer.id}`, {
             onStart:   () => setIsDeleting(true),
@@ -66,6 +74,15 @@ export default function Show({ engineer }: Props) {
     return (
         <AuthenticatedLayout>
             <Head title="人材詳細" />
+            {/* マッチング実行の遷移中（Python AI 同期計算）に全画面で計算中を表示する。
+                共通部品のデフォルトは汎用文言のため、ここではマッチング用途の具体文言を渡す。
+                マッチングは読み取り専用でキャンセルが安全なため onCancel を渡す（visit を中断）。 */}
+            <AiLoadingOverlay
+                show={isMatching}
+                message="AIがマッチングを計算しています…"
+                onCancel={() => matchingCancel.current?.()}
+            />
+
             {/* Sticky page header */}
             <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between border-b border-border bg-white px-10 py-4">
                 <div>
@@ -74,10 +91,45 @@ export default function Show({ engineer }: Props) {
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
-                        onClick={() => router.get(`/matching/${engineer.id}`)}
+                        onClick={() =>
+                            router.get(
+                                // ルートは一覧カードと統一（`/engineers/{id}/matching`＝engineers.matching）。
+                                // 旧 `/matching/{id}` は未定義ルートで 404 になっていたため廃止（9-6）。
+                                `/engineers/${engineer.id}/matching`,
+                                {},
+                                {
+                                    onStart: () => setIsMatching(true),
+                                    // Inertia が渡す cancel トークンを保持し、オーバーレイのキャンセルボタンで叩けるようにする。
+                                    onCancelToken: (token) => {
+                                        matchingCancel.current = token.cancel;
+                                    },
+                                    // サーバー到達エラー（通信断・リクエスト中断）は成功レスポンスの
+                                    // flash.error では拾えないため、ここでトースト表示し Silent Rejection を防ぐ。
+                                    // （エンジン通信失敗など到達済みエラーはサーバーが flash.error で通知する）
+                                    onError: () =>
+                                        toast({
+                                            description:
+                                                'マッチングの実行に失敗しました。通信環境をご確認のうえ、再度お試しください。',
+                                            variant: 'destructive',
+                                        }),
+                                    // onFinish は成功・失敗・キャンセルすべてで発火するためオーバーレイは必ず解除される。
+                                    onFinish: () => {
+                                        setIsMatching(false);
+                                        matchingCancel.current = null;
+                                    },
+                                },
+                            )
+                        }
+                        // 提案不可の人材はマッチング対象外（サーバー側 MatchingController でも弾く）。
+                        disabled={engineer.status === 'not_proposable'}
+                        title={
+                            engineer.status === 'not_proposable'
+                                ? '提案不可の人材はマッチングを実行できません'
+                                : undefined
+                        }
                     >
                         <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
-                        マッチング
+                        マッチング実行
                     </Button>
                     <Button
                         variant="outline"
@@ -114,10 +166,7 @@ export default function Show({ engineer }: Props) {
                             )}
                         </p>
                         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <StatusBadge
-                                status={engineer.status}
-                                label={ENGINEER_STATUS_LABELS[engineer.status] ?? engineer.status}
-                            />
+                            <StatusBadge status={engineer.status} />
                             <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
                                 <Clock className="mr-1 inline h-3 w-3" />{engineer.available_label}
                             </span>
@@ -208,7 +257,7 @@ export default function Show({ engineer }: Props) {
                         {engineer.skills.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {engineer.skills.map((skill, i) => (
-                                    <SkillTagDetail key={i} label={skill.label ?? ''} detail={skill.detail} />
+                                    <SkillTagDetail key={`${skill.label ?? ''}-${i}`} label={skill.label ?? ''} detail={skill.detail} />
                                 ))}
                             </div>
                         ) : (
@@ -217,8 +266,8 @@ export default function Show({ engineer }: Props) {
                     </DetailRow>
                     <DetailRow label="経験工程">
                         <ProcessCheckboxGroup
-                            phases={engineer.phases.map(({ key, name }) => ({ key, name }))}
-                            values={Object.fromEntries(engineer.phases.map((p) => [p.key, p.has_experience]))}
+                            phases={phaseList}
+                            values={phaseValues}
                             readOnly
                             className="flex-nowrap gap-x-4"
                         />
@@ -278,10 +327,7 @@ export default function Show({ engineer }: Props) {
                 {/* 管理情報 */}
                 <SectionCard title="管理情報">
                     <DetailRow label="ステータス">
-                        <StatusBadge
-                            status={engineer.status}
-                            label={ENGINEER_STATUS_LABELS[engineer.status] ?? engineer.status}
-                        />
+                        <StatusBadge status={engineer.status} />
                     </DetailRow>
                     <DetailRow label="担当営業">
                         <span>担当：{engineer.users.main.name}</span>
