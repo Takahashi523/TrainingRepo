@@ -8,10 +8,14 @@ import { Head, useForm } from '@inertiajs/react';
 import { KeyboardEvent } from 'react';
 
 export default function Login({ status }: { status?: string }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm<{
+        email: string;
+        password: string;
+        remember: boolean;
+    }>({
         email: '',
         password: '',
-        remember: false as boolean,
+        remember: false,
     });
 
     // CLAUDE.md 規約に従い <form> は使わず、useForm().post() をボタン onClick で実行する。
@@ -87,10 +91,7 @@ export default function Login({ status }: { status?: string }) {
                         name="remember"
                         checked={data.remember}
                         onChange={(e) =>
-                            setData(
-                                'remember',
-                                (e.target.checked || false) as false,
-                            )
+                            setData('remember', e.target.checked)
                         }
                     />
                     <span className="ms-2 text-sm text-gray-600">
