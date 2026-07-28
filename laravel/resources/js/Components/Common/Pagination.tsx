@@ -1,6 +1,6 @@
 import { Button } from '@/Components/ui/button';
 import { cn } from '@/lib/utils';
-import { PaginationMeta } from '@/types/engineer';
+import { PaginationMeta } from '@/types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Props {
