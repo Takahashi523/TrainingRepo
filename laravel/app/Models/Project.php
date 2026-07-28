@@ -40,6 +40,30 @@ class Project extends Model
         ['value' => 'pending', 'label' => 'ペンディング'],
     ];
 
+    /**
+     * 案件 ENUM の表示ラベル（SSOT）。value => label。
+     * フォーム選択肢（ProjectController）・マッチング結果の表示ラベル（MatchingResource）は
+     * この定数のみを参照し、PHP/TS 双方でのラベル重複定義をなくす。
+     */
+    public const COMMERCIAL_FLOW_LABELS = [
+        'prime' => 'プライム',
+        'secondary' => '2次',
+        'tertiary' => '3次',
+        'other' => 'その他',
+    ];
+
+    public const WORK_STYLE_LABELS = [
+        'onsite' => '常駐',
+        'hybrid' => '一部リモート可',
+        'remote' => 'フルリモート',
+    ];
+
+    public const STATUS_LABELS = [
+        'open' => '募集中',
+        'closed' => '終了',
+        'pending' => 'ペンディング',
+    ];
+
     protected $fillable = [
         'name',
         'client_name',

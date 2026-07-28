@@ -276,7 +276,7 @@ return [
             'required' => '常駐・一部リモートの場合は路線名を入力してください。',
         ],
         'work_location_station' => [
-            'required' => '常駐・一部リモートの場合は最寄駅を入力してください。',
+            'required_if' => '常駐・一部リモートの場合は最寄駅を入力してください。',
         ],
         'interview_count' => [
             'integer' => '正しい回数を入力してください。',
@@ -285,7 +285,23 @@ return [
         'negotiation_required' => [
             'boolean' => '顧客折衝経験要否を正しく選択してください。',
         ],
-        
+        'required_skills.*.label' => [
+            'required'      => '必須スキル名は必須です。',
+            'required_with' => 'スキル詳細を入力する場合はスキル名も入力してください。',
+            'max'           => 'スキルラベルは15文字以内で入力してください。',
+        ],
+        'preferred_skills.*.label' => [
+            'required'      => '尚可スキル名は必須です。',
+            'required_with' => 'スキル詳細を入力する場合はスキル名も入力してください。',
+            'max'           => 'スキルラベルは15文字以内で入力してください。',
+        ],
+        'required_skills.*.detail' => [
+            'max' => 'スキル詳細は500文字以内で入力してください。',
+        ],
+        'preferred_skills.*.detail' => [
+            'max' => 'スキル詳細は500文字以内で入力してください。',
+        ],
+
         // 担当営業（共通）
         'main_user_id' => [
             'required' => '担当営業を選択してください。',

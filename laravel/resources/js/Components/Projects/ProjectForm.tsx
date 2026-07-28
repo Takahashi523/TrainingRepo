@@ -12,17 +12,26 @@ import {
 } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 import { InertiaFormProps } from "@inertiajs/react";
-import { FieldSettings, SkillPair, ProjectFormData } from "@/types/project";
+import {
+    FieldSettings,
+    SkillPair,
+    ProjectFormData,
+    Phase,
+    WorkStyleOption,
+    StatusOption,
+    CommercialFlowOption,
+    UserOption,
+} from "@/types/project";
 import React from "react";
 
 interface Props {
     form: InertiaFormProps<ProjectFormData>;
     fieldSettings: FieldSettings;
-    phases: { key: string; name: string }[];
-    work_styles: { key: string; name: string }[];
-    commercial_flows: { value: string; label: string }[];
-    statuses: { value: string; label: string }[];
-    users: { id: number; name: string }[];
+    phases: Phase[];
+    work_styles: WorkStyleOption[];
+    commercial_flows: CommercialFlowOption[];
+    statuses: StatusOption[];
+    users: UserOption[];
 }
 
 const NEGOTIATION_OPTIONS = [
@@ -93,11 +102,7 @@ export default function ProjectForm({
     const { data, setData, errors } = form;
 
     const handleRateNegotiableChange = (checked: boolean) => {
-        setData((prev) => ({
-            ...prev,
-            rate_is_negotiable: checked,
-            ...(checked ? { rate_min: "", rate_max: "" } : { rate_note: "" }),
-        }));
+        setData("rate_is_negotiable", checked);
     };
 
     const procValues: Record<string, boolean> = {
@@ -268,13 +273,7 @@ export default function ProjectForm({
             >
                 <Select
                     value={data.work_style}
-                    onValueChange={(value) => {
-                        setData("work_style", value);
-                        if (value === "remote") {
-                            setData("work_location_line", "");
-                            setData("work_location_station", "");
-                        }
-                    }}
+                    onValueChange={(value) => setData("work_style", value)}
                 >
                     <SelectTrigger
                         className={`w-40 ${errors.work_style ? "border-destructive" : ""}`}
