@@ -11,6 +11,8 @@ use Illuminate\Validation\Rules\Password;
 /**
  * マスタ管理：ユーザー編集のバリデーション。
  * パスワードは省略可（省略時は変更なし）。最後の管理者を general 化する操作を事前検査する。
+ * 自分自身のロール変更は禁止する（自己降格すると保存後の GET /master 再取得が 403 になり、
+ * 成功しているのに失敗表示になる事故を防ぐ。DeleteUserRequest の自己削除ガードと対称）。
  */
 class UpdateUserRequest extends FormRequest
 {
@@ -76,6 +78,15 @@ class UpdateUserRequest extends FormRequest
         $validator->after(function (Validator $validator) {
             /** @var User $user */
             $user = $this->route('user');
+
+            // 自分自身のロール変更を禁止する。管理者専用画面のため編集者は必ず admin であり、
+            // 自己降格（admin→general）すると保存直後の Inertia 再取得が admin ミドルウェアで
+            // 403 になる。他項目の編集を妨げないよう、ロールを変えた場合のみ弾く。
+            if ($this->user()->id === $user->id && $this->input('role') !== $user->role) {
+                $validator->errors()->add('role', '自分自身のロールは変更できません。');
+
+                return;
+            }
 
             $demotingAdmin = $user->role === 'admin' && $this->input('role') === 'general';
             if ($demotingAdmin && User::where('role', 'admin')->count() <= 1) {

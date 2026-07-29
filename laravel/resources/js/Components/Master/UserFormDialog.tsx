@@ -24,6 +24,8 @@ interface Props {
     open: boolean;
     /** 編集対象。null の場合は新規追加モード */
     user: MasterUser | null;
+    /** ログイン中ユーザーのID。自分自身の編集判定に使う（自己ロール変更の抑止）。 */
+    currentUserId: number;
     /**
      * 許容メールドメイン（@なし）。設定時のみヒントに明示する。
      * 管理者専用画面に限定して渡される（公開画面には出さない）。
@@ -57,10 +59,15 @@ function RequiredBadge() {
 export default function UserFormDialog({
     open,
     user,
+    currentUserId,
     allowedEmailDomains,
     onClose,
 }: Props) {
     const isEdit = user !== null;
+
+    // 自分自身を編集している場合はロール変更を禁止する（自己降格すると保存後の
+    // GET /master 再取得が 403 になるため）。サーバ側でも UpdateUserRequest で弾く。
+    const isSelf = isEdit && user.id === currentUserId;
 
     // 許容ドメインが設定されていれば入力前に明示してエラーの往復を減らす。
     // 未設定時はドメイン制限がないため、ログインID用途のみ案内する。
@@ -310,6 +317,7 @@ export default function UserFormDialog({
                         <Select
                             value={data.role}
                             onValueChange={(v) => setData('role', v as UserRole)}
+                            disabled={isSelf}
                         >
                             <SelectTrigger
                                 id="user-role"
@@ -322,6 +330,11 @@ export default function UserFormDialog({
                                 <SelectItem value="admin">管理者</SelectItem>
                             </SelectContent>
                         </Select>
+                        {isSelf && (
+                            <p className="text-xs text-muted-foreground">
+                                自分自身のロールは変更できません。
+                            </p>
+                        )}
                         {errors.role && (
                             <p className="text-xs text-destructive">{errors.role}</p>
                         )}

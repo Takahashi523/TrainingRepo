@@ -146,6 +146,7 @@ export default function Index({
             <UserFormDialog
                 open={userDialogOpen}
                 user={editingUser}
+                currentUserId={auth.user.id}
                 allowedEmailDomains={allowed_email_domains}
                 onClose={() => setUserDialogOpen(false)}
             />

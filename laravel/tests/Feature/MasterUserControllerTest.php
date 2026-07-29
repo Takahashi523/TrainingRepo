@@ -362,6 +362,38 @@ class MasterUserControllerTest extends TestCase
         $this->assertSame('general', $target->fresh()->role);
     }
 
+    public function test_changing_own_role_is_rejected_even_when_another_admin_exists(): void
+    {
+        // 別の管理者がいるため last-admin ガードは発火しない。自己ロール変更ガード単体を検証する。
+        $actor = $this->admin();
+        $this->admin();
+
+        $this->actingAs($actor)->put("/master/users/{$actor->id}", [
+            'name' => $actor->name,
+            'email' => $actor->email,
+            'role' => 'general',
+        ])->assertSessionHasErrors('role');
+
+        $this->assertSame('admin', $actor->fresh()->role);
+    }
+
+    public function test_admin_can_update_own_profile_without_changing_role(): void
+    {
+        // 自分自身でもロール以外（氏名・メール）は編集できる（ロール据え置きなら弾かれない）。
+        $actor = $this->admin(['name' => '旧名', 'email' => 'old@example.com']);
+
+        $this->actingAs($actor)->put("/master/users/{$actor->id}", [
+            'name' => '新名',
+            'email' => 'new@example.com',
+            'role' => 'admin',
+        ])->assertSessionHasNoErrors();
+
+        $fresh = $actor->fresh();
+        $this->assertSame('新名', $fresh->name);
+        $this->assertSame('new@example.com', $fresh->email);
+        $this->assertSame('admin', $fresh->role);
+    }
+
     public function test_update_returns_404_for_missing_user(): void
     {
         $this->actingAs($this->admin())
