@@ -132,25 +132,23 @@ export default function EngineerForm({
             {/* ==================== 基本情報 ==================== */}
             <SectionHeading>基本情報</SectionHeading>
 
-            <FormRow
-                label="氏名 / カナ"
-                required
-                error={errors.name || errors.name_kana}
-            >
-                <div className="flex gap-2">
-                    <Input
-                        value={data.name}
-                        onChange={(e) => setData('name', e.target.value)}
-                        placeholder="例：山田 太郎"
-                        className={errors.name ? 'border-destructive' : ''}
-                    />
-                    <Input
-                        value={data.name_kana}
-                        onChange={(e) => setData('name_kana', e.target.value)}
-                        placeholder="例：ヤマダ タロウ"
-                        className={errors.name_kana ? 'border-destructive' : ''}
-                    />
-                </div>
+            {/* 氏名・氏名カナは登録フィールドが別のため、他項目と同じく独立した行として並べる。 */}
+            <FormRow label="氏名" required error={errors.name}>
+                <Input
+                    value={data.name}
+                    onChange={(e) => setData('name', e.target.value)}
+                    placeholder="例：山田 太郎"
+                    className={`w-64 ${errors.name ? 'border-destructive' : ''}`}
+                />
+            </FormRow>
+
+            <FormRow label="カナ" required error={errors.name_kana}>
+                <Input
+                    value={data.name_kana}
+                    onChange={(e) => setData('name_kana', e.target.value)}
+                    placeholder="例：ヤマダ タロウ"
+                    className={`w-64 ${errors.name_kana ? 'border-destructive' : ''}`}
+                />
             </FormRow>
 
             <FormRow
@@ -173,26 +171,34 @@ export default function EngineerForm({
                 </div>
             </FormRow>
 
+            {/* 最寄駅・路線は登録フィールドが別で必須/任意も独立するため、他項目と同じく
+                独立した行（左カラムに必須/任意バッジ）として並べる。 */}
             <FormRow
-                label="最寄駅 / 路線"
-                required={fieldSettings.nearest_station.is_required || fieldSettings.nearest_line.is_required}
-                hint="出社が必要な案件との通勤条件の判定に使用します。駅名・路線名をそれぞれ自由入力（例：新宿 / JR中央線）"
-                error={errors.nearest_station || errors.nearest_line}
+                label="最寄駅"
+                required={fieldSettings.nearest_station.is_required}
+                hint="出社が必要な案件との通勤条件の判定に使用します。駅名を自由入力（例：新宿）"
+                error={errors.nearest_station}
             >
-                <div className="flex gap-2">
-                    <Input
-                        value={data.nearest_station}
-                        onChange={(e) => setData('nearest_station', e.target.value)}
-                        placeholder="駅名（例：新宿）"
-                        className="w-48"
-                    />
-                    <Input
-                        value={data.nearest_line}
-                        onChange={(e) => setData('nearest_line', e.target.value)}
-                        placeholder="路線名（例：JR中央線）"
-                        className="w-48"
-                    />
-                </div>
+                <Input
+                    value={data.nearest_station}
+                    onChange={(e) => setData('nearest_station', e.target.value)}
+                    placeholder="駅名（例：新宿）"
+                    className={`w-64 ${errors.nearest_station ? 'border-destructive' : ''}`}
+                />
+            </FormRow>
+
+            <FormRow
+                label="路線"
+                required={fieldSettings.nearest_line.is_required}
+                hint="路線名を自由入力（例：JR中央線）"
+                error={errors.nearest_line}
+            >
+                <Input
+                    value={data.nearest_line}
+                    onChange={(e) => setData('nearest_line', e.target.value)}
+                    placeholder="路線名（例：JR中央線）"
+                    className={`w-64 ${errors.nearest_line ? 'border-destructive' : ''}`}
+                />
             </FormRow>
 
             <FormRow
