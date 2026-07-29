@@ -457,16 +457,26 @@
               </tr>
             </thead>
             <tbody>
+              <!-- 氏名・氏名カナは別カラム（別 field_key）のため2行に分割。いずれも固定必須 -->
               <tr>
-                <td class="col-name">氏名 / カナ</td>
+                <td class="col-name">氏名</td>
                 <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
               </tr>
               <tr>
-                <td class="col-name">年齢（生年月日）</td>
+                <td class="col-name">氏名カナ</td>
+                <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
+              </tr>
+              <tr>
+                <td class="col-name">生年月日</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <!-- 最寄駅・路線は別カラム（別 field_key）のため2行2トグルに分割。個別に必須/任意を切替可能 -->
+              <tr>
+                <td class="col-name">最寄駅</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">最寄駅 / 路線</td>
+                <td class="col-name">路線</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
               <tr>
@@ -479,7 +489,7 @@
               </tr>
               <tr>
                 <td class="col-name">経験工程</td>
-                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
               <tr>
                 <td class="col-name">顧客折衝経験</td>
@@ -490,15 +500,11 @@
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">職務経歴ファイル</td>
+                <td class="col-name">希望単価（月額）</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">希望単価</td>
-                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
-              </tr>
-              <tr>
-                <td class="col-name">勤務形態タグ</td>
+                <td class="col-name">勤務形態</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
@@ -536,7 +542,7 @@
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">単価（下限〜上限）</td>
+                <td class="col-name">単価（月額）</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
               <tr>
@@ -548,7 +554,7 @@
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">勤務地</td>
+                <td class="col-name">勤務地（路線名）</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
               <tr>
@@ -583,6 +589,10 @@
               <tr>
                 <td class="col-name">業務内容詳細</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">特記事項</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
                 <td class="col-name">特記事項</td>

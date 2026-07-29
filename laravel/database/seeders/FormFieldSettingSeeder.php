@@ -13,7 +13,9 @@ class FormFieldSettingSeeder extends Seeder
         // engineer（人材登録フォーム）
         // ----------------------------------------------------------------
 
-        $systemRequiredFields = ['name', 'status', 'main_user_id'];
+        // システム固定必須（管理者も変更不可）。氏名カナは EngineerRequest で常に required のため
+        // docs/api/09 どおり system-required に含める（PR #21 指摘の是正）。
+        $systemRequiredFields = ['name', 'name_kana', 'status', 'main_user_id'];
 
         foreach ($systemRequiredFields as $key) {
             FormFieldSetting::updateOrCreate(
@@ -22,13 +24,25 @@ class FormFieldSettingSeeder extends Seeder
             );
         }
 
-        $engineerFields = [
+        // 初期値：必須（docs/api/09 の WF_12 初期値に準拠）
+        $engineerRequiredFields = [
             'birth_date', 'nearest_station', 'nearest_line', 'available_from',
-            'skills', 'proc_experience', 'has_negotiation_exp', 'appeal_note',
-            'desired_rate', 'work_styles', 'remarks',
+            'skills', 'proc_experience', 'has_negotiation_exp',
         ];
 
-        foreach ($engineerFields as $key) {
+        foreach ($engineerRequiredFields as $key) {
+            FormFieldSetting::updateOrCreate(
+                ['form_type' => 'engineer', 'field_key' => $key],
+                ['is_required' => true, 'is_system_required' => false],
+            );
+        }
+
+        // 初期値：任意
+        $engineerOptionalFields = [
+            'appeal_note', 'desired_rate', 'work_styles', 'remarks',
+        ];
+
+        foreach ($engineerOptionalFields as $key) {
             FormFieldSetting::updateOrCreate(
                 ['form_type' => 'engineer', 'field_key' => $key],
                 ['is_required' => false, 'is_system_required' => false],

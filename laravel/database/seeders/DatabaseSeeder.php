@@ -15,14 +15,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // 開発・テスト用の既知アカウント。既知の脆弱な認証情報のため本番では作成しない。
+        // 本番の初期管理者は `php artisan app:create-admin` で作成すること。
+        if (app()->environment('local', 'testing')) {
+            User::factory()->create([
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+                'role' => 'admin',
+            ]);
+        }
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'role' => 'admin',
-        ]);
-
+        // フォーム設定はアプリの構成データのため全環境で投入する。
         $this->call(FormFieldSettingSeeder::class);
     }
 }
