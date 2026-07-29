@@ -7,19 +7,19 @@ import { EngineerListItem, Phase } from '@/types/engineer';
 import { router } from '@inertiajs/react';
 import { ArrowLeftRight, Clock } from 'lucide-react';
 
-const ENGINEER_STATUS_LABELS: Record<string, string> = {
-    proposable:     '提案可',
-    interviewing:   '面談中',
-    not_proposable: '提案不可',
-};
-
 const MAX_SKILLS_VISIBLE = 5;
 
 interface Props {
     engineer: EngineerListItem;
+    /**
+     * 「マッチング」ボタン押下時のハンドラ。
+     * マッチング実行は AI 同期計算で数秒待つため、計算中オーバーレイを一覧ページ側で一元管理する。
+     * カードは起動のみを担い、遷移・オーバーレイ制御は呼び出し側（Pages/Engineers/Index）に委ねる（9-5）。
+     */
+    onMatch: () => void;
 }
 
-export default function EngineerCard({ engineer }: Props) {
+export default function EngineerCard({ engineer, onMatch }: Props) {
     const accentClass = STATUS_STYLES[engineer.status]?.accentClass ?? 'bg-gray-400';
 
     const visibleSkills = engineer.skills.slice(0, MAX_SKILLS_VISIBLE);
@@ -55,10 +55,7 @@ export default function EngineerCard({ engineer }: Props) {
                             </p>
                         </div>
                         <div className="ml-auto flex flex-wrap items-center gap-2">
-                            <StatusBadge
-                                status={engineer.status}
-                                label={ENGINEER_STATUS_LABELS[engineer.status] ?? engineer.status}
-                            />
+                            <StatusBadge status={engineer.status} />
                             <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-muted/50 px-2.5 py-0.5 text-[11px]">
                                 <Clock className="h-3 w-3" />
                                 {engineer.available_label}
@@ -128,7 +125,14 @@ export default function EngineerCard({ engineer }: Props) {
                         className="w-full"
                         variant="outline"
                         size="sm"
-                        onClick={() => router.get(`/matching/${engineer.id}`)}
+                        onClick={onMatch}
+                        // 提案不可の人材はマッチング対象外（サーバー側 MatchingController でも弾く）。
+                        disabled={engineer.status === 'not_proposable'}
+                        title={
+                            engineer.status === 'not_proposable'
+                                ? '提案不可の人材はマッチングを実行できません'
+                                : undefined
+                        }
                     >
                         <ArrowLeftRight className="mr-1 h-3.5 w-3.5" />
                         マッチング

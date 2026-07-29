@@ -39,43 +39,9 @@ class ProjectController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(): Response
     {
-        $settings = FormFieldSetting::where('form_type', 'project')
-            ->pluck('is_required', 'field_key');
-
-        $fieldKeys = [
-            'client_name',
-            'required_skills',
-            'preferred_skills',
-            'rate',
-            'start_date',
-            'work_style',
-            'work_location',
-            'commercial_flow',
-            'interview_count',
-            'headcount',
-            'work_env',
-            'billing_range',
-            'proc_experience',
-            'negotiation_required',
-            'description',
-            'remarks',
-        ];
-
-        $fieldSettings = collect($fieldKeys)->mapWithKeys(fn($key) => [
-            $key => ['is_required' => (bool) $settings->get($key, 0)],
-        ])->toArray();
-
-        return Inertia::render('Projects/Create', [
-            'fieldSettings'    => $fieldSettings,
-            'phases'           => Project::PHASES,
-            'work_styles'      => Project::WORK_STYLES,
-            'commercial_flows' => Project::COMMERCIAL_FLOWS,
-            'statuses'         => Project::STATUSES,
-            'users'            => User::select('id', 'name')->orderBy('name')->get(),
-            'authUserId'       => auth()->id(),
-        ]);
+        return Inertia::render('Projects/Create', $this->commonFormProps());
     }
 
     /**
@@ -103,17 +69,24 @@ class ProjectController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(Project $project): Response
     {
-        //
+        $project->loadMissing(['projectSkills', 'mainUser', 'subUser']);
+
+        return Inertia::render('Projects/Edit', array_merge(
+            $this->commonFormProps(),
+            ['project' => ProjectResource::make($project)]
+        ));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(ProjectRequest $request, Project $project): RedirectResponse
     {
-        //
+        $project = $this->projectService->update($request, $project);
+
+        return redirect()->route('projects.show', $project)->with('success', '案件情報を更新しました。');
     }
 
     /**
@@ -126,5 +99,44 @@ class ProjectController extends Controller
         $this->projectService->destroy($project);
 
         return redirect('/projects')->with('success', '案件情報を削除しました。');
+    }
+
+    private function commonFormProps(): array
+    {
+        $settings = FormFieldSetting::where('form_type', 'project')
+            ->pluck('is_required', 'field_key');
+
+        $fieldKeys = [
+            'client_name',
+            'required_skills',
+            'preferred_skills',
+            'rate',
+            'start_date',
+            'work_style',
+            'work_location',
+            'commercial_flow',
+            'interview_count',
+            'headcount',
+            'work_env',
+            'billing_range',
+            'proc_experience',
+            'negotiation_required',
+            'description',
+            'remarks',
+        ];
+
+        $fieldSettings = collect($fieldKeys)->mapWithKeys(fn($key) => [
+            $key => ['is_required' => (bool) $settings->get($key, 0)],
+        ])->toArray();
+
+        return [
+            'fieldSettings'    => $fieldSettings,
+            'phases'           => Project::PHASES,
+            'work_styles'      => Project::WORK_STYLES,
+            'commercial_flows' => Project::COMMERCIAL_FLOWS,
+            'statuses'         => Project::STATUSES,
+            'users'            => User::select('id', 'name')->orderBy('name')->get(),
+            'authUserId'       => auth()->id(),
+        ];
     }
 }

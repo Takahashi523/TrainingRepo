@@ -253,7 +253,7 @@
 | billing_range | 精算幅 | false | 任意 |
 | proc_experience | 対象工程 | false | 必須 |
 | negotiation_required | 顧客折衝経験 | false | 必須 |
-| description | 業務内容詳細 | false | 任意 |
+| description | 業務内容詳細 | false | 必須 |
 | remarks | 特記事項 | false | 任意 |
 
 > **`work_location`（勤務地）ラベルについて**
