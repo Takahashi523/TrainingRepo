@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\FormFieldSetting;
 use App\Models\User;
+use Database\Seeders\FormFieldSettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -49,6 +50,31 @@ class MasterFormSettingControllerTest extends TestCase
                 ],
             ])
             ->assertForbidden();
+    }
+
+    // -------------------------------------------------------
+    // SSOT 同期（FIELD_LABELS ⇔ Seeder）
+    // -------------------------------------------------------
+
+    /**
+     * FIELD_LABELS（表示名・表示順の SSOT）と、実際に Seeder が投入する field_key が一致することを保証する。
+     * 将来フォーム項目を追加した際に片方だけ更新するズレは fieldLabel() の ?? フォールバックで
+     * 画面が壊れず隠蔽され CI で気づけないため、機械的に検知する（PR #51 レビュー指摘）。
+     */
+    public function test_field_labels_matches_seeded_field_keys(): void
+    {
+        $this->seed(FormFieldSettingSeeder::class);
+
+        foreach (['engineer', 'project'] as $formType) {
+            $seededKeys = FormFieldSetting::where('form_type', $formType)->pluck('field_key')->all();
+            $labelKeys = array_keys(FormFieldSetting::FIELD_LABELS[$formType]);
+
+            $this->assertEqualsCanonicalizing(
+                $seededKeys,
+                $labelKeys,
+                "form_type={$formType}: FIELD_LABELS と Seeder の field_key がズレています。",
+            );
+        }
     }
 
     // -------------------------------------------------------
