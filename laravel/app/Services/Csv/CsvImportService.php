@@ -1,0 +1,245 @@
+<?php
+
+namespace App\Services\Csv;
+
+use App\Models\User;
+use App\Support\Csv\CsvFile;
+use App\Support\Csv\CsvInjection;
+use App\Support\Csv\CsvSchema;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * CSV インポートの中核。人材・案件で共通のロジックを持ち、列の違いは CsvSchema に委譲する。
+ *
+ * 処理順序（api/08・§8 の確定に厳密に従う）：
+ *   1. BOM ストリップ → RFC4180 パース（空行は論理レコード単位でスキップ／CsvFile）
+ *   2. ヘッダー検証（名前ベース照合・必須列欠落は全体中断・未知列は無視・列順入替は許容／O-7）
+ *   3. データ0行チェック（O-9）
+ *   4. 参照データ preload（users.id・既存 id を各1回／N+1回避・O-13）
+ *   5. 行ごと：レイアウト（列数）先行 → 復元（CsvInjection）→ 正規化 → 項目検証（bail なし・全メッセージ収集）
+ *              → 担当者/更新 id の存在照合（メモリ）→ ファイル内 id 重複（O-8）
+ *   6. エラーが1件でもあれば書き込まず 422（errors.importErrors に構造化 JSON）
+ *   7. エラー0件なら DB::transaction 内でバッチ INSERT / 個別 UPDATE（全項目上書き＝O-1 暫定許容）
+ *
+ * 設計原則：SRP（1クラス＝インポートの1責務）／DRY（列定義は CsvSchema・書式ルールは *Rules に集約）／
+ * フェイルセーフ（全エラー収集後に一括ロールバック）。
+ */
+class CsvImportService
+{
+    /** データ行の安全上限（O-13）。ここに到達する前に CsvImportRequest でも弾かれる（二重防御）。 */
+    private const MAX_DATA_ROWS = 5000;
+
+    /**
+     * インポートを実行する。成功時は ['resource' => ..., 'summary' => [...]] を返す。
+     * ヘッダー/行/構造エラーがあれば ValidationException（errors.importErrors）を投げる（部分反映なし）。
+     *
+     * @return array{resource: string, summary: array{total_rows: int, created: int, updated: int}}
+     *
+     * @throws ValidationException
+     */
+    public function import(UploadedFile $file, CsvSchema $schema): array
+    {
+        $content = CsvFile::stripBom((string) file_get_contents($file->getRealPath()));
+        $records = CsvFile::readRecords($content); // [オフセット => セル配列]（0=ヘッダー・空行はスキップ済み）
+
+        // ---- ヘッダー検証（O-7）----
+        $header = array_map(fn ($h) => trim((string) $h), $records[0] ?? []);
+        $missing = array_values(array_diff($schema->requiredHeaders(), $header));
+        if ($missing !== []) {
+            $this->fail([[
+                'row' => 1,
+                'field' => null,
+                'messages' => ['必要な列がありません：'.implode('、', $missing)],
+            ]]);
+        }
+
+        $headerIndex = [];
+        foreach ($header as $i => $name) {
+            $headerIndex[$name] ??= $i; // 最初の出現を採用
+        }
+        $headerCount = count($header);
+        $importableMap = $schema->importableHeaderMap(); // header => field（id 含む）
+
+        // ---- データ行（O-9）----
+        $dataRows = $records;
+        unset($dataRows[0]);
+        if ($dataRows === []) {
+            $this->fail([[
+                'row' => null,
+                'field' => null,
+                'messages' => ['取り込む対象データがありません。'],
+            ]]);
+        }
+        if (count($dataRows) > self::MAX_DATA_ROWS) {
+            // 通常は CsvImportRequest で弾かれるが、Service 単体利用時の保険
+            $this->fail([[
+                'row' => null,
+                'field' => null,
+                'messages' => ['一度に取り込めるのは5,000行までです。ファイルを分割して取り込んでください。'],
+            ]]);
+        }
+
+        // ---- 参照データ preload（N+1回避・O-13）----
+        $userIdSet = array_flip(User::query()->pluck('id')->all());
+
+        // ---- pass1：レイアウト検証 + 行データ構築 + id 収集 ----
+        $errors = [];
+        $parsed = [];
+        $idRowNumbers = [];
+        foreach ($dataRows as $offset => $cells) {
+            $rowNum = $offset + 1; // ヘッダーを1行目とする1オリジン（論理行・空行スキップでも繰り上げない）
+
+            if (count($cells) !== $headerCount) {
+                $errors[] = [
+                    'row' => $rowNum,
+                    'field' => null,
+                    'messages' => ["列数がヘッダーと一致しません（想定{$headerCount}列／実際".count($cells).'列）。'],
+                ];
+
+                continue; // 列数不正の行は項目検証をスキップ
+            }
+
+            $assoc = [];
+            foreach ($importableMap as $headerName => $field) {
+                $idx = $headerIndex[$headerName] ?? null;
+                $raw = ($idx !== null && array_key_exists($idx, $cells)) ? $cells[$idx] : null;
+                if ($raw !== null) {
+                    $raw = CsvInjection::restore(trim((string) $raw));
+                }
+                $assoc[$field] = ($raw === null || $raw === '') ? null : $raw;
+            }
+            $assoc = $schema->normalizeRow($assoc);
+
+            $id = $assoc['id'] ?? null;
+            if ($id !== null) {
+                $idRowNumbers[$id][] = $rowNum;
+            }
+
+            $parsed[] = ['row' => $rowNum, 'id' => $id, 'assoc' => $assoc];
+        }
+
+        // 既存 id 集合を1回だけロード（更新対象・非空かつ数値のみ）
+        $idsInFile = array_values(array_unique(array_filter(
+            array_map(fn ($p) => $p['id'], $parsed),
+            fn ($v) => $v !== null && is_numeric($v),
+        )));
+        $existingIdSet = $idsInFile !== []
+            ? array_flip($schema->modelClass()::query()->whereIn('id', $idsInFile)->pluck('id')->all())
+            : [];
+
+        $duplicateIds = array_flip(array_keys(array_filter(
+            $idRowNumbers,
+            fn ($rows) => count($rows) > 1,
+        )));
+
+        // ---- pass2：項目・存在・重複 検証 + 書き込み候補の確定 ----
+        $writable = [];
+        foreach ($parsed as $p) {
+            ['row' => $rowNum, 'id' => $id, 'assoc' => $assoc] = $p;
+            $rowHasError = false;
+
+            // 項目バリデーション（id は対象外・exists はメモリ照合のため付与しない・bail なしで全メッセージ収集）
+            $validator = Validator::make($assoc, $schema->importRules($assoc), $schema->importMessages(), $schema->attributes());
+            if ($validator->fails()) {
+                $rowHasError = true;
+                foreach ($validator->errors()->messages() as $field => $messages) {
+                    $errors[] = ['row' => $rowNum, 'field' => $field, 'messages' => array_values($messages)];
+                }
+            }
+
+            // 担当者 ID の存在（preload 済み集合とメモリ照合＝N+1回避）
+            foreach (['main_user_id' => '主担当ID', 'sub_user_id' => 'サブ担当ID'] as $field => $label) {
+                $value = $assoc[$field] ?? null;
+                if ($value !== null && is_numeric($value) && ! isset($userIdSet[(int) $value])) {
+                    $rowHasError = true;
+                    $errors[] = ['row' => $rowNum, 'field' => $field, 'messages' => ["指定された{$label}のユーザーが存在しません。"]];
+                }
+            }
+
+            // ファイル内 id 重複（構造系エラー・field:null／O-8）
+            if ($id !== null && isset($duplicateIds[$id])) {
+                $rowHasError = true;
+                $errors[] = ['row' => $rowNum, 'field' => null, 'messages' => ['同一IDが複数行にあります。']];
+            }
+
+            // 更新対象 id の存在（存在しない id は当該行エラー）
+            if ($id !== null && (! is_numeric($id) || ! isset($existingIdSet[(int) $id]))) {
+                $rowHasError = true;
+                $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["指定されたID「{$id}」のデータが存在しません。"]];
+            }
+
+            if (! $rowHasError) {
+                $writable[] = ['id' => $id, 'assoc' => $assoc];
+            }
+        }
+
+        if ($errors !== []) {
+            // 行番号順に整列（読みやすさ。row=null は末尾へ）
+            usort($errors, fn ($a, $b) => ($a['row'] ?? PHP_INT_MAX) <=> ($b['row'] ?? PHP_INT_MAX));
+            $this->fail($errors);
+        }
+
+        return [
+            'resource' => $schema->resourceKey(),
+            'summary' => $this->write($schema, $writable),
+        ];
+    }
+
+    /**
+     * 全行 OK のときのみ呼ばれる。1トランザクション内でバッチ INSERT / 個別 UPDATE する。
+     *
+     * @param  array<int, array{id: ?string, assoc: array<string, mixed>}>  $writable
+     * @return array{total_rows: int, created: int, updated: int}
+     */
+    private function write(CsvSchema $schema, array $writable): array
+    {
+        /** @var class-string<Model> $model */
+        $model = $schema->modelClass();
+        $now = now();
+
+        $inserts = [];
+        $updates = [];
+        foreach ($writable as $row) {
+            $attrs = $schema->buildAttributes($row['assoc']);
+            if ($row['id'] === null) {
+                $inserts[] = $attrs + ['created_at' => $now, 'updated_at' => $now];
+            } else {
+                $updates[] = ['id' => (int) $row['id'], 'attrs' => $attrs + ['updated_at' => $now]];
+            }
+        }
+
+        DB::transaction(function () use ($model, $inserts, $updates): void {
+            foreach (array_chunk($inserts, 500) as $chunk) {
+                $model::query()->insert($chunk);
+            }
+            foreach ($updates as $update) {
+                $model::query()->whereKey($update['id'])->update($update['attrs']);
+            }
+        });
+
+        return [
+            'total_rows' => count($inserts) + count($updates),
+            'created' => count($inserts),
+            'updated' => count($updates),
+        ];
+    }
+
+    /**
+     * 構造化エラーを errors.importErrors（JSON 文字列）として 422 で投げる。
+     * flash では返さない（Inertia の onSuccess 誤発火防止）。
+     *
+     * @param  array<int, array{row: ?int, field: ?string, messages: array<int, string>}>  $errors
+     *
+     * @throws ValidationException
+     */
+    private function fail(array $errors): never
+    {
+        throw ValidationException::withMessages([
+            'importErrors' => [json_encode($errors, JSON_UNESCAPED_UNICODE)],
+        ]);
+    }
+}
