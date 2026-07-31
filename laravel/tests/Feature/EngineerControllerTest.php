@@ -613,6 +613,18 @@ class EngineerControllerTest extends TestCase
         $this->assertDatabaseHas('engineers', ['name_kana' => 'ヤマダ　タロウ']);
     }
 
+    // #21-3: 氏名（name）も name_kana と同様に半角スペースを全角スペースへ正規化する
+    public function test_name_half_width_space_is_normalized_to_full_width(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), ['name' => '山田 太郎']);
+
+        $this->actingAs($user)->post('/engineers', $payload);
+
+        $this->assertDatabaseHas('engineers', ['name' => '山田　太郎']);
+    }
+
     // -------------------------------------------------------
     // store: POST /engineers — AI サマリ
     // -------------------------------------------------------
