@@ -46,6 +46,8 @@ export type ImportResult = {
 export type CsvIndexPageProps = {
     engineer_filter_options: CsvFilterOptions;
     project_filter_options: CsvFilterOptions;
+    /** アップロード上限（バイト）。サーバー（CsvImportRequest::MAX_FILE_SIZE_KB）由来の SSOT。 */
+    csv_max_upload_bytes: number;
 };
 
 /**
@@ -116,6 +118,17 @@ export const CSV_FIELD_LABELS: Record<CsvResource, Record<string, string>> = {
 export function csvFieldLabel(resource: CsvResource, field: string | null): string {
     if (field === null) return '行全体';
     return CSV_FIELD_LABELS[resource][field] ?? field;
+}
+
+/**
+ * ヘッダーレベルのエラーか（行・項目バリデーションと出し分けるための判定）。
+ *
+ * サーバーはヘッダー不正（欠落/空/重複/未知）を行番号 1（ヘッダー行）で返し、かつ即中断するため
+ * 他のエラーと混在しない。データ行のエラーは必ず行番号 2 以上になる（ヘッダーが1行目）。
+ * よって「row === 1 を含むか」でヘッダーエラーかどうかを一意に判定できる。
+ */
+export function hasHeaderError(errors: ImportError[]): boolean {
+    return errors.some((e) => e.row === 1);
 }
 
 /** エラー配列から「エラー行数」「メッセージ総数」を集計する（サマリ表示・バナー用）。 */

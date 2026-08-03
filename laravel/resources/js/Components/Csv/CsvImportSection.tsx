@@ -1,13 +1,16 @@
 import CsvUploader from '@/Components/Common/CsvUploader';
 import LoadingOverlay from '@/Components/Common/LoadingOverlay';
+import CodeLegendPopover from '@/Components/Csv/CodeLegendPopover';
 import ImportResultBanner from '@/Components/Csv/ImportResultBanner';
 import ImportResultModal from '@/Components/Csv/ImportResultModal';
+import ImportSuccessBanner from '@/Components/Csv/ImportSuccessBanner';
 import UserIdLegendPopover from '@/Components/Csv/UserIdLegendPopover';
 import { Button } from '@/Components/ui/button';
 import { Card } from '@/Components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { CsvResource, ImportError, ImportResult } from '@/types/csv';
+import { CsvResource, ImportError, ImportResult, ImportSummary } from '@/types/csv';
 import { useForm } from '@inertiajs/react';
+import { Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface Props {
@@ -25,6 +28,8 @@ interface Props {
      * モーダルは Portal で body 直下に出るため、タブを hidden にしても自動では消えない。ここで明示的に閉じる。
      */
     active: boolean;
+    /** アップロード上限（バイト・サーバー由来）。選択時にサイズを事前チェックして fail-fast する。 */
+    maxUploadBytes: number;
 }
 
 /** 成功時 flash から importResult を安全に取り出す（Inertia の page.props を最小限にナローイング）。 */
@@ -62,12 +67,18 @@ export default function CsvImportSection({
     resourceLabel,
     users,
     active,
+    maxUploadBytes,
 }: Props) {
     const { toast } = useToast();
+    // 上限の表示ラベル（例：5MB）。サーバー由来のバイト値から生成し、案内文とエラー文言で共有する。
+    // サーバー側メッセージ（MAX_FILE_SIZE_KB/1024 + "MB"）と表記を揃えるため、末尾の .0 は落とす。
+    const maxSizeLabel = `${+(maxUploadBytes / 1024 / 1024).toFixed(1)}MB`;
     const form = useForm<{ file: File | null }>({ file: null });
 
-    // 保持する結果（モーダルを閉じても破棄しない）。エラー時のみ持つ（成功はトースト通知）。
+    // 保持する結果（モーダルを閉じても破棄しない）。エラー詳細はモーダル/バナー、成功は常設バナーで残す。
     const [errorResult, setErrorResult] = useState<ImportError[] | null>(null);
+    // 成功サマリ（新規/更新件数）。一括書き込みは高影響のため、トーストに加えて欄に常設する。
+    const [successResult, setSuccessResult] = useState<ImportSummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     // ファイルレベルエラー（mime/サイズ/文字コード/行数超過）。アップロード欄直下に出す。
     const [fileError, setFileError] = useState<string | null>(null);
@@ -80,6 +91,7 @@ export default function CsvImportSection({
     /** 結果とモーダルをまとめてクリアする（新ファイル選択・ファイル取消の起点）。 */
     const clearResult = () => {
         setErrorResult(null);
+        setSuccessResult(null);
         setModalOpen(false);
         setFileError(null);
     };
@@ -87,6 +99,14 @@ export default function CsvImportSection({
     const handleSelect = (file: File) => {
         // 新しいファイル選択＝再インポートの起点。前回結果はクリアする（requirements 表）。
         clearResult();
+
+        // サイズ事前ガード（fail-fast）。巨大ファイルを送信する前に弾く（通信・サーバー負荷の抑制）。
+        // 上限は props（サーバーの CsvImportRequest::MAX_FILE_SIZE_KB 由来）。サーバーの max 検証も最後の砦として残る。
+        if (file.size > maxUploadBytes) {
+            setFileError(`ファイルサイズは${maxSizeLabel}以内にしてください。`);
+            return;
+        }
+
         form.setData('file', file);
     };
 
@@ -102,7 +122,11 @@ export default function CsvImportSection({
         form.post(route(importRouteName), {
             forceFormData: true,
             preserveScroll: true,
-            onStart: () => setFileError(null),
+            // 新しい実行の起点。前回のファイルエラー・成功バナーはクリアしてから結果を反映する。
+            onStart: () => {
+                setFileError(null);
+                setSuccessResult(null);
+            },
             onSuccess: (page) => {
                 const result = readImportResult(page.props);
                 const summary = result?.summary;
@@ -110,12 +134,13 @@ export default function CsvImportSection({
                     variant: 'success',
                     duration: 4000,
                     description: summary
-                        ? `${resourceLabel}CSVの取り込みが完了しました：新規追加 ${summary.created}件 / 更新 ${summary.updated}件`
-                        : `${resourceLabel}CSVの取り込みが完了しました。`,
+                        ? `${resourceLabel}CSVのインポートが完了しました：新規追加 ${summary.created}件 / 更新 ${summary.updated}件`
+                        : `${resourceLabel}CSVのインポートが完了しました。`,
                 });
-                // 成功したら前回のエラー結果は破棄する（新結果で置換）。
+                // 成功したら前回のエラー結果は破棄し、成功サマリを常設バナーとして残す（トーストが消えても確認できる）。
                 setErrorResult(null);
                 setModalOpen(false);
+                setSuccessResult(summary ?? null);
             },
             onError: (errors) => {
                 const importErrorsRaw = firstError(
@@ -162,7 +187,8 @@ export default function CsvImportSection({
                     <h2 className="text-sm font-bold text-foreground">
                         インポート（登録 / 更新）
                     </h2>
-                    <div className="ml-auto">
+                    <div className="ml-auto flex items-center gap-2">
+                        <CodeLegendPopover resource={resource} />
                         <UserIdLegendPopover users={users} />
                     </div>
                 </div>
@@ -170,7 +196,7 @@ export default function CsvImportSection({
                 <div className="space-y-4 p-5">
                     <p className="text-xs leading-relaxed text-muted-foreground">
                         CSVファイルをアップロードして、{resourceLabel}データを一括登録または更新します。
-                        システムIDが含まれる行は既存データを上書き更新、IDが空の行は新規追加として処理します。
+                        <br />システムIDが含まれる行は既存データを上書き更新、IDが空の行は新規追加として処理します。
                         <br />※ エクスポートしたCSVを編集して再インポートする運用を想定しています。
                     </p>
 
@@ -182,6 +208,7 @@ export default function CsvImportSection({
                         onClear={handleClear}
                         disabled={form.processing}
                         errorMessage={fileError ?? undefined}
+                        maxSizeLabel={maxSizeLabel}
                     />
 
                     {/* 保持中のエラー結果バナー（モーダルを閉じても残る／「詳細を表示」で再オープン） */}
@@ -192,17 +219,23 @@ export default function CsvImportSection({
                         />
                     )}
 
-                    {/* 実行ボタン行 */}
-                    <div className="flex items-center gap-3 border-t border-border pt-4">
-                        <span className="mr-auto text-[11px] text-muted-foreground">
+                    {/* 成功サマリの常設バナー（トーストが消えても件数を確認できる／新ファイル選択・取消でクリア） */}
+                    {successResult !== null && (
+                        <ImportSuccessBanner summary={successResult} />
+                    )}
+
+                    {/* 実行ボタン行（WF_11 準拠：注記を左、実行ボタンを右寄せ・上罫線） */}
+                    <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+                        <span className="text-[11px] text-muted-foreground">
                             ※ 実行前にバックアップを取得することを推奨します
                         </span>
                         <Button
                             type="button"
                             onClick={handleSubmit}
                             disabled={form.data.file === null || form.processing}
-                            className="h-9"
+                            className="h-9 gap-1.5"
                         >
+                            <Upload className="h-4 w-4" />
                             インポート実行
                         </Button>
                     </div>
@@ -210,7 +243,7 @@ export default function CsvImportSection({
             </Card>
 
             {/* 実行中オーバーレイ（AIバッジなしの汎用・キャンセル不可＝書き込み処理のため） */}
-            <LoadingOverlay show={form.processing} message="CSVを取り込んでいます…" />
+            <LoadingOverlay show={form.processing} message="CSVをインポートしています…" />
 
             {/* 結果モーダル（エラー時。閉じても結果は保持） */}
             {errorResult !== null && (
@@ -235,44 +268,34 @@ function CsvHint() {
             <p className="font-bold">📝 CSV作成のヒント</p>
             <ul className="list-disc space-y-0.5 pl-4">
                 <li>
-                    Excel では「<b>CSV UTF-8（コンマ区切り）</b>」形式で保存してください（文字化け防止）。
+                    「<b>CSV UTF-8（コンマ区切り）</b>」形式で保存してください。
                 </li>
                 <li>
                     カンマ・改行・引用符を含む項目は <b>&quot; &quot;（ダブルクオート）で囲みます</b>。
-                    Excel が自動対応するため通常は意識不要です。<b>シングルクオート（&apos;）で囲む必要はありません。</b>
                 </li>
                 <li>
                     <b>空行（何も入力していない行）は無視</b>されます。スペースだけの行は不正な行として扱われます。
                 </li>
                 <li>
-                    <b>一度に取り込めるのは 5,000 行までです。</b>超える場合はファイルを分割してください。
+                    <b>一度にインポートできるのは 5,000 行までです。</b>超える場合はファイルを分割してください。
                 </li>
                 <li>
                     担当者ID（主担当ID / サブ担当ID）が分からない場合は右上の「<b>担当者ID一覧</b>」で確認できます。
                 </li>
                 <li>
-                    エクスポートCSVの「主担当名 / サブ担当名」列は参照用で、<b>取り込み時は無視</b>されます（担当者はID列で決まります）。
+                    エクスポートCSVの「主担当名 / サブ担当名」列は参照用で、<b>インポート時は無視</b>されます（担当者はID列で決まります）。
                 </li>
                 <li>
-                    <b>ステータス・商流・稼働形態などは英字コードのまま入力してください</b>（日本語で書き換えると取り込めません）。下の対応表を参照。
+                    <b>ステータス・商流・稼働形態などは英字コードのまま入力してください</b>（日本語で書き換えるとインポートできません）。値は右上の「<b>コード対応</b>」で確認できます。
                 </li>
                 <li>
                     <b>日付は <code className="rounded bg-sky-100 px-1">YYYY-MM-DD</code> 形式で入力してください</b>
-                    （例：2026-04-01）。Excel の自動変換（2026/4/1 等）や ID の指数表記・先頭ゼロ落ちに注意。
+                    （例：2026-04-01）。Excel 等の自動変換（2026/4/1 等）や ID の指数表記・先頭ゼロ落ちに注意してください。
                 </li>
                 <li>
-                    <b>CSV作業中は、対象の人材・案件を画面から編集しないでください。</b>取り込み時に他の人の変更を上書きする場合があります。
+                    <b>CSV作業中は、対象の人材・案件を画面から編集しないでください。</b>インポート時に他の人の変更を上書きする場合があります。
                 </li>
             </ul>
-            <div className="mt-1.5 border-t border-dashed border-sky-200 pt-1.5 text-[10px] text-sky-800">
-                <b>コード対応：</b>
-                人材ステータス＝ <code>proposable</code>提案可 / <code>interviewing</code>面談中 /{' '}
-                <code>not_proposable</code>提案不可。 案件ステータス＝ <code>open</code>募集中 /{' '}
-                <code>closed</code>終了 / <code>pending</code>ペンディング。 商流＝ <code>prime</code>プライム /{' '}
-                <code>secondary</code>2次 / <code>tertiary</code>3次 / <code>other</code>その他。 稼働形態＝{' '}
-                <code>onsite</code>常駐 / <code>hybrid</code>一部リモート可 / <code>remote</code>フルリモート。
-                （0/1 で入力：勤務形態フラグ・各工程経験・顧客折衝）
-            </div>
         </div>
     );
 }

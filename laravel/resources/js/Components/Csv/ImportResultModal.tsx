@@ -17,6 +17,7 @@ import { Button } from '@/Components/ui/button';
 import {
     csvFieldLabel,
     CsvResource,
+    hasHeaderError,
     ImportError,
     summarizeImportErrors,
 } from '@/types/csv';
@@ -44,7 +45,10 @@ interface Props {
  *   （onInteractOutside を preventDefault）。閉じるのは「閉じる」ボタン／✕／Esc のみ。
  */
 export default function ImportResultModal({ open, resource, errors, onClose }: Props) {
-    const { errorRowCount, messageCount } = summarizeImportErrors(errors);
+    // サマリは行数のみ（メッセージ内訳は下の表で確認できる）。バナーと表現を統一する。
+    // ヘッダーエラーは「行」の概念に馴染まないため文言・対処を出し分ける。
+    const { errorRowCount } = summarizeImportErrors(errors);
+    const headerError = hasHeaderError(errors);
 
     return (
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -62,12 +66,16 @@ export default function ImportResultModal({ open, resource, errors, onClose }: P
 
                 {/* 件数サマリ（全取消・全行ロールバックを明示） */}
                 <div className="border-b border-destructive/20 bg-destructive/5 px-5 py-3 text-xs leading-relaxed text-destructive">
-                    {errorRowCount > 0
-                        ? `${errorRowCount}行でエラー（メッセージ ${messageCount}件）。`
-                        : `メッセージ ${messageCount}件のエラーがあります。`}
-                    すべての行の取り込みを取り消しました。
+                    {headerError
+                        ? 'ヘッダーにエラーがあります。'
+                        : errorRowCount > 0
+                          ? `エラーのある行が ${errorRowCount} 件あります。`
+                          : 'エラーのためインポートできませんでした。'}
+                    1件もインポートされていません。
                     <br />
-                    CSV を修正して再アップロードしてください。
+                    {headerError
+                        ? 'CSVのヘッダー（1行目）を修正してインポートし直してください。'
+                        : 'CSV を修正してインポートし直してください。'}
                 </div>
 
                 {/* エラー表（スクロール可能領域） */}

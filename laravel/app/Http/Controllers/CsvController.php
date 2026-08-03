@@ -40,7 +40,8 @@ class CsvController extends Controller
         Gate::authorize('access-csv');
 
         // users は「凡例・絞り込み・インポート検証(exists)」の3者で一致させる（全件・SELECT id,name）。
-        $users = User::query()->select('id', 'name')->orderBy('name')->get();
+        // 担当者ID一覧は「ID から名前を引く」用途のため ID 昇順で並べる。
+        $users = User::query()->select('id', 'name')->orderBy('id')->get();
 
         $filterOptions = fn (array $statuses, array $workStyles) => [
             'statuses' => $statuses,
@@ -51,6 +52,8 @@ class CsvController extends Controller
         return Inertia::render('Csv/Index', [
             'engineer_filter_options' => $filterOptions(Engineer::STATUSES, Engineer::WORK_STYLES),
             'project_filter_options' => $filterOptions(Project::STATUSES, Project::WORK_STYLES),
+            // アップロード上限（バイト）。フロントのサイズ事前ガードで使う。上限値は CsvImportRequest に集約（SSOT）。
+            'csv_max_upload_bytes' => CsvImportRequest::MAX_FILE_SIZE_KB * 1024,
         ]);
     }
 

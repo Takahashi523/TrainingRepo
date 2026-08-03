@@ -20,6 +20,9 @@ COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 # Nginx 設定を組み込む
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 
+# アップロード上限を引き上げる（既定 2M ではアプリの 5MB 上限に届かないため）
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 # Laravel 本体をコピー
 WORKDIR /var/www
 COPY . .

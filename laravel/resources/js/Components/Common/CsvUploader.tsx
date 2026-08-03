@@ -17,6 +17,8 @@ interface Props {
     errorMessage?: string;
     /** 受け付ける拡張子（既定 .csv）。 */
     accept?: string;
+    /** 案内文に出すサイズ上限のラベル（例：5MB）。サイズ判定自体は呼び出し側が行う。 */
+    maxSizeLabel?: string;
 }
 
 /**
@@ -34,6 +36,7 @@ export default function CsvUploader({
     disabled = false,
     errorMessage,
     accept = '.csv',
+    maxSizeLabel,
 }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [dragOver, setDragOver] = useState(false);
@@ -112,8 +115,10 @@ export default function CsvUploader({
                     'flex flex-col items-center rounded-md border-2 border-dashed px-6 py-9 text-center transition-colors',
                     disabled
                         ? 'cursor-not-allowed border-border bg-muted/30 opacity-60'
-                        : 'cursor-pointer border-input bg-muted/30 hover:border-foreground hover:bg-muted/60',
-                    dragOver && !disabled && 'border-foreground bg-muted/60',
+                        // 操作系コントロールのため、hover/focus/click(active) の操作状態は primary で示す。
+                        : 'cursor-pointer border-input bg-muted/30 hover:border-primary hover:bg-primary/5 focus-visible:border-primary focus-visible:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:border-primary active:bg-primary/10',
+                    // ドラッグ中（ドロップ可能な状態）も操作中として primary で強調する。
+                    dragOver && !disabled && 'border-primary bg-primary/5',
                 )}
             >
                 <FolderOpen className="mb-2.5 h-7 w-7 text-muted-foreground" />
@@ -121,7 +126,9 @@ export default function CsvUploader({
                     CSVファイルをドラッグ＆ドロップ、またはクリックして選択
                 </p>
                 <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                    対応形式：.csv（UTF-8 / BOM付き）　最大ファイルサイズ：5MB　改行コード：CRLF・LF両対応
+                    対応形式：.csv（UTF-8 / BOM付き）
+                    {maxSizeLabel && `　最大ファイルサイズ：${maxSizeLabel}`}
+                    　改行コード：CRLF・LF両対応
                 </p>
                 <button
                     type="button"

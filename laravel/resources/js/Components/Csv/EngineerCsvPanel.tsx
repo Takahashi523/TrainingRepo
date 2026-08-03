@@ -7,6 +7,8 @@ interface Props {
     options: CsvFilterOptions;
     /** このタブが表示中か（モーダルのタブ切替クローズ制御に使う）。 */
     active: boolean;
+    /** アップロード上限（バイト・サーバー由来）。インポートのサイズ事前ガードに渡す。 */
+    maxUploadBytes: number;
 }
 
 /**
@@ -22,20 +24,21 @@ const exportConfig: ExportFilterConfig = {
     dateFromParam: 'available_from_start',
     dateToParam: 'available_from_end',
     keywordLabel: 'スキル（キーワード）',
-    keywordPlaceholder: '例：Java, AWS',
+    keywordPlaceholder: '例：Java',
     workStyleLabel: '勤務形態タグ',
     workStyleParam: 'work_styles',
 };
 
-export default function EngineerCsvPanel({ options, active }: Props) {
+export default function EngineerCsvPanel({ options, active, maxUploadBytes }: Props) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <CsvImportSection
                 resource="engineers"
                 importRouteName="csv.engineers.import"
                 resourceLabel="人材"
                 users={options.users}
                 active={active}
+                maxUploadBytes={maxUploadBytes}
             />
 
             <Card className="overflow-hidden">

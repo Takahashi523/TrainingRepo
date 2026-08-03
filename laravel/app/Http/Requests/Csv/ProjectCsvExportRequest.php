@@ -28,7 +28,8 @@ class ProjectCsvExportRequest extends FormRequest
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'start_date_from' => ['nullable', 'date'],
             'start_date_to' => ['nullable', 'date', 'after_or_equal:start_date_from'],
-            'keyword' => ['nullable', 'string', 'max:100'],
+            // スキルラベルは VARCHAR(15)・前方一致検索のため、16文字以上は構造上ゼロ件確定。上限をラベル長に揃える。
+            'keyword' => ['nullable', 'string', 'max:15'],
             'work_style' => ['nullable', 'array'],
             'work_style.*' => [Rule::in(ProjectRules::workStyleValues())],
         ];

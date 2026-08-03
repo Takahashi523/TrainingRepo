@@ -7,6 +7,8 @@ interface Props {
     options: CsvFilterOptions;
     /** このタブが表示中か（モーダルのタブ切替クローズ制御に使う）。 */
     active: boolean;
+    /** アップロード上限（バイト・サーバー由来）。インポートのサイズ事前ガードに渡す。 */
+    maxUploadBytes: number;
 }
 
 /**
@@ -22,20 +24,21 @@ const exportConfig: ExportFilterConfig = {
     dateFromParam: 'start_date_from',
     dateToParam: 'start_date_to',
     keywordLabel: '必須スキル（キーワード）',
-    keywordPlaceholder: '例：PHP, Laravel',
+    keywordPlaceholder: '例：PHP',
     workStyleLabel: '稼働形態',
     workStyleParam: 'work_style',
 };
 
-export default function ProjectCsvPanel({ options, active }: Props) {
+export default function ProjectCsvPanel({ options, active, maxUploadBytes }: Props) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <CsvImportSection
                 resource="projects"
                 importRouteName="csv.projects.import"
                 resourceLabel="案件"
                 users={options.users}
                 active={active}
+                maxUploadBytes={maxUploadBytes}
             />
 
             <Card className="overflow-hidden">

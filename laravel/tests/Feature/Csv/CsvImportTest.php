@@ -212,6 +212,50 @@ class CsvImportTest extends CsvTestCase
         $this->assertStringContainsString('氏名カナ', $errors[0]['messages'][0]);
     }
 
+    public function test_unknown_header_column_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        // 全 importable 列＋定義にない「メモ」列（未知列）。ヘッダー段階で全体中断する。
+        $headers = array_keys((new EngineerCsvSchema)->importableHeaderMap());
+        $content = implode(',', $headers).",メモ\r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 1, null));
+        $this->assertStringContainsString('不明な列があります', $errors[0]['messages'][0]);
+        $this->assertStringContainsString('メモ', $errors[0]['messages'][0]);
+    }
+
+    public function test_empty_header_column_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        // 末尾の余分なカンマ由来の空ヘッダーは専用メッセージで弾く（列位置つき）。
+        $headers = array_keys((new EngineerCsvSchema)->importableHeaderMap());
+        $content = implode(',', $headers).",\r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 1, null));
+        $this->assertStringContainsString('ヘッダーに空の列があります', $errors[0]['messages'][0]);
+    }
+
+    public function test_duplicate_header_column_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        // 「氏名」を重複させる。値の対応が曖昧になるためヘッダー段階で弾く。
+        $headers = array_keys((new EngineerCsvSchema)->importableHeaderMap());
+        $content = implode(',', $headers).',氏名'."\r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 1, null));
+        $this->assertStringContainsString('ヘッダーに重複した列があります', $errors[0]['messages'][0]);
+        $this->assertStringContainsString('氏名', $errors[0]['messages'][0]);
+    }
+
     public function test_header_only_zero_data_rows_is_rejected(): void
     {
         $user = $this->makeUser('admin');
@@ -220,7 +264,7 @@ class CsvImportTest extends CsvTestCase
         $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
         $response->assertStatus(422);
         $errors = $this->importErrors($response);
-        $this->assertStringContainsString('取り込む対象データがありません', $errors[0]['messages'][0]);
+        $this->assertStringContainsString('インポートする対象データがありません', $errors[0]['messages'][0]);
     }
 
     // ------------------------------------------------------------------

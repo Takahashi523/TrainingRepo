@@ -1,6 +1,3 @@
-import MultiSelectDropdown, {
-    MultiSelectOption,
-} from '@/Components/Common/MultiSelectDropdown';
 import { Button } from '@/Components/ui/button';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Input } from '@/Components/ui/input';
@@ -44,6 +41,7 @@ interface Props {
 }
 
 const ALL_USERS = 'all';
+const ALL_STATUS = 'all';
 
 /**
  * エクスポート絞り込み UI（WF_11）。
@@ -53,17 +51,16 @@ const ALL_USERS = 'all';
  * 配列パラメータは `status[]` / `work_styles[]` 形式で Laravel の配列バリデーションに合わせる。
  */
 export default function ExportFilter({ options, config }: Props) {
-    const [status, setStatus] = useState<string[]>([]);
+    // ステータスは単一選択（WF_11 準拠）。バックエンドは status[] 配列のため、選択時のみ1件を配列で送る。
+    const [status, setStatus] = useState<string | null>(null);
     const [userId, setUserId] = useState<number | null>(null);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [keyword, setKeyword] = useState('');
     const [workStyles, setWorkStyles] = useState<string[]>([]);
-
-    const statusOptions: MultiSelectOption[] = options.statuses.map((s) => ({
-        value: s.value,
-        label: s.label,
-    }));
+    // 日付逆転（開始 > 終了）のクライアント側ガード用エラー。サーバーの after_or_equal を最後の砦に残しつつ、
+    // 素の GET ダウンロード（window.location.assign）では 422 を画面に出せないため、送信前にここで弾く。
+    const [dateError, setDateError] = useState<string | null>(null);
 
     const toggleWorkStyle = (key: string) => {
         setWorkStyles((prev) =>
@@ -72,8 +69,16 @@ export default function ExportFilter({ options, config }: Props) {
     };
 
     const handleExport = () => {
+        // 開始・終了ともに指定があり、開始 > 終了なら送信を止めて即時にエラー表示する（ISO 文字列は辞書順比較で日付順と一致）。
+        if (dateFrom !== '' && dateTo !== '' && dateFrom > dateTo) {
+            setDateError(`${config.dateLabel}は開始日を終了日以前にしてください。`);
+            return;
+        }
+        setDateError(null);
+
         const params = new URLSearchParams();
-        status.forEach((v) => params.append('status[]', v));
+        // 単一選択だがサーバーの status[] 配列バリデーションに合わせ、選択時のみ1件を配列で送る。
+        if (status !== null) params.append('status[]', status);
         if (userId !== null) params.append('user_id', String(userId));
         if (dateFrom) params.append(config.dateFromParam, dateFrom);
         if (dateTo) params.append(config.dateToParam, dateTo);
@@ -90,7 +95,8 @@ export default function ExportFilter({ options, config }: Props) {
     return (
         <div className="space-y-4">
             <p className="text-xs leading-relaxed text-muted-foreground">
-                絞り込み条件を指定して、対象データを CSV でダウンロードします。条件を指定しない場合は全件を出力します。
+                絞り込み条件を指定して、対象データを CSV でダウンロードします。<br />
+                条件を指定しない場合は全件を出力します。<br />
                 対象が0件の場合もヘッダー行のみの CSV をダウンロードできます（初期投入テンプレートとして利用可）。
             </p>
 
@@ -99,19 +105,29 @@ export default function ExportFilter({ options, config }: Props) {
             </p>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* ステータス（複数） */}
+                {/* ステータス（単一・WF_11 準拠） */}
                 <div className="flex flex-col gap-1.5">
                     <Label className="text-[11px] font-bold text-muted-foreground">
                         ステータス
                     </Label>
-                    <div>
-                        <MultiSelectDropdown
-                            label={status.length === 0 ? 'すべて' : 'ステータス'}
-                            options={statusOptions}
-                            selected={status}
-                            onChange={setStatus}
-                        />
-                    </div>
+                    <Select
+                        value={status === null ? ALL_STATUS : status}
+                        onValueChange={(v) => setStatus(v === ALL_STATUS ? null : v)}
+                    >
+                        <SelectTrigger className="h-8 bg-white text-xs">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL_STATUS} className="text-xs">
+                                すべて
+                            </SelectItem>
+                            {options.statuses.map((s) => (
+                                <SelectItem key={s.value} value={s.value} className="text-xs">
+                                    {s.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 {/* 担当営業（単一） */}
@@ -128,7 +144,7 @@ export default function ExportFilter({ options, config }: Props) {
                         </SelectTrigger>
                         <SelectContent className="max-w-[280px]">
                             <SelectItem value={ALL_USERS} className="text-xs">
-                                全員
+                                全担当
                             </SelectItem>
                             {options.users.map((u) => (
                                 <SelectItem key={u.id} value={String(u.id)} className="text-xs">
@@ -148,7 +164,10 @@ export default function ExportFilter({ options, config }: Props) {
                         <Input
                             type="date"
                             value={dateFrom}
-                            onChange={(e) => setDateFrom(e.target.value)}
+                            onChange={(e) => {
+                                setDateFrom(e.target.value);
+                                setDateError(null);
+                            }}
                             className="h-8 bg-white px-2 text-xs md:text-xs"
                             aria-label={`${config.dateLabel}（開始）`}
                         />
@@ -156,11 +175,18 @@ export default function ExportFilter({ options, config }: Props) {
                         <Input
                             type="date"
                             value={dateTo}
-                            onChange={(e) => setDateTo(e.target.value)}
+                            onChange={(e) => {
+                                setDateTo(e.target.value);
+                                setDateError(null);
+                            }}
                             className="h-8 bg-white px-2 text-xs md:text-xs"
                             aria-label={`${config.dateLabel}（終了）`}
                         />
                     </div>
+                    {/* エラー表示は人材登録フォーム（FormRow）と同じ text-xs / text-destructive に揃える。 */}
+                    {dateError && (
+                        <p className="text-xs text-destructive">{dateError}</p>
+                    )}
                 </div>
 
                 {/* キーワード */}
@@ -173,7 +199,7 @@ export default function ExportFilter({ options, config }: Props) {
                         value={keyword}
                         onChange={(e) => setKeyword(e.target.value)}
                         placeholder={config.keywordPlaceholder}
-                        maxLength={100}
+                        maxLength={15}
                         className="h-8 bg-white text-xs md:text-xs"
                     />
                 </div>

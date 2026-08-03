@@ -3,7 +3,9 @@
 namespace App\Http\Requests\Csv;
 
 use App\Support\Csv\CsvFile;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Validator;
 
 /**
@@ -17,6 +19,12 @@ use Illuminate\Validation\Validator;
  */
 class CsvImportRequest extends FormRequest
 {
+    /**
+     * アップロード上限（KB）。Laravel の file `max` ルールの単位に合わせて KB で保持する。
+     * フロントのサイズ事前ガード（fail-fast）もこの値を props 経由で受け取り、マジックナンバーを二重管理しない（SSOT）。
+     */
+    public const MAX_FILE_SIZE_KB = 5120; // = 5MB
+
     public function authorize(): bool
     {
         // 認証は auth ミドルウェア、CSV アクセス権は CsvController の Gate（access-csv）で担保する。
@@ -29,9 +37,36 @@ class CsvImportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // mimes:csv,txt … text/csv が txt と判定される環境があるため両方許容（拡張子は下の after() で厳格化）
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+            // 評価順は配列順（bail で最初の失敗で打ち切り）：required → file → 拡張子 → 形式(mimes) → サイズ。
+            // 「まず .csv という名前か」を先に見て、拡張子が合っていて中身だけ偽物のケースを mimes で弾く。
+            // mimes:csv,txt … text/csv が txt と判定される環境があるため両方許容（拡張子は下のクロージャで厳格化）。
+            'file' => [
+                'bail',
+                'required',
+                'file',
+                $this->extensionRule(),
+                'mimes:csv,txt',
+                'max:'.self::MAX_FILE_SIZE_KB,
+            ],
         ];
+    }
+
+    /**
+     * 実拡張子（.csv）の厳格チェック。クライアント指定の拡張子を信用しつつ .csv のみ許可する。
+     * 形式(mimes)より前に評価し、「拡張子が違う」ケースを「形式が違う」ケースと切り分ける。
+     */
+    private function extensionRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            // required/file を通過していれば UploadedFile。想定外は前段ルールに委ねる。
+            if (! $value instanceof UploadedFile) {
+                return;
+            }
+
+            if (strtolower((string) $value->getClientOriginalExtension()) !== 'csv') {
+                $fail('ファイルの拡張子を「.csv」にしてください。');
+            }
+        };
     }
 
     /**
@@ -42,31 +77,28 @@ class CsvImportRequest extends FormRequest
         return [
             'file.required' => 'CSVファイルを選択してください。',
             'file.file' => 'CSVファイルを選択してください。',
-            'file.mimes' => '.csvファイルを選択してください。',
-            'file.max' => 'ファイルサイズは5MB以内にしてください。',
+            // mimes は拡張子でなくファイル内容（推測MIME）を見ているため「形式」として案内する
+            'file.mimes' => 'ファイル形式が正しくありません。CSVファイル（.csv）をアップロードしてください。',
+            'file.max' => 'ファイルサイズは'.(self::MAX_FILE_SIZE_KB / 1024).'MB以内にしてください。',
+            // PHP の upload/post 上限超過などで発火する uploaded ルール。生の項目名「file」を出さず、サイズ起因と分かる文言にする。
+            'file.uploaded' => 'ファイルのアップロードに失敗しました。ファイルサイズが大きすぎる可能性があります（'.(self::MAX_FILE_SIZE_KB / 1024).'MB以内）。',
         ];
     }
 
     /**
-     * 拡張子（.csv）・文字コード（UTF-8）・データ行数上限（5,000）を追加検証する。
-     * これらは Laravel 標準ルールでは表現しづらいため after フックで実装する。
+     * 文字コード（UTF-8）・データ行数上限（5,000）を追加検証する。
+     * これらは Laravel 標準ルールでは表現しづらいため after フックで実装する
+     * （拡張子・形式・サイズは rules() 側で bail 付きで検証済み）。
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
-            // 前段（required/file/mimes/max）で既に失敗している場合は、ファイル本体を触らない
+            // 前段（required/file/拡張子/mimes/max）で既に失敗している場合は、ファイル本体を触らない
             if ($validator->errors()->has('file')) {
                 return;
             }
 
             $file = $this->file('file');
-
-            // 実拡張子の厳格チェック（クライアント指定の拡張子は信用しつつ .csv のみ許可）
-            if (strtolower((string) $file->getClientOriginalExtension()) !== 'csv') {
-                $validator->errors()->add('file', '.csvファイルを選択してください。');
-
-                return;
-            }
 
             $content = (string) file_get_contents($file->getRealPath());
 
@@ -79,7 +111,7 @@ class CsvImportRequest extends FormRequest
 
             // データ行数の上限（O-13）。空行スキップ後のデータ行が 5,000 を超えるとエラー
             if (CsvFile::countDataRows($content) > 5000) {
-                $validator->errors()->add('file', '一度に取り込めるのは5,000行までです。ファイルを分割して取り込んでください。');
+                $validator->errors()->add('file', '一度にインポートできるのは5,000行までです。ファイルを分割してインポートし直してください。');
             }
         });
     }

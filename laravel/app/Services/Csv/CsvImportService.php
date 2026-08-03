@@ -47,13 +47,49 @@ class CsvImportService
         $records = CsvFile::readRecords($content); // [オフセット => セル配列]（0=ヘッダー・空行はスキップ済み）
 
         // ---- ヘッダー検証（O-7）----
+        // 欠落・空・重複・未知の4種を検出し、あれば1エントリ（row=1）でまとめて中断する。
+        // 未知列を無視せずエラーにするのは、末尾カンマ由来の空列や誤って足した列が「全データ行の列数不一致」に化けて
+        // 原因が分かりにくくなるのを防ぐため。エクスポート専用列（AI要約・担当者名）は exportHeaders に含むので許容される。
         $header = array_map(fn ($h) => trim((string) $h), $records[0] ?? []);
+        $headerErrors = [];
+
+        // ① 必須列（全 importable 列）の欠落
         $missing = array_values(array_diff($schema->requiredHeaders(), $header));
         if ($missing !== []) {
+            $headerErrors[] = '必要な列がありません：'.implode('、', $missing).'。不足している列を追加してください。';
+        }
+
+        // ② 空ヘッダー（末尾カンマ等）。原因特定のため1始まりの列位置で示す。
+        $emptyPositions = [];
+        foreach ($header as $i => $name) {
+            if ($name === '') {
+                $emptyPositions[] = ($i + 1).'列目';
+            }
+        }
+        if ($emptyPositions !== []) {
+            $headerErrors[] = 'ヘッダーに空の列があります（'.implode('、', $emptyPositions).'）。末尾の余分なカンマなどを確認してください。';
+        }
+
+        // ③ 重複ヘッダー（空は②で扱うため除外）。同名列があると値の対応が曖昧になるため弾く。
+        $namedHeaders = array_filter($header, fn ($name) => $name !== '');
+        $duplicates = array_keys(array_filter(array_count_values($namedHeaders), fn ($count) => $count > 1));
+        if ($duplicates !== []) {
+            $labels = array_map(fn ($h) => "「{$h}」", $duplicates);
+            $headerErrors[] = 'ヘッダーに重複した列があります：'.implode('、', $labels).'。重複した列を1つにしてください。';
+        }
+
+        // ④ 未知の列（既知の列名以外・空は②で扱うため除外）。既知＝importable＋エクスポート専用列。
+        $unknown = array_values(array_diff(array_unique($namedHeaders), $schema->exportHeaders()));
+        if ($unknown !== []) {
+            $labels = array_map(fn ($h) => "「{$h}」", $unknown);
+            $headerErrors[] = '不明な列があります：'.implode('、', $labels).'。エクスポートしたCSVの列構成のままにしてください。';
+        }
+
+        if ($headerErrors !== []) {
             $this->fail([[
                 'row' => 1,
                 'field' => null,
-                'messages' => ['必要な列がありません：'.implode('、', $missing)],
+                'messages' => $headerErrors,
             ]]);
         }
 
@@ -71,7 +107,7 @@ class CsvImportService
             $this->fail([[
                 'row' => null,
                 'field' => null,
-                'messages' => ['取り込む対象データがありません。'],
+                'messages' => ['インポートする対象データがありません。データ行を1行以上入力してください。'],
             ]]);
         }
         if (count($dataRows) > self::MAX_DATA_ROWS) {
@@ -79,7 +115,7 @@ class CsvImportService
             $this->fail([[
                 'row' => null,
                 'field' => null,
-                'messages' => ['一度に取り込めるのは5,000行までです。ファイルを分割して取り込んでください。'],
+                'messages' => ['一度にインポートできるのは5,000行までです。ファイルを分割してインポートし直してください。'],
             ]]);
         }
 
@@ -97,7 +133,7 @@ class CsvImportService
                 $errors[] = [
                     'row' => $rowNum,
                     'field' => null,
-                    'messages' => ["列数がヘッダーと一致しません（想定{$headerCount}列／実際".count($cells).'列）。'],
+                    'messages' => ['列数がヘッダーと一致しません（この行'.count($cells).'列 / ヘッダー'.$headerCount.'列）。列数をヘッダーと揃えてください。'],
                 ];
 
                 continue; // 列数不正の行は項目検証をスキップ
@@ -156,20 +192,20 @@ class CsvImportService
                 $value = $assoc[$field] ?? null;
                 if ($value !== null && is_numeric($value) && ! isset($userIdSet[(int) $value])) {
                     $rowHasError = true;
-                    $errors[] = ['row' => $rowNum, 'field' => $field, 'messages' => ["指定された{$label}のユーザーが存在しません。"]];
+                    $errors[] = ['row' => $rowNum, 'field' => $field, 'messages' => ["指定された{$label}のユーザーが存在しません。「担当者ID一覧」で有効なIDを確認してください。"]];
                 }
             }
 
             // ファイル内 id 重複（構造系エラー・field:null／O-8）
             if ($id !== null && isset($duplicateIds[$id])) {
                 $rowHasError = true;
-                $errors[] = ['row' => $rowNum, 'field' => null, 'messages' => ['同一IDが複数行にあります。']];
+                $errors[] = ['row' => $rowNum, 'field' => null, 'messages' => ['同一IDが複数行にあります。同じIDの行は1つにまとめてください。']];
             }
 
             // 更新対象 id の存在（存在しない id は当該行エラー）
             if ($id !== null && (! is_numeric($id) || ! isset($existingIdSet[(int) $id]))) {
                 $rowHasError = true;
-                $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["指定されたID「{$id}」のデータが存在しません。"]];
+                $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["指定されたID「{$id}」のデータが存在しません。新規追加はID列を空欄にし、更新する場合は既存の正しいIDを指定してください。"]];
             }
 
             if (! $rowHasError) {

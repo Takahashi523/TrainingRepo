@@ -166,4 +166,19 @@ class CsvExportTest extends CsvTestCase
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('status.0');
     }
+
+    public function test_export_keyword_max_length_is_15(): void
+    {
+        // スキルラベルは VARCHAR(15) のため keyword 上限もラベル長に揃える（境界：15 OK / 16 NG）。
+        $user = $this->makeUser('admin');
+
+        $this->actingAs($user)
+            ->get(route('csv.engineers.export', ['keyword' => str_repeat('あ', 15)]))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->getJson(route('csv.engineers.export', ['keyword' => str_repeat('あ', 16)]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('keyword');
+    }
 }

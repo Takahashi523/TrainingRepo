@@ -28,7 +28,8 @@ class EngineerCsvExportRequest extends FormRequest
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'available_from_start' => ['nullable', 'date'],
             'available_from_end' => ['nullable', 'date', 'after_or_equal:available_from_start'],
-            'keyword' => ['nullable', 'string', 'max:100'],
+            // スキルラベルは VARCHAR(15)・前方一致検索のため、16文字以上は構造上ゼロ件確定。上限をラベル長に揃える。
+            'keyword' => ['nullable', 'string', 'max:15'],
             'work_styles' => ['nullable', 'array'],
             'work_styles.*' => [Rule::in(EngineerRules::workStyleValues())],
         ];

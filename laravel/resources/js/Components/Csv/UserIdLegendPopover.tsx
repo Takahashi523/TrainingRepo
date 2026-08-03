@@ -45,12 +45,14 @@ export default function UserIdLegendPopover({ users }: Props) {
                         {users.map((u) => (
                             <li
                                 key={u.id}
-                                className="flex items-baseline gap-2 px-3 py-1 text-xs text-foreground"
+                                className="flex items-baseline gap-2 px-3 py-1 text-xs text-sky-900"
                             >
-                                <span className="w-7 shrink-0 font-bold text-primary">
+                                <span className="w-7 shrink-0 font-bold tabular-nums text-sky-900">
                                     {u.id}
                                 </span>
-                                <span className="min-w-0 break-all">{u.name}</span>
+                                <span className="min-w-0 break-all text-muted-foreground">
+                                    {u.name}
+                                </span>
                             </li>
                         ))}
                     </ul>
