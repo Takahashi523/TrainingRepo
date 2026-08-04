@@ -10,7 +10,7 @@ import { Card } from '@/Components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CsvResource, ImportError, ImportResult, ImportSummary } from '@/types/csv';
 import { useForm } from '@inertiajs/react';
-import { Upload } from 'lucide-react';
+import { Lightbulb, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface Props {
@@ -265,7 +265,10 @@ export default function CsvImportSection({
 function CsvHint() {
     return (
         <div className="space-y-1.5 rounded-md border border-sky-200 bg-sky-50 px-3.5 py-3 text-[11px] leading-relaxed text-sky-900">
-            <p className="font-bold">📝 CSV作成のヒント</p>
+            <p className="flex items-center gap-1.5 font-bold">
+                <Lightbulb className="h-4 w-4" />
+                CSV作成のヒント
+            </p>
             <ul className="list-disc space-y-0.5 pl-4">
                 <li>
                     「<b>CSV UTF-8（コンマ区切り）</b>」形式で保存してください。

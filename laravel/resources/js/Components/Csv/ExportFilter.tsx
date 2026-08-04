@@ -43,11 +43,19 @@ interface Props {
 const ALL_USERS = 'all';
 const ALL_STATUS = 'all';
 
+/** Content-Disposition ヘッダーからサーバー生成のファイル名を取り出す（取得できなければ既定名）。 */
+function filenameFromDisposition(disposition: string | null): string {
+    const match = disposition?.match(/filename="?([^";]+)"?/i);
+    return match?.[1] ?? 'export.csv';
+}
+
 /**
  * エクスポート絞り込み UI（WF_11）。
  *
- * エクスポートは Inertia を介さない GET ダウンロード（StreamedResponse）。
- * 絞り込み条件をクエリ文字列にして `window.location.assign` で遷移する（画面遷移はせずファイルDLになる）。
+ * エクスポートは Inertia を介さない GET ダウンロード（StreamedResponse）。fetch でファイル本体を取得し、
+ * Blob 経由で `<a download>` を発火させる（同一オリジンの Cookie は自動付与）。
+ * こうすることで、絞り込み条件が実行時に不正（例：選択後に削除された担当者IDで exists 失敗）になり
+ * サーバーが 422 を返しても、SPA を離脱して生の JSON エラーページを表示せず、画面内にエラーを出せる。
  * 配列パラメータは `status[]` / `work_styles[]` 形式で Laravel の配列バリデーションに合わせる。
  */
 export default function ExportFilter({ options, config }: Props) {
@@ -59,8 +67,12 @@ export default function ExportFilter({ options, config }: Props) {
     const [keyword, setKeyword] = useState('');
     const [workStyles, setWorkStyles] = useState<string[]>([]);
     // 日付逆転（開始 > 終了）のクライアント側ガード用エラー。サーバーの after_or_equal を最後の砦に残しつつ、
-    // 素の GET ダウンロード（window.location.assign）では 422 を画面に出せないため、送信前にここで弾く。
+    // 送信前にここで弾いて即時フィードバックする。
     const [dateError, setDateError] = useState<string | null>(null);
+    // ダウンロード全体のエラー（422・通信失敗など）。日付ガードとは別に、実行ボタン付近へ表示する。
+    const [exportError, setExportError] = useState<string | null>(null);
+    // ダウンロード中フラグ（二重実行防止・ボタン無効化）。
+    const [exporting, setExporting] = useState(false);
 
     const toggleWorkStyle = (key: string) => {
         setWorkStyles((prev) =>
@@ -68,13 +80,16 @@ export default function ExportFilter({ options, config }: Props) {
         );
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        if (exporting) return;
+
         // 開始・終了ともに指定があり、開始 > 終了なら送信を止めて即時にエラー表示する（ISO 文字列は辞書順比較で日付順と一致）。
         if (dateFrom !== '' && dateTo !== '' && dateFrom > dateTo) {
             setDateError(`${config.dateLabel}は開始日を終了日以前にしてください。`);
             return;
         }
         setDateError(null);
+        setExportError(null);
 
         const params = new URLSearchParams();
         // 単一選択だがサーバーの status[] 配列バリデーションに合わせ、選択時のみ1件を配列で送る。
@@ -88,8 +103,42 @@ export default function ExportFilter({ options, config }: Props) {
 
         const base = route(config.exportRouteName);
         const qs = params.toString();
-        // GET ダウンロード（Content-Disposition: attachment）。Inertia を介さない通常遷移。
-        window.location.assign(qs === '' ? base : `${base}?${qs}`);
+        const url = qs === '' ? base : `${base}?${qs}`;
+
+        setExporting(true);
+        try {
+            // same-origin のため Cookie（セッション）は自動付与される。GET なので CSRF トークンは不要。
+            const res = await fetch(url, {
+                headers: { Accept: 'text/csv' },
+                credentials: 'same-origin',
+            });
+
+            if (!res.ok) {
+                // 422＝絞り込み条件が実行時に不正（削除済み担当者ID等）。SPA を保ったままインライン表示する。
+                setExportError(
+                    res.status === 422
+                        ? '絞り込み条件が正しくありません。画面を再読み込みして条件を選び直してください。'
+                        : 'エクスポートに失敗しました。時間をおいて再度お試しください。',
+                );
+                return;
+            }
+
+            // 本体を Blob 化し、サーバー生成のファイル名で <a download> を発火する（画面遷移なし）。
+            const blob = await res.blob();
+            const objectUrl = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl;
+            anchor.download = filenameFromDisposition(res.headers.get('Content-Disposition'));
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.URL.revokeObjectURL(objectUrl);
+        } catch {
+            // ネットワーク断など。握りつぶさずインラインで知らせる。
+            setExportError('エクスポートに失敗しました。通信環境を確認して再度お試しください。');
+        } finally {
+            setExporting(false);
+        }
     };
 
     return (
@@ -229,10 +278,19 @@ export default function ExportFilter({ options, config }: Props) {
                 </div>
             </div>
 
-            <div className="flex justify-end border-t border-border pt-4">
-                <Button type="button" onClick={handleExport} className="h-9 gap-1.5">
+            <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+                {/* ダウンロード全体のエラー（422・通信失敗）。日付ガードとは別枠でボタン左に出す。 */}
+                {exportError && (
+                    <p className="text-xs text-destructive">{exportError}</p>
+                )}
+                <Button
+                    type="button"
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="h-9 gap-1.5"
+                >
                     <Download className="h-4 w-4" />
-                    エクスポート実行
+                    {exporting ? 'ダウンロード中…' : 'エクスポート実行'}
                 </Button>
             </div>
         </div>

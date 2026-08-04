@@ -19,6 +19,12 @@ class CsvFile
     private const BOM_UTF8 = "\xEF\xBB\xBF";
 
     /**
+     * 一度に取り込めるデータ行数の上限（O-13）。ヘッダーを除いた論理データ行数で数える。
+     * 事前判定（CsvImportRequest）と本処理の保険（CsvImportService）の双方がこの値を共有する（SSOT）。
+     */
+    public const MAX_DATA_ROWS = 5000;
+
+    /**
      * 先頭の UTF-8 BOM を取り除く（O-6）。
      * BOM 付きでエクスポートした CSV を再インポートしたとき、先頭ヘッダーが "﻿id" になり
      * ヘッダー照合が落ちるのを防ぐ。

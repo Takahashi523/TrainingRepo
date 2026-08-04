@@ -329,6 +329,31 @@ class CsvImportTest extends CsvTestCase
         $this->assertStringContainsString('同一ID', $this->findError($errors, 2, null)['messages'][0]);
     }
 
+    public function test_leading_zero_id_variants_are_detected_as_duplicate(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+        // 同一レコードを指す "1" と "01"（Excel 等が生む表記ゆれ）を2行に置く。
+        // 文字列そのままをキーにすると別ID扱いで重複をすり抜け、同一行を二重 UPDATE してしまうため、
+        // 正規化キー（(int) 化）で重複として検出されることを担保する。
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            ['id' => (string) $engineer->id, 'name' => 'A', 'name_kana' => 'エー', 'status' => 'proposable', 'main_user_id' => $user->id],
+            ['id' => '0'.$engineer->id, 'name' => 'B', 'name_kana' => 'ビー', 'status' => 'proposable', 'main_user_id' => $user->id],
+        ]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, null));
+        $this->assertNotNull($this->findError($errors, 3, null));
+        $this->assertStringContainsString('同一ID', $this->findError($errors, 2, null)['messages'][0]);
+
+        // 全行ロールバック：どちらの表記も書き込まれず、既存レコードは元のまま（後勝ちの二重更新が起きない）
+        $engineer->refresh();
+        $this->assertSame('既存太郎', $engineer->name);
+    }
+
     public function test_non_existent_main_user_id_is_row_error_without_n_plus_one(): void
     {
         $user = $this->makeUser('admin');
@@ -531,6 +556,41 @@ class CsvImportTest extends CsvTestCase
 
         $engineer = Engineer::where('name', 'アポストロフィ')->first();
         $this->assertSame("'重要メモ", $engineer->appeal_note, '危険文字が続かない先頭 \' は保持される');
+    }
+
+    public function test_exported_csv_round_trips_back_through_import(): void
+    {
+        // この機能のメイン運用（エクスポート→編集→再インポート）を実 export 出力で通しで検証する。
+        // 実ファイルには export専用列（主担当名/サブ担当名/AI要約）と BOM が含まれるが、
+        // 未知列扱いにならず（exportHeaders に含む）、値は無視され、id 付きで既存行が更新される。
+        $mainUser = $this->makeUser('admin');
+        $subUser = $this->makeUser('general');
+        $engineer = $this->engineer([
+            'main_user_id' => $mainUser->id,
+            'sub_user_id' => $subUser->id,
+            'name' => '往復太郎',
+            'name_kana' => 'オウフクタロウ',
+            'status' => 'interviewing',
+            'birth_date' => '1990-01-02',
+            'work_style_onsite' => 1,
+            'ai_summary' => 'AI生成の要約',
+        ]);
+
+        // 実際のエクスポート出力（BOM 付き・26列・export専用列を含む）をそのまま取り込む。
+        $exported = $this->actingAs($mainUser)->get(route('csv.engineers.export'))->streamedContent();
+
+        $this->postImport($mainUser, 'csv.engineers.import', $this->makeUpload($exported), false)
+            ->assertRedirect(route('csv.index'));
+
+        $this->assertSame(['total_rows' => 1, 'created' => 0, 'updated' => 1], session('importResult')['summary']);
+
+        $engineer->refresh();
+        $this->assertSame('往復太郎', $engineer->name);
+        $this->assertSame('interviewing', $engineer->status);
+        $this->assertSame('1990-01-02', $engineer->birth_date, '日付が Y-m-d で往復する');
+        $this->assertSame(1, (int) $engineer->work_style_onsite);
+        // AI要約 は export専用列のため取り込まれず、既存値が保持される（上書きされない）
+        $this->assertSame('AI生成の要約', $engineer->ai_summary);
     }
 
     /**

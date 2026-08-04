@@ -30,9 +30,6 @@ use Illuminate\Validation\ValidationException;
  */
 class CsvImportService
 {
-    /** データ行の安全上限（O-13）。ここに到達する前に CsvImportRequest でも弾かれる（二重防御）。 */
-    private const MAX_DATA_ROWS = 5000;
-
     /**
      * インポートを実行する。成功時は ['resource' => ..., 'summary' => [...]] を返す。
      * ヘッダー/行/構造エラーがあれば ValidationException（errors.importErrors）を投げる（部分反映なし）。
@@ -110,12 +107,12 @@ class CsvImportService
                 'messages' => ['インポートする対象データがありません。データ行を1行以上入力してください。'],
             ]]);
         }
-        if (count($dataRows) > self::MAX_DATA_ROWS) {
+        if (count($dataRows) > CsvFile::MAX_DATA_ROWS) {
             // 通常は CsvImportRequest で弾かれるが、Service 単体利用時の保険
             $this->fail([[
                 'row' => null,
                 'field' => null,
-                'messages' => ['一度にインポートできるのは5,000行までです。ファイルを分割してインポートし直してください。'],
+                'messages' => ['一度にインポートできるのは'.number_format(CsvFile::MAX_DATA_ROWS).'行までです。ファイルを分割してインポートし直してください。'],
             ]]);
         }
 
@@ -151,11 +148,15 @@ class CsvImportService
             $assoc = $schema->normalizeRow($assoc);
 
             $id = $assoc['id'] ?? null;
-            if ($id !== null) {
-                $idRowNumbers[$id][] = $rowNum;
+            // 重複判定は正規化キーで行う。数値 id は (int) 化した文字列をキーにし、
+            // "1" と "01" / "1.0" のような同一レコードを指す表記ゆれを1つのIDとして束ねる
+            // （文字列そのままをキーにすると別IDと誤認し、同一行への二重 UPDATE をすり抜けてしまう）。
+            $dupKey = $id === null ? null : (is_numeric($id) ? (string) (int) $id : $id);
+            if ($dupKey !== null) {
+                $idRowNumbers[$dupKey][] = $rowNum;
             }
 
-            $parsed[] = ['row' => $rowNum, 'id' => $id, 'assoc' => $assoc];
+            $parsed[] = ['row' => $rowNum, 'id' => $id, 'dupKey' => $dupKey, 'assoc' => $assoc];
         }
 
         // 既存 id 集合を1回だけロード（更新対象・非空かつ数値のみ）
@@ -175,7 +176,7 @@ class CsvImportService
         // ---- pass2：項目・存在・重複 検証 + 書き込み候補の確定 ----
         $writable = [];
         foreach ($parsed as $p) {
-            ['row' => $rowNum, 'id' => $id, 'assoc' => $assoc] = $p;
+            ['row' => $rowNum, 'id' => $id, 'dupKey' => $dupKey, 'assoc' => $assoc] = $p;
             $rowHasError = false;
 
             // 項目バリデーション（id は対象外・exists はメモリ照合のため付与しない・bail なしで全メッセージ収集）
@@ -196,8 +197,8 @@ class CsvImportService
                 }
             }
 
-            // ファイル内 id 重複（構造系エラー・field:null／O-8）
-            if ($id !== null && isset($duplicateIds[$id])) {
+            // ファイル内 id 重複（構造系エラー・field:null／O-8）。正規化キーで判定する。
+            if ($dupKey !== null && isset($duplicateIds[$dupKey])) {
                 $rowHasError = true;
                 $errors[] = ['row' => $rowNum, 'field' => null, 'messages' => ['同一IDが複数行にあります。同じIDの行は1つにまとめてください。']];
             }

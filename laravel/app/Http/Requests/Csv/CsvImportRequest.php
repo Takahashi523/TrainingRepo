@@ -109,9 +109,9 @@ class CsvImportRequest extends FormRequest
                 return;
             }
 
-            // データ行数の上限（O-13）。空行スキップ後のデータ行が 5,000 を超えるとエラー
-            if (CsvFile::countDataRows($content) > 5000) {
-                $validator->errors()->add('file', '一度にインポートできるのは5,000行までです。ファイルを分割してインポートし直してください。');
+            // データ行数の上限（O-13）。空行スキップ後のデータ行が上限を超えるとエラー（閾値は CsvFile に集約）
+            if (CsvFile::countDataRows($content) > CsvFile::MAX_DATA_ROWS) {
+                $validator->errors()->add('file', '一度にインポートできるのは'.number_format(CsvFile::MAX_DATA_ROWS).'行までです。ファイルを分割してインポートし直してください。');
             }
         });
     }
