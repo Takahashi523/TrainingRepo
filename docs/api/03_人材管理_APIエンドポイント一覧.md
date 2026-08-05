@@ -33,11 +33,11 @@
 | status | string[] | 任意 | ステータス配列 | proposable / interviewing / not_proposable |
 | work_styles | string[] | 任意 | 勤務形態キー配列 | onsite / hybrid / remote |
 | phases | string[] | 任意 | 工程経験キー配列 | proc_requirements / proc_basic_design / proc_detail_design / proc_development / proc_testing / proc_maintenance |
-| keyword | string | 任意 | フリーワード検索 | 氏名・スキルラベル・アピールポイントに対して部分一致。検索対象項目はTBD |
-| sort | string | 任意 | ソート項目 | デフォルト：created_at |
-| order | string | 任意 | 並び順 | asc / desc（デフォルト：desc） |
+| keyword | string | 任意 | フリーワード検索 | 氏名（部分一致）・スキルラベル（前方一致）を対象とする。アピールポイントは検索対象外（カードに非表示の項目がヒットするとユーザーが理由を確認できず混乱を招くため） |
+| sort | string | 任意 | ソート項目 | デフォルト：created_at 許容される組み合わせはsortOptions(#1 Props)の4パターンに限る |
+| order | string | 任意 | 並び順 | asc / desc（デフォルト：desc）許容される組み合わせはsortOptions(#1 Props)の4パターンに限る |
 | page | int | 任意 | ページ番号 | デフォルト：1 |
-| per_page | int | 任意 | 1ページあたり件数 | デフォルト：20・上限はTBD |
+| per_page | int | 任意 | 1ページあたり件数 | デフォルト：20・上限：100（超過時は100にクランプ） |
 
 > 異なる項目間はAND条件。例：`(提案可) AND (フルリモート)`  
 > スキル検索は `keyword` のフリーワード検索（スキルラベル前方一致）で対応する。スキルマスタ廃止のため `skill_ids[]` は廃止（WF_03 v3.0確定）
@@ -64,7 +64,7 @@
                                               // available_from が null → "未定"
                                               // available_from に日付あり → "YYYY/MM/DD〜"
                                               // Controller内で生成する
-                                              // ※ 過去日付の扱い（そのまま表示 or "即日〜"）はTBD
+                                              // 過去日付でも変換せずそのまま "YYYY/MM/DD〜" 形式で表示する
         "users": {
           "main": { "id": "int", "name": "string" },
           "sub":  { "id": "int", "name": "string" } // null許容：未設定の場合null
@@ -129,13 +129,25 @@
         "order": "string"                     // 並び順
       }
     }
+  ],
+
+  // ソート選択肢（DB設計書 §8 準拠・sort × order の組み合わせが決まっている4パターン固定）
+  // フロントはこの配列をそのまま SortSelect の options として使用する
+  "sortOptions": [
+    { "sort": "string", "order": "string", "label": "string" }
+    // 例：
+    // { "sort": "created_at",     "order": "desc", "label": "登録日順（新しい順）" }
+    // { "sort": "created_at",     "order": "asc",  "label": "登録日順（古い順）" }
+    // { "sort": "updated_at",     "order": "desc", "label": "更新日順（新しい順）" }
+    // { "sort": "available_from", "order": "asc",  "label": "提案可能タイミング順" }
   ]
 }
 ```
 
 > **実装注意（N+1対策）**：`skills`・`mainUser`・`subUser` を Eager Loading すること（`with(['skills', 'mainUser', 'subUser'])` 相当）  
-> **実装注意（TEXT除外）**：`appeal_note` / `ai_summary` / `remarks` はTEXTカラムのため `EngineerListResource` で明示的に除外すること（DB設計書 §1-9）
-
+> **実装注意（TEXT除外）**：`appeal_note` / `ai_summary` / `remarks` はTEXTカラムのため `EngineerListResource` で明示的に除外すること（DB設計書 §1-9）  
+> **実装注意（ソート制御）**：sort・order は独立した値としてではなく、`sortOptions` の4組の組み合わせ単位でバリデーションすること（DB設計書 §8 準拠）。フロントの選択肢にない組み合わせ（例：updated_at＋asc）をURL経由で許可しないよう統一する  
+> **実装注意（per_page上限）**：100件を超える指定はサーバー側で100にクランプすること
 ---
 
 ### GET /engineers/create　Props（#2）
@@ -318,6 +330,3 @@
 
 | # | 項目 | QA# | 理由 |
 |---|------|-----|------|
-| 1 | 人材一覧フリーワード検索の検索対象項目 | - | スキルラベル前方一致を含む方針だが、氏名以外の対象項目が未確定 |
-| 2 | 人材一覧ページの1ページあたり件数上限値 | - | デフォルト20は確定。上限値（推奨：100件）は未決定 |
-| 3 | available_label の過去日付の扱い | - | 過去日付をそのまま"YYYY/MM/DD〜"と表示するか"即日〜"に変換するかが未確定 |

@@ -20,6 +20,13 @@
     <php>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <!-- 各自の .env / .env.testing に残ったドメイン制限値がテストへ漏れ込むと、
+             Factory の @example.* メールが ends_with 検証で弾かれてテストが不安定（flaky）になる。
+             PHPUnit 起動時に空をセットしておくと、後続の dotenv(.env.testing) は immutable で
+             上書きしないため常に空（＝ドメイン制限なし）に固定される。
+             （注）シェル export や CI の実環境変数として渡された場合はそちらが優先されるため、
+             CI ではワークフロー側で ALLOWED_EMAIL_DOMAINS を渡さない運用とする。 -->
+        <env name="ALLOWED_EMAIL_DOMAINS" value=""/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
