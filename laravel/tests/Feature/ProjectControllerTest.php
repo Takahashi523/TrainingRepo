@@ -1175,6 +1175,41 @@ class ProjectControllerTest extends TestCase
         );
     }
 
+    public function test_index_sort_by_rate_max_separates_negotiable_from_unset_in_null_bucket(): void
+    {
+        // rate_max/rate_minが揃ってNULLになる末尾バケット内で、
+        // 「スキル見合い（rate_noteあり）→単価未設定（rate_noteなし）」の順に固定されることを確認する
+        // （PRレビュー指摘：数値案件・スキル見合い・単価未設定の3種混在ケース）
+        $user = User::factory()->create();
+        $this->createProject([
+            'main_user_id' => $user->id, 'name' => '数値案件',
+            'rate_min' => 50, 'rate_max' => 100, 'rate_note' => null,
+        ]);
+        $this->createProject([
+            'main_user_id' => $user->id, 'name' => 'スキル見合い案件',
+            'rate_min' => null, 'rate_max' => null, 'rate_note' => 'スキル見合い',
+        ]);
+        $this->createProject([
+            'main_user_id' => $user->id, 'name' => '単価未設定案件',
+            'rate_min' => null, 'rate_max' => null, 'rate_note' => null,
+        ]);
+
+        // 高い順・低い順のどちらでも「見合い→未設定」の順は変わらない（$order非依存）
+        $descResponse = $this->actingAs($user)->get('/projects?sort=rate_max&order=desc');
+        $descResponse->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', '数値案件')
+            ->where('projects.data.1.name', 'スキル見合い案件')
+            ->where('projects.data.2.name', '単価未設定案件')
+        );
+
+        $ascResponse = $this->actingAs($user)->get('/projects?sort=rate_max&order=asc');
+        $ascResponse->assertInertia(fn ($page) => $page
+            ->where('projects.data.0.name', '数値案件')
+            ->where('projects.data.1.name', 'スキル見合い案件')
+            ->where('projects.data.2.name', '単価未設定案件')
+        );
+    }
+
     public function test_index_sort_by_updated_at_desc(): void
     {
         $user = User::factory()->create();
