@@ -48,6 +48,7 @@ export default function Index({
     commercialFlowOptions,
     interviewCountOptions,
     sortOptions,
+    savedSearches,
 }: Props) {
     // フリーワード入力はデバウンスのために state を分離。サーバ側 filters.keyword と切り離す。
     const [keywordInput, setKeywordInput] = useState(filters.keyword);
@@ -140,6 +141,7 @@ export default function Index({
                         workStyles={workStyleOptions}
                         commercialFlows={commercialFlowOptions}
                         interviewCounts={interviewCountOptions}
+                        savedSearches={savedSearches}
                         keywordInput={keywordInput}
                         onKeywordInput={setKeywordInput}
                         onFilterChange={handleFilterChange}

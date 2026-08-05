@@ -8,10 +8,12 @@ use App\Http\Resources\EngineerListResource;
 use App\Http\Resources\EngineerResource;
 use App\Models\Engineer;
 use App\Models\FormFieldSetting;
+use App\Models\SavedSearch;
 use App\Models\User;
 use App\Services\AiSummaryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -126,6 +128,7 @@ class EngineerController extends Controller
         $paginator = $query->paginate($perPage)->appends($request->query());
 
         return Inertia::render('Engineers/Index', [
+            'savedSearches' => SavedSearch::listForUser(Auth::id(), 'engineer'),
             'engineers' => [
                 'data' => EngineerListResource::collection($paginator)->collection,
                 'meta' => [

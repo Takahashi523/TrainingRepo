@@ -7,6 +7,7 @@ use App\Http\Controllers\Master\UserController as MasterUserController;
 use App\Http\Controllers\MatchingController;
 use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\SavedSearchController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -31,6 +32,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('pipelines/{pipeline}', [PipelineController::class, 'update'])->name('pipelines.update');
     Route::delete('pipelines/{pipeline}', [PipelineController::class, 'destroy'])->name('pipelines.destroy');
     Route::post('pipelines', [PipelineController::class, 'store'])->name('pipelines.store');
+
+    Route::post('saved-searches', [SavedSearchController::class, 'store'])->name('savedSearches.store');
+    Route::delete('saved-searches/{savedSearch}', [SavedSearchController::class, 'destroy'])->name('savedSearches.destroy');
 });
 
 // マスタ管理（管理者専用）。全エンドポイントに admin ミドルウェアを適用する（docs/api/09）。

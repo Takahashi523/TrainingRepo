@@ -1,14 +1,20 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
+import SavedSearchManageDialog from '@/Components/Common/SavedSearchManageDialog';
+import SavedSearchSelect from '@/Components/Common/SavedSearchSelect';
+import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
-import { EngineerFilters, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
-import { Search, X } from 'lucide-react';
+import { EngineerFilters, EngineerSearchConditions, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
+import { SavedSearchItem } from '@/types/savedSearch';
+import { Search, Star, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface Props {
     filters: EngineerFilters;
     statuses: StatusOption[];
     workStyles: WorkTypeOption[];
     phases: Phase[];
+    savedSearches: SavedSearchItem<EngineerSearchConditions>[];
     keywordInput: string;
     onKeywordInput: (value: string) => void;
     onFilterChange: (patch: Partial<EngineerFilters>) => void;
@@ -23,11 +29,22 @@ export default function EngineerFilterPanel({
     statuses,
     workStyles,
     phases,
+    savedSearches,
     keywordInput,
     onKeywordInput,
     onFilterChange,
     onClearAll,
 }: Props) {
+    // 保存検索条件に送る「今の絞り込み状態」（page/per_page は含めない）
+    const currentConditions: EngineerSearchConditions = {
+        status: filters.status,
+        work_styles: filters.work_styles,
+        phases: filters.phases,
+        keyword: filters.keyword,
+        sort: filters.sort,
+        order: filters.order,
+    };
+
     const statusOptions: MultiSelectOption[] = statuses.map((s) => ({ value: s.value, label: s.label }));
     const workStyleOptions: MultiSelectOption[] = workStyles.map((w) => ({ value: w.key, label: w.name }));
     const phaseOptions: MultiSelectOption[] = phases.map((p) => ({ value: p.key, label: p.name }));
@@ -35,6 +52,16 @@ export default function EngineerFilterPanel({
     const statusLabel = (v: string) => statuses.find((s) => s.value === v)?.label ?? v;
     const workStyleLabel = (k: string) => workStyles.find((w) => w.key === k)?.name ?? k;
     const phaseLabel = (k: string) => phases.find((p) => p.key === k)?.name ?? k;
+
+    // 保存モーダルに表示する、現在の絞り込み条件のタグ（表示専用）
+    const activeTagLabels = [
+        ...filters.status.map(statusLabel),
+        ...filters.work_styles.map(workStyleLabel),
+        ...filters.phases.map(phaseLabel),
+        ...(filters.keyword ? [`"${filters.keyword}"`] : []),
+    ];
+
+    const [showSaveModal, setShowSaveModal] = useState(false);
 
     const hasAnyFilter =
         filters.status.length > 0 ||
@@ -129,7 +156,32 @@ export default function EngineerFilterPanel({
                         すべてクリア
                     </button>
                 )}
+
+                {/* 保存済み条件の呼び出し・保存（WF_03の配置に合わせて右端） */}
+                <div className="ml-auto flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">保存済み条件</span>
+                    <SavedSearchSelect savedSearches={savedSearches} onApply={onFilterChange} />
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 bg-white text-[11px]"
+                        onClick={() => setShowSaveModal(true)}
+                    >
+                        <Star className="h-3 w-3" />
+                        条件を保存
+                    </Button>
+                </div>
             </div>
+
+            <SavedSearchManageDialog
+                open={showSaveModal}
+                searchType="engineer"
+                savedSearches={savedSearches}
+                currentConditions={currentConditions}
+                activeTagLabels={activeTagLabels}
+                onClose={() => setShowSaveModal(false)}
+            />
         </div>
     );
 }

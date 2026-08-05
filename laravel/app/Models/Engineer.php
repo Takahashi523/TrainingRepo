@@ -28,6 +28,12 @@ class Engineer extends Model
         ['key' => 'remote', 'name' => 'フルリモート'],
     ];
 
+    public const STATUSES = [
+        ['key' => 'proposable',     'name' => '提案可'],
+        ['key' => 'interviewing',   'name' => '面談中'],
+        ['key' => 'not_proposable', 'name' => '提案不可'],
+    ];
+
     protected $fillable = [
         'name', 'name_kana', 'birth_date', 'nearest_station', 'nearest_line',
         'available_from', 'has_negotiation_exp', 'desired_rate', 'appeal_note',

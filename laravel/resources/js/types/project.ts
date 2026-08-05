@@ -1,4 +1,5 @@
-import { PaginationMeta, SortOption } from '@/types';
+import { PaginationMeta, SortOption } from "@/types";
+import { SavedSearchItem } from "@/types/savedSearch";
 
 export interface Phase {
     key: string;
@@ -185,6 +186,8 @@ export interface ProjectFilters {
     page: number;
 }
 
+export type ProjectSearchConditions = Omit<ProjectFilters, "page" | "per_page">;
+
 // PaginationMeta / SortOption は一覧画面共通の型のため types/index.d.ts に集約している
 // （バックエンドの ProjectController の SORT_OPTIONS を SSOT として props で受け取る点は変わらない）。
 
@@ -199,6 +202,7 @@ export type ProjectIndexPageProps = {
     commercialFlowOptions: CommercialFlowOption[];
     interviewCountOptions: InterviewCountOption[];
     sortOptions: SortOption[];
+    savedSearches: SavedSearchItem<ProjectSearchConditions>[];
 };
 
 export const PROJECT_STATUS_LABELS: Record<string, string> = {

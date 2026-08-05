@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Engineer;
 use App\Models\FormFieldSetting;
+use App\Models\SavedSearch;
 use App\Models\User;
 use App\Services\AiSummaryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1181,6 +1182,34 @@ class EngineerControllerTest extends TestCase
             ->has('statusOptions')
             ->has('workStyleOptions')
             ->has('phaseOptions')
+        );
+    }
+
+    public function test_index_saved_searches_only_include_engineer_type_for_current_user(): void
+    {
+        // ProjectController@index とコピペで search_type を取り違えやすい箇所の回帰防止。
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $engineerSearch = SavedSearch::create([
+            'user_id' => $user->id, 'name' => '自分のengineer検索', 'search_type' => 'engineer',
+            'conditions' => ['status' => [], 'work_styles' => [], 'phases' => [], 'keyword' => '', 'sort' => '', 'order' => ''],
+        ]);
+        SavedSearch::create([
+            'user_id' => $user->id, 'name' => '自分のproject検索', 'search_type' => 'project',
+            'conditions' => ['status' => [], 'work_style' => [], 'commercial_flow' => [], 'interview_count' => [], 'keyword' => '', 'sort' => '', 'order' => ''],
+        ]);
+        SavedSearch::create([
+            'user_id' => $otherUser->id, 'name' => '他人のengineer検索', 'search_type' => 'engineer',
+            'conditions' => ['status' => [], 'work_styles' => [], 'phases' => [], 'keyword' => '', 'sort' => '', 'order' => ''],
+        ]);
+
+        $response = $this->actingAs($user)->get('/engineers');
+
+        $response->assertInertia(fn ($page) => $page
+            ->count('savedSearches', 1)
+            ->where('savedSearches.0.id', $engineerSearch->id)
+            ->where('savedSearches.0.name', '自分のengineer検索')
         );
     }
 

@@ -1,4 +1,5 @@
-import { PaginationMeta, SortOption } from '@/types';
+import { PaginationMeta, SortOption } from "@/types";
+import { SavedSearchItem } from "@/types/savedSearch";
 
 export interface Phase {
     key: string;
@@ -118,11 +119,16 @@ export interface EngineerFilters {
     work_styles: string[];
     phases: string[];
     keyword: string;
-    sort: 'created_at' | 'updated_at' | 'available_from';
-    order: 'asc' | 'desc';
+    sort: "created_at" | "updated_at" | "available_from";
+    order: "asc" | "desc";
     per_page: number;
     page: number;
 }
+
+export type EngineerSearchConditions = Omit<
+    EngineerFilters,
+    "page" | "per_page"
+>;
 
 // PaginationMeta / SortOption は一覧画面共通の型のため types/index.d.ts に集約している
 // （バックエンドの EngineerController の SORT_OPTIONS を SSOT として props で受け取る点は変わらない）。
@@ -137,4 +143,5 @@ export type EngineerListPageProps = {
     workStyleOptions: WorkTypeOption[];
     phaseOptions: Phase[];
     sortOptions: SortOption[];
+    savedSearches: SavedSearchItem<EngineerSearchConditions>[];
 };

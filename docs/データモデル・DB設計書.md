@@ -2,7 +2,7 @@
 
 **システム名：** Nexus  
 **作成日：** 2026-05-10  
-**最終更新：** 2026-06-08  
+**最終更新：** 2026-08-05  
 **作成者：** 岡大貴  
 **ステータス：** 基本設計中
 
@@ -156,7 +156,8 @@ erDiagram
 
 > **工程経験・勤務形態：** §1-8 の設計方針に従い、中間テーブルを設けず `engineers` / `projects` のカラムとして直接保持する。  
 > **担当営業：** `engineers.main_user_id` / `sub_user_id`・`projects.main_user_id` / `sub_user_id` で直接参照。中間テーブルは設けない。WF_04 / WF_07 にてサブは1名まで確定。  
-> **パイプライン担当営業（QA #83 確定）：** 進捗管理画面では `pipelines.engineer_id → engineers.main_user_id → users` の経路で担当者を参照する。
+> **パイプライン担当営業（QA #83 確定）：** 進捗管理画面では `pipelines.engineer_id → engineers.main_user_id → users` の経路で担当者を参照する。  
+> **保存検索条件（saved_searches）：** `user_id` は FK `ON DELETE CASCADE`。個人保存・共有機能なし（QA #81 確定）のため、ユーザーが削除されると紐づく保存検索条件も連動して自動削除される。`main_user_id`（RESTRICT）とは異なり、アプリ層での事前チェックは不要。
 
 -----
 
@@ -349,7 +350,7 @@ erDiagram
 | カラム名（案） | 型 | NULL | キー | DEFAULT | 備考 |
 |---|---|---|---|---|---|
 | id | BIGINT UNSIGNED | NOT NULL | PK | - | AUTO_INCREMENT |
-| user_id | BIGINT UNSIGNED | NOT NULL | FK | なし（要指定） | → users.id。個人保存・共有機能なし。QA #81 確定 |
+| user_id | BIGINT UNSIGNED | NOT NULL | FK | なし（要指定） | → users.id。**ON DELETE CASCADE**。個人保存・共有機能なし。QA #81 確定 |
 | name | VARCHAR(100) | NOT NULL | | なし（要指定） | ユーザーが任意に命名 |
 | search_type | ENUM('engineer','project') | NOT NULL | | なし（要指定） | engineer / project |
 | conditions | JSON | NOT NULL | | なし（要指定） | 検索パラメータをJSONシリアライズして保存 |
@@ -513,6 +514,7 @@ QA #78 にて固定確定。将来の追加なし。
 | projects | status を `closed` に変更してクローズ扱いとする（論理削除ではない。レコードはDBに残る） | 物理DELETEのみ | QA #38 確定 |
 | pipelines | 削除不可 | 物理DELETEのみ | QA #71 確定 |
 | users | 操作不可 | **`main_user_id` は FK `ON DELETE RESTRICT`** のため、主担当が残っているユーザーは DB レベルで削除不可。削除実行時に `main_user_id` の紐付け件数をチェックし、1件でも残っていれば処理を中断し「担当中の案件が〇件、人材が〇件あるため削除できません。一覧画面から別の担当者へ変更してから再度実行してください。」を表示（COUNT→DELETE 間に担当が付いた場合は FK 例外を捕捉して同メッセージの 422 に変換）。紐付けゼロを確認後、物理DELETE。**`sub_user_id` は FK `ON DELETE SET NULL`** のため副担当の参照は削除時に自動で NULL になる（ガード対象外）。加えて、自分自身の削除・最後の管理者の削除は 422 で禁止（`09_マスタ管理_APIエンドポイント一覧.md` 参照）。 | QA #16 確定 |
+| saved_searches | 保存・削除は本人のみ（自身の保存検索条件を物理DELETE可能。`07_保存検索条件_APIエンドポイント一覧.md` 参照） | 個別の削除操作なし。**`user_id` は FK `ON DELETE CASCADE`** のため、ユーザー削除（上記）に連動して当該ユーザーの保存検索条件も自動的に物理削除される。個人保存のみで共有機能がないため、`main_user_id` のような事前チェック・ガード処理は不要 | QA #81 確定 |
 
 -----
 
