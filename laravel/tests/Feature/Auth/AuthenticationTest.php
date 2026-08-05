@@ -132,4 +132,55 @@ class AuthenticationTest extends TestCase
             ->get('/login')
             ->assertRedirect('/dashboard');
     }
+
+    public function test_login_rejects_disallowed_email_domain_when_configured(): void
+    {
+        // 許容ドメイン設定時、社外ドメインはバリデーション段階（認証前）で弾く（二重チェック）。
+        config(['organization.allowed_email_domains' => ['nexus.example.com']]);
+
+        $response = $this->from('/login')->post('/login', [
+            'email' => 'user@gmail.com',
+            'password' => 'password',
+        ]);
+
+        // 未認証画面のため許可ドメイン名は出さず、汎用文言で伏せる（情報漏えい防止）。
+        $response->assertSessionHasErrors([
+            'email' => '社内メールアドレスでログインしてください。',
+        ]);
+        $errors = session('errors')->get('email');
+        $this->assertNotEmpty($errors);
+        $this->assertStringNotContainsString('nexus.example.com', $errors[0]);
+        $this->assertGuest();
+    }
+
+    public function test_login_allows_configured_email_domain(): void
+    {
+        // 許容ドメインの既存ユーザーは通る。ログイン側では unique を付けないため
+        // 「既に存在するメール」でも一意制約で弾かれず認証まで到達する。
+        config(['organization.allowed_email_domains' => ['nexus.example.com']]);
+        $user = User::factory()->create(['email' => 'coordinator@nexus.example.com']);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect('/dashboard');
+    }
+
+    public function test_login_has_no_domain_restriction_when_unset(): void
+    {
+        // 未設定（既定）ではドメイン制限を掛けない（形式チェックのみ・TBD#3）。
+        config(['organization.allowed_email_domains' => []]);
+        $user = User::factory()->create(['email' => 'anyone@anydomain.co.jp']);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect('/dashboard');
+    }
 }

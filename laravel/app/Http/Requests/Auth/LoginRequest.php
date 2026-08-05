@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Http\Requests\Concerns\ResolvesEmailRules;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -12,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
+    use ResolvesEmailRules;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -23,12 +26,16 @@ class LoginRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
+     * ドメイン制限（許容ドメイン設定時）はマスタ管理のユーザー登録と同じ SSOT
+     * （ResolvesEmailRules）を共有する二重チェック。ログインは既存ユーザーの照合のため
+     * emailDomainRules() を使い、unique は付けない。
+     *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'email' => $this->emailDomainRules(),
             'password' => ['required', 'string'],
         ];
     }
@@ -52,12 +59,18 @@ class LoginRequest extends FormRequest
      * email 形式エラーは共通文言だと「メールアドレスに有効なメールアドレスを…」と冗長になるため、
      * ログイン画面では :attribute を含まない簡潔な文言にする。
      *
+     * ドメイン制限（ends_with）のエラーでは、マスタ管理（admin 限定）と違い
+     * **許可ドメイン名を出さない**。ログイン画面は未認証で誰でも到達できるため、
+     * 許可ドメインを晒すと社内ドメインの情報漏えい・標的型フィッシングの足がかりになる。
+     * ends_with は許容ドメイン設定時のみ発火するため、常に定義しても未設定時は表示されない。
+     *
      * @return array<string, string>
      */
     public function messages(): array
     {
         return [
             'email.email' => '有効なメールアドレスを入力してください。',
+            'email.ends_with' => '社内メールアドレスでログインしてください。',
         ];
     }
 
