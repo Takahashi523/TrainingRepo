@@ -17,20 +17,39 @@ interface Props {
     project: ProjectListItem;
 }
 
-// 単価表示ロジック（一覧・詳細共通、API doc 04 参照）：
+// 単価表示ロジック（API doc 04 参照）：
 // ① rate_min/rate_max があれば範囲表示 ② 無くても rate_note があればそれを表示 ③ どちらも無ければ「—」
-function formatRate(
-    rateMin: number | null,
-    rateMax: number | null,
-    rateNote: string | null,
-): string {
+// 数値のときは金額（濃色・太字）と単位「万円」（淡色・通常ウェイト）を分けて描画する
+// （WF_06 .rate-display / .rate-unit 準拠。PRレビュー #53 指摘：単価のみ一律太字だと見出しと焦点が競合するため）。
+// ※単価描画の共通部品化（MatchCard等との統合）は別issueで扱う想定で、ここではProjectCard内の見た目改善に留める。
+function RateValue({
+    rateMin,
+    rateMax,
+    rateNote,
+}: {
+    rateMin: number | null;
+    rateMax: number | null;
+    rateNote: string | null;
+}) {
     if (rateMin != null && rateMax != null) {
-        return `${rateMin}万円〜${rateMax}万円`;
+        return (
+            <span className="break-words text-[13px] font-semibold text-foreground">
+                {rateMin}
+                <span className="text-[11px] font-normal text-muted-foreground">
+                    万円
+                </span>
+                〜{rateMax}
+                <span className="text-[11px] font-normal text-muted-foreground">
+                    万円
+                </span>
+            </span>
+        );
     }
-    if (rateNote) {
-        return rateNote;
-    }
-    return "—";
+    return (
+        <span className="break-words text-[13px] font-semibold text-foreground">
+            {rateNote ?? "—"}
+        </span>
+    );
 }
 
 export default function ProjectCard({ project }: Props) {
@@ -87,12 +106,6 @@ export default function ProjectCard({ project }: Props) {
                                           project.commercial_flow
                                       ] ?? project.commercial_flow)
                                     : "—"}
-                                　｜　担当：{project.users.main.name}
-                                <span className="mx-1">/</span>
-                                サブ：
-                                {project.users.sub
-                                    ? project.users.sub.name
-                                    : "未割当"}
                             </p>
                         </div>
                         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -113,6 +126,14 @@ export default function ProjectCard({ project }: Props) {
                                 {project.headcount != null
                                     ? `${project.headcount}名`
                                     : "—"}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                                担当：{project.users.main.name}
+                                <span className="mx-1">/</span>
+                                サブ：
+                                {project.users.sub
+                                    ? project.users.sub.name
+                                    : "未割当"}
                             </span>
                         </div>
                     </div>
@@ -166,17 +187,18 @@ export default function ProjectCard({ project }: Props) {
                     {/* 単価 + 稼働開始 + 勤務形態 */}
                     <div className="flex flex-wrap items-start gap-x-4 gap-y-1.5">
                         <Section label="単価">
-                            <span className="break-words text-[13px] font-bold text-foreground">
-                                {formatRate(
-                                    project.rate_min,
-                                    project.rate_max,
-                                    project.rate_note,
-                                )}
-                            </span>
+                            <RateValue
+                                rateMin={project.rate_min}
+                                rateMax={project.rate_max}
+                                rateNote={project.rate_note}
+                            />
                         </Section>
                         <Section label="稼働開始">
-                            <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-muted/50 px-2.5 py-0.5 text-[11px]">
-                                <Clock className="h-3 w-3" />
+                            {/* ラベル「稼働開始」と重複しないよう、装飾ピルは外して単価行と同型の
+                                「ラベル＋値テキスト」にする（PRレビュー #53 指摘）。スキャン用の
+                                小さなClockアイコンはインラインで残す。 */}
+                            <span className="inline-flex items-center gap-1 break-words text-[13px] font-semibold text-foreground">
+                                <Clock className="h-3 w-3 shrink-0 text-muted-foreground" />
                                 {project.start_label}
                             </span>
                         </Section>

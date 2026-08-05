@@ -22,8 +22,9 @@ interface Props {
     onClearAll: () => void;
 }
 
-// キーワード入力の上限（案件名 max:255 とは別に、検索用途として人材一覧と同じ上限に揃える）
-const KEYWORD_MAX_LENGTH = 100;
+// キーワード入力の上限。案件名 max:255・バックエンドのkeywordバリデーション max:255 と一致させる
+// （人材一覧も keyword上限＝氏名上限 の原則で揃えており、それに倣う。PRレビュー #53 指摘）
+const KEYWORD_MAX_LENGTH = 255;
 
 export default function ProjectFilterPanel({
     filters,
@@ -70,7 +71,7 @@ export default function ProjectFilterPanel({
                         type="text"
                         value={keywordInput}
                         onChange={(e) => onKeywordInput(e.target.value)}
-                        placeholder="案件名・スキルキーワードで検索"
+                        placeholder="案件名・スキルで検索"
                         maxLength={KEYWORD_MAX_LENGTH}
                         className="h-8 w-[220px] bg-white pl-8 pr-2 text-xs md:text-xs"
                     />
