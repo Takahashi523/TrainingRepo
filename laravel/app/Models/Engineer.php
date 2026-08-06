@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -96,5 +97,17 @@ class Engineer extends Model
     public function subUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sub_user_id');
+    }
+
+    /**
+     * 指定ユーザーがメインまたはサブで担当している人材に絞り込む。
+     * ダッシュボードの「自分担当」集計軸（QA #70）で使用する共通スコープ。
+     */
+    public function scopeAssignedTo(Builder $query, int $userId): Builder
+    {
+        return $query->where(function (Builder $q) use ($userId) {
+            $q->where('main_user_id', $userId)
+                ->orWhere('sub_user_id', $userId);
+        });
     }
 }
