@@ -9,7 +9,7 @@ import {
 import { Input } from "@/Components/ui/input";
 import { ConditionValue, SavedSearchItem } from "@/types/savedSearch";
 import { router } from "@inertiajs/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // 保存名の上限（DB設計書 saved_searches.name VARCHAR(100) に合わせる）
 const NAME_MAX_LENGTH = 100;
@@ -61,8 +61,21 @@ export default function SavedSearchManageDialog<
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
+    // モーダルを閉じたら入力内容・削除確認UIをリセットする
+    // (このコンポーネントは open の真偽で表示切替するだけで常時マウントされているため、
+    //  リセットしないと前回入力した条件名が次に開いたときも残ってしまう)
+    useEffect(() => {
+        if (!open) {
+            setName("");
+            setConfirmDeleteId(null);
+        }
+    }, [open]);
+
+    // 絞り込み条件が0件かつ条件名も未入力の場合、保存するものが実質無いため保存不可とする
+    const canSave = activeTagLabels.length > 0 || name.trim().length > 0;
+
     const handleSave = () => {
-        if (isSaving) return;
+        if (isSaving || !canSave) return;
 
         // 未入力ならタグから自動生成した名前を使う（WF準拠。APIには常に非空文字列を送る）
         const finalName = name.trim() || buildAutoName(activeTagLabels);
@@ -109,7 +122,7 @@ export default function SavedSearchManageDialog<
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4 py-2">
+                <div className="min-w-0 space-y-4 py-2">
                     {/* 現在の絞り込み条件（表示専用） */}
                     <div>
                         <p className="mb-1.5 text-xs font-semibold text-muted-foreground">
@@ -151,14 +164,16 @@ export default function SavedSearchManageDialog<
                                 type="button"
                                 size="sm"
                                 className="h-8 shrink-0 px-2.5 text-xs"
-                                disabled={isSaving}
+                                disabled={isSaving || !canSave}
                                 onClick={handleSave}
                             >
                                 保存する
                             </Button>
                         </div>
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                            未入力の場合はタグの組み合わせを自動で条件名に使用します
+                            {canSave
+                                ? "未入力の場合はタグの組み合わせを自動で条件名に使用します"
+                                : "絞り込み条件を設定するか、条件名を入力すると保存できます"}
                         </p>
                     </div>
 
@@ -194,16 +209,17 @@ export default function SavedSearchManageDialog<
                                                     disabled={deletingId === item.id}
                                                     onClick={() => handleDelete(item.id)}
                                                 >
-                                                    削除
+                                                    {deletingId === item.id ? "削除中..." : "削除"}
                                                 </Button>
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant="outline"
                                                     className="h-6 px-2 text-[11px]"
+                                                    disabled={deletingId === item.id}
                                                     onClick={() => setConfirmDeleteId(null)}
                                                 >
-                                                    取消
+                                                    キャンセル
                                                 </Button>
                                             </div>
                                         ) : (

@@ -33,6 +33,9 @@ export default function SavedSearchSelect<
             <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
                 <SelectValue placeholder="条件を選択して呼び出す" />
             </SelectTrigger>
+            {/* 条件名は最長でも100文字だが、省略表示（…）はしない。
+                ここは選択のためだけの一時的なポップオーバーで、他の操作要素を巻き込まないため、
+                多少幅が広がったり折り返されたりしても実害がない（モーダル側とは異なる判断）。 */}
             <SelectContent>
                 {savedSearches.length === 0 ? (
                     <div className="px-2 py-1.5 text-xs text-muted-foreground">
