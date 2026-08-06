@@ -7,7 +7,6 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -18,8 +17,9 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): Response
     {
+        // パスワード再設定フローは本アプリで未提供のため canResetPassword は渡さない
+        // （password.request ルート削除済で常に false・フロント未使用のデッド Props）。
         return Inertia::render('Auth/Login', [
-            'canResetPassword' => Route::has('password.request'),
             'status' => session('status'),
         ]);
     }
