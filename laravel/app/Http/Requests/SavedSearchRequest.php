@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * 保存検索条件（POST /saved-searches）の検証。
+ * 検索条件保存（POST /saved-searches）の検証。
  *
  * conditions の中身（status/work_styles/phases/sort/order 等）は
  * EngineerIndexRequest / ProjectIndexRequest と同じ方針で個別バリデーションしない。
@@ -18,7 +18,7 @@ use Illuminate\Validation\Rule;
 class SavedSearchRequest extends FormRequest
 {
     /**
-     * ログイン済みなら誰でも自分の保存検索条件を作成できる（auth ミドルウェアで保護済み）。
+     * ログイン済みなら誰でも自分の検索条件を保存できる（auth ミドルウェアで保護済み）。
      */
     public function authorize(): bool
     {

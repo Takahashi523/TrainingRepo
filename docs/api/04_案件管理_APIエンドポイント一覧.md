@@ -117,7 +117,7 @@
     "page": "int"                              // ページ番号（状態復元用）
   },
 
-  // ログインユーザーの保存検索条件一覧（search_type = "project" のみ）
+  // ログインユーザーの保存済み検索条件一覧（search_type = "project" のみ）
   "savedSearches": [
     {
       "id": "int",

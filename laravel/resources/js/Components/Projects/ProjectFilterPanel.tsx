@@ -45,7 +45,7 @@ export default function ProjectFilterPanel({
     onFilterChange,
     onClearAll,
 }: Props) {
-    // 保存検索条件に送る「今の絞り込み状態」（page/per_page は含めない）
+    // 検索条件保存に送る「今の絞り込み状態」（page/per_page は含めない）
     const currentConditions: ProjectSearchConditions = {
         status: filters.status,
         work_style: filters.work_style,
