@@ -23,7 +23,8 @@ class ProjectController extends Controller
         private readonly ProjectService $projectService
     ) {}
 
-    private const SORT_OPTIONS = [
+    // SavedSearchService::sanitizeConditions() でも同じ許可リストを SSOT として参照するため public。
+    public const SORT_OPTIONS = [
         ['sort' => 'created_at', 'order' => 'desc', 'label' => '登録日順（新しい順）'],
         ['sort' => 'created_at', 'order' => 'asc',  'label' => '登録日順（古い順）'],
         ['sort' => 'updated_at', 'order' => 'desc', 'label' => '更新日順（新しい順）'],

@@ -34,7 +34,8 @@ class EngineerController extends Controller
      * バリデーションはこのペアを基準に行い、同じ配列を sortOptions として props でフロントへ渡す。
      * 先頭がデフォルト（created_at DESC）。
      */
-    private const SORT_OPTIONS = [
+    // SavedSearchService::sanitizeConditions() でも同じ許可リストを SSOT として参照するため public。
+    public const SORT_OPTIONS = [
         ['sort' => 'created_at',     'order' => 'desc', 'label' => '登録日順（新しい順）'],
         ['sort' => 'created_at',     'order' => 'asc',  'label' => '登録日順（古い順）'],
         ['sort' => 'updated_at',     'order' => 'desc', 'label' => '更新日順（新しい順）'],

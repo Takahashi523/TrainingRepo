@@ -231,9 +231,65 @@ class SavedSearchControllerTest extends TestCase
         $this->assertSame('desc', $saved->conditions['order']);
     }
 
+    public function test_engineer_conditions_invalid_sort_order_pair_falls_back_to_default(): void
+    {
+        // EngineerController::SORT_OPTIONS に存在しない組み合わせは、
+        // EngineerController::resolveSort() と同じくデフォルト（先頭）へフォールバックする。
+        $user = User::factory()->create();
+        $payload = $this->validEngineerPayload();
+        $payload['conditions']['sort'] = 'available_from';
+        $payload['conditions']['order'] = 'desc'; // available_from は asc のみ許可
+
+        $this->actingAs($user)->post('/saved-searches', $payload);
+
+        $saved = SavedSearch::where('user_id', $user->id)->first();
+        $this->assertSame('created_at', $saved->conditions['sort']);
+        $this->assertSame('desc', $saved->conditions['order']);
+    }
+
     // -------------------------------------------------------
     // store: POST /saved-searches — conditions のサニタイズ（project）
     // -------------------------------------------------------
+
+    public function test_project_conditions_invalid_status_is_removed(): void
+    {
+        $user = User::factory()->create();
+        $payload = $this->validProjectPayload();
+        $payload['conditions']['status'] = ['open', 'hacked_status'];
+
+        $this->actingAs($user)->post('/saved-searches', $payload);
+
+        $saved = SavedSearch::where('user_id', $user->id)->first();
+        $this->assertSame(['open'], $saved->conditions['status']);
+    }
+
+    public function test_project_conditions_keyword_sort_order_are_stored(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post('/saved-searches', $this->validProjectPayload());
+
+        $saved = SavedSearch::where('user_id', $user->id)->first();
+        $this->assertSame('AI', $saved->conditions['keyword']);
+        $this->assertSame('created_at', $saved->conditions['sort']);
+        $this->assertSame('desc', $saved->conditions['order']);
+    }
+
+    public function test_project_conditions_invalid_sort_value_falls_back_to_default(): void
+    {
+        // ProjectController::SORT_OPTIONS に存在しないソート項目名は、
+        // ProjectController::resolveSort() と同じくデフォルト（先頭）へフォールバックする。
+        $user = User::factory()->create();
+        $payload = $this->validProjectPayload();
+        $payload['conditions']['sort'] = 'malicious_column';
+        $payload['conditions']['order'] = 'desc';
+
+        $this->actingAs($user)->post('/saved-searches', $payload);
+
+        $saved = SavedSearch::where('user_id', $user->id)->first();
+        $this->assertSame('created_at', $saved->conditions['sort']);
+        $this->assertSame('desc', $saved->conditions['order']);
+    }
 
     public function test_project_conditions_use_singular_keys(): void
     {
