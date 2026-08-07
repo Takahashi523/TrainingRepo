@@ -129,7 +129,7 @@ export default function Show({ engineer }: Props) {
                         }
                     >
                         <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
-                        マッチング実行
+                        マッチング
                     </Button>
                     <Button
                         variant="outline"
@@ -241,10 +241,7 @@ export default function Show({ engineer }: Props) {
                         )}
                     </DetailRow>
                     <DetailRow label="最寄駅 / 路線">
-                        {engineer.nearest_station || '—'}
-                        {engineer.nearest_line && (
-                            <span className="ml-1">　{engineer.nearest_line}</span>
-                        )}
+                        {engineer.nearest_station || '—'}　／　{engineer.nearest_line || '—'}
                     </DetailRow>
                     <DetailRow label="稼働可能時期">
                         {engineer.available_label}
