@@ -1,17 +1,14 @@
-import ApplicationLogo from '@/Components/ApplicationLogo';
-import { Link } from '@inertiajs/react';
 import { PropsWithChildren } from 'react';
 
+/**
+ * ゲスト（未認証）画面の共通レイアウト。
+ * WF_01 に合わせ、中央にログインカード1枚を配置する。
+ * ブランド表示（Nexus ワードマーク）はカード内の先頭に置くため、各ページ側で描画する。
+ */
 export default function Guest({ children }: PropsWithChildren) {
     return (
-        <div className="flex min-h-screen flex-col items-center bg-gray-100 pt-6 sm:justify-center sm:pt-0">
-            <div>
-                <Link href="/">
-                    <ApplicationLogo className="h-20 w-20 fill-current text-gray-500" />
-                </Link>
-            </div>
-
-            <div className="mt-6 w-full overflow-hidden bg-white px-6 py-4 shadow-md sm:max-w-md sm:rounded-lg">
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 px-4 py-6">
+            <div className="w-full max-w-[400px] rounded-lg border border-gray-200 bg-white px-9 py-10 shadow-sm">
                 {children}
             </div>
         </div>

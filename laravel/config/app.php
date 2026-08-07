@@ -60,12 +60,15 @@ return [
     |--------------------------------------------------------------------------
     |
     | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | will be used by the PHP date and date-time functions.
+    |
+    | 本システムは国内 SES 向けの社内ツール（利用者は日本国内）であり、
+    | ダッシュボードの「今日／期限超過／7日以内」など日付境界を JST 基準で扱う必要があるため
+    | Asia/Tokyo を既定とする（DB セッション TZ も config/database.php で +09:00 に揃える）。
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Tokyo'),
 
     /*
     |--------------------------------------------------------------------------

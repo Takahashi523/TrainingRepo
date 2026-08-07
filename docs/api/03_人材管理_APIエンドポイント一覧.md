@@ -64,7 +64,7 @@
                                               // available_from が null → "未定"
                                               // available_from に日付あり → "YYYY/MM/DD〜"
                                               // Controller内で生成する
-                                              // 過去日付でも変換せずそのまま "YYYY/MM/DD〜" 形式で表示する
+                                              // 過去日付でも特別扱いせず、そのまま"YYYY/MM/DD〜"と表示する
         "users": {
           "main": { "id": "int", "name": "string" },
           "sub":  { "id": "int", "name": "string" } // null許容：未設定の場合null

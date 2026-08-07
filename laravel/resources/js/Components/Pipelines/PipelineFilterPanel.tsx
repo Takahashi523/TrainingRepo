@@ -10,7 +10,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/Components/ui/select';
-import { ActiveFilters, RankOption, SortOption, StatusOption, UserOption } from '@/types/pipeline';
+import { ActiveFilters, RankOption, StatusOption, UserOption } from '@/types/pipeline';
+import { SortOption } from '@/types';
 import { Search, X } from 'lucide-react';
 
 interface Props {

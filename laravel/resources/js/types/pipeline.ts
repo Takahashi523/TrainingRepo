@@ -2,6 +2,8 @@
 // サーバ（PipelineController / 各 Resource）が返す Props を忠実に型付けする。
 // any は使用しない。Props 形状は docs/api/06_進捗管理_APIエンドポイント一覧.md に一致させる。
 
+import { PaginationMeta, SortOption } from '@/types';
+
 /** 進行中12種 + 終了4種のステータス値（DB値・SSOT は Pipeline::STATUSES） */
 export type PipelineStatus =
     // 進行中12種
@@ -150,15 +152,8 @@ export interface CompletedFilters {
     order: string;
 }
 
-/** Laravel ページネーション meta（完了済みタブ） */
-export interface PaginationMeta {
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    from: number | null;
-    to: number | null;
-}
+// PaginationMeta / SortOption は一覧画面共通の型のため types/index.d.ts に集約している
+// （バックエンドの PipelineController の SORT_OPTIONS_* を SSOT として props で受け取る点は変わらない）。
 
 /** ページネーション付きコレクション */
 export interface Paginated<T> {
@@ -167,17 +162,6 @@ export interface Paginated<T> {
 }
 
 /** GET /pipelines（進行中タブ）Props。show 部分リロードで selectedPipeline / statusOptions が付与される */
-/**
- * ソート選択肢（sort×order のペア＋表示ラベル）。
- * バックエンド（PipelineController の SORT_OPTIONS_*）を SSOT として props で受け取り、
- * UI の選択肢と許可された組み合わせを常に一致させる。
- */
-export interface SortOption {
-    sort: string;
-    order: string;
-    label: string;
-}
-
 export type PipelineIndexPageProps = {
     columns: KanbanColumn[];
     filters: ActiveFilters;
