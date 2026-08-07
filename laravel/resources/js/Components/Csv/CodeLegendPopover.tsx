@@ -10,15 +10,17 @@ import { ChevronDown, Code2 } from 'lucide-react';
 type CodeGroup = { title: string; items: [code: string, label: string][] };
 
 /**
- * コード対応（英字コード → 日本語）の一覧。enum 系列（O-2）はこのコードのまま入力する必要がある。
+ * コード対応（コード → 日本語）の一覧。英字コード列（ステータス・商流・稼働形態）はこのコードのまま入力する（O-2）。
  *
- * 人材・案件で使う enum 列は異なるため、リソースごとに出し分ける：
- * - 人材：ステータスのみ（商流・稼働形態 enum は無く、勤務形態は 0/1 フラグ）
- * - 案件：ステータス・商流・稼働形態
+ * 人材・案件で使う列は異なるため、リソースごとに出し分ける：
+ * - 人材：ステータス＋0/1入力の大項目（勤務形態・各工程経験・顧客折衝経験）
+ * - 案件：ステータス・商流・稼働形態＋0/1入力の大項目（各工程対象・顧客折衝経験要否）
  *
- * `flagList` は 0/1 で入力する列（各リソースのフラグ列）を示す注記。
+ * 0/1 で入力する列は「有/無」の意味が大項目ごとに異なる（経験あり/なし・対象/対象外・要/不要）ため、
+ * 汎用の「フラグ」1グループにまとめず、大項目ごとのグループにして 0/1 の意味を具体的に示す
+ * （営業担当者が迷わないよう、列の意味に沿った文言にする）。
  */
-const CODE_LEGEND: Record<CsvResource, { groups: CodeGroup[]; flagList: string }> = {
+const CODE_LEGEND: Record<CsvResource, { groups: CodeGroup[] }> = {
     engineers: {
         groups: [
             {
@@ -29,8 +31,28 @@ const CODE_LEGEND: Record<CsvResource, { groups: CodeGroup[]; flagList: string }
                     ['not_proposable', '提案不可'],
                 ],
             },
+            {
+                title: '勤務形態（0/1）',
+                items: [
+                    ['1', '該当する'],
+                    ['0', '該当しない'],
+                ],
+            },
+            {
+                title: '各工程経験（0/1）',
+                items: [
+                    ['1', '経験あり'],
+                    ['0', '経験なし'],
+                ],
+            },
+            {
+                title: '顧客折衝経験（0/1）',
+                items: [
+                    ['1', 'あり'],
+                    ['0', 'なし'],
+                ],
+            },
         ],
-        flagList: '勤務形態・各工程経験・顧客折衝経験',
     },
     projects: {
         groups: [
@@ -59,8 +81,21 @@ const CODE_LEGEND: Record<CsvResource, { groups: CodeGroup[]; flagList: string }
                     ['remote', 'フルリモート'],
                 ],
             },
+            {
+                title: '各工程対象（0/1）',
+                items: [
+                    ['1', '対象'],
+                    ['0', '対象外'],
+                ],
+            },
+            {
+                title: '顧客折衝経験要否（0/1）',
+                items: [
+                    ['1', '要'],
+                    ['0', '不要'],
+                ],
+            },
         ],
-        flagList: '各工程対象・顧客折衝経験要否',
     },
 };
 
@@ -77,7 +112,7 @@ interface Props {
  * 表示するコードは resource に応じて出し分ける（無関係なコードを見せない）。
  */
 export default function CodeLegendPopover({ resource }: Props) {
-    const { groups, flagList } = CODE_LEGEND[resource];
+    const { groups } = CODE_LEGEND[resource];
 
     return (
         <Popover>
@@ -121,7 +156,7 @@ export default function CodeLegendPopover({ resource }: Props) {
                     ))}
                 </div>
                 <p className="border-t border-border px-3 py-2 text-[10px] text-muted-foreground">
-                    この英字コードのまま入力（0/1：{flagList}）
+                    上記のコードはそのまま入力してください。
                 </p>
             </PopoverContent>
         </Popover>

@@ -68,6 +68,7 @@ export const CSV_FIELD_LABELS: Record<CsvResource, Record<string, string>> = {
         available_from: '稼働可能時期',
         desired_rate: '希望単価（万円）',
         appeal_note: 'アピールポイント',
+        ai_summary: 'AI要約', // エクスポート専用（インポート時は無視）。PHP 側 EngineerCsvSchema と同期。
         remarks: '特記事項',
         status: 'ステータス',
         main_user_id: '主担当ID',

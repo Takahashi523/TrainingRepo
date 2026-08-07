@@ -53,7 +53,9 @@ class CsvImportService
         // ① 必須列（全 importable 列）の欠落
         $missing = array_values(array_diff($schema->requiredHeaders(), $header));
         if ($missing !== []) {
-            $headerErrors[] = '必要な列がありません：'.implode('、', $missing).'。不足している列を追加してください。';
+            // 列名は重複・不明の他メッセージと表記を揃えて「」で囲む。
+            $labels = array_map(fn ($h) => "「{$h}」", $missing);
+            $headerErrors[] = '必要な列がありません：'.implode('、', $labels).'。不足している列を追加してください。';
         }
 
         // ② 空ヘッダー（末尾カンマ等）。原因特定のため1始まりの列位置で示す。
@@ -148,10 +150,12 @@ class CsvImportService
             $assoc = $schema->normalizeRow($assoc);
 
             $id = $assoc['id'] ?? null;
-            // 重複判定は正規化キーで行う。数値 id は (int) 化した文字列をキーにし、
-            // "1" と "01" / "1.0" のような同一レコードを指す表記ゆれを1つのIDとして束ねる
-            // （文字列そのままをキーにすると別IDと誤認し、同一行への二重 UPDATE をすり抜けてしまう）。
-            $dupKey = $id === null ? null : (is_numeric($id) ? (string) (int) $id : $id);
+            // 重複判定は正規化キーで行う。数値かつ整数値（"1"/"01"/"1.0"）のみ (int) 化した文字列をキーにし、
+            // 同一レコードを指す表記ゆれを1つのIDとして束ねる（文字列そのままをキーにすると別IDと誤認し、
+            // 同一行への二重 UPDATE をすり抜けてしまう）。"1.5" のような小数は整数値でないため raw を維持し、
+            // id=1 の行と誤って同一視しない（この後の存在チェックで形式エラーとして弾く）。
+            $isIntegerId = $id !== null && is_numeric($id) && (float) $id == (int) $id;
+            $dupKey = $id === null ? null : ($isIntegerId ? (string) (int) $id : $id);
             if ($dupKey !== null) {
                 $idRowNumbers[$dupKey][] = $rowNum;
             }
@@ -203,10 +207,16 @@ class CsvImportService
                 $errors[] = ['row' => $rowNum, 'field' => null, 'messages' => ['同一IDが複数行にあります。同じIDの行は1つにまとめてください。']];
             }
 
-            // 更新対象 id の存在（存在しない id は当該行エラー）
-            if ($id !== null && (! is_numeric($id) || ! isset($existingIdSet[(int) $id]))) {
-                $rowHasError = true;
-                $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["指定されたID「{$id}」のデータが存在しません。新規追加はID列を空欄にし、更新する場合は既存の正しいIDを指定してください。"]];
+            // 更新対象 id の存在。小数（"1.5" 等）は (int) 化で別レコード（id=1）を指してしまうため、
+            // 整数値でない id はまず形式エラーとして弾き、サイレントな取り違え更新を防ぐ。
+            if ($id !== null) {
+                if (! is_numeric($id) || (float) $id != (int) $id) {
+                    $rowHasError = true;
+                    $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["ID「{$id}」が正しくありません。IDは整数で入力してください（新規追加はID列を空欄にしてください）。"]];
+                } elseif (! isset($existingIdSet[(int) $id])) {
+                    $rowHasError = true;
+                    $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["指定されたID「{$id}」のデータが存在しません。新規追加はID列を空欄にし、更新する場合は既存の正しいIDを指定してください。"]];
+                }
             }
 
             if (! $rowHasError) {

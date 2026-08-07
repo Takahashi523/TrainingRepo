@@ -355,6 +355,27 @@ class CsvImportTest extends CsvTestCase
         $this->assertSame('既存太郎', $engineer->name);
     }
 
+    public function test_decimal_id_is_rejected_and_does_not_overwrite_integer_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+        // "1.5" のような小数 id は (int) 化すると id=1 を指してしまう。
+        // サイレントに id=1 を上書きせず、形式エラー（field:id）として弾かれ、既存行が変わらないことを担保する。
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id.'.5',
+            'name' => '書き換え', 'name_kana' => 'カキカエ', 'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'id'));
+
+        // サイレントな取り違え更新が起きていない（既存レコードは元のまま）
+        $engineer->refresh();
+        $this->assertSame('既存太郎', $engineer->name);
+    }
+
     public function test_non_existent_main_user_id_is_row_error_without_n_plus_one(): void
     {
         $user = $this->makeUser('admin');
