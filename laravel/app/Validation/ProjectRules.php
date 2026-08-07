@@ -89,7 +89,7 @@ class ProjectRules
      */
     public static function workStyleValues(): array
     {
-        return array_column(Project::WORK_STYLES, 'key');
+        return array_column(Project::WORK_STYLES, 'value');
     }
 
     public static function statusRule(): In
