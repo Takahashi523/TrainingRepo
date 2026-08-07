@@ -4,8 +4,8 @@ export interface Phase {
 }
 
 export interface WorkStyleOption {
-    key: string;
-    name: string;
+    value: string;
+    label: string;
 }
 
 export interface StatusOption {
@@ -137,12 +137,83 @@ export type ProjectShowPageProps = {
     project: Project;
 };
 
+// 一覧用スキル型（label のみ。detail は一覧では取得しない。API doc 04 §GET /projects Props参照）
+export interface SkillListItem {
+    label: string | null;
+}
+
+// 一覧用 Project（description / work_env / remarks / billing_range / work_location・skills[].detail を含まない）
+export interface ProjectListItem {
+    id: number;
+    name: string;
+    client_name: string | null;
+    status: string;
+    commercial_flow: string | null;
+    headcount: number | null;
+    start_date: string | null;
+    start_label: string;
+    rate_min: number | null;
+    rate_max: number | null;
+    rate_note: string | null;
+    work_style: string | null;
+    interview_count: number | null;
+    users: {
+        main: UserOption;
+        sub: UserOption | null;
+    };
+    required_skills: SkillListItem[];
+    preferred_skills: SkillListItem[];
+    updated_at: string;
+}
+
+export interface InterviewCountOption {
+    value: number;
+    label: string;
+}
+
+export interface ProjectFilters {
+    status: string[];
+    work_style: string[];
+    commercial_flow: string[];
+    interview_count: number[];
+    keyword: string;
+    sort: "created_at" | "updated_at" | "start_date" | "rate_max";
+    order: "asc" | "desc";
+    per_page: number;
+    page: number;
+}
+
+export interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+}
+
 /**
- * 一覧画面（暫定実装）。バックエンドが id / name のみ返すため、
- * Project 詳細型のサブセットとして定義する（検索・絞り込み・ページネーションは別途実装予定）。
+ * ソート選択肢（sort×order のペア＋表示ラベル）。
+ * バックエンド（ProjectController の SORT_OPTIONS）を SSOT として props で受け取り、
+ * UI の選択肢と許可された組み合わせを常に一致させる（Engineer 実装と同方針）。
  */
+export interface SortOption {
+    sort: string;
+    order: string;
+    label: string;
+}
+
 export type ProjectIndexPageProps = {
-    projects: Pick<Project, "id" | "name">[];
+    projects: {
+        data: ProjectListItem[];
+        meta: PaginationMeta;
+    };
+    filters: ProjectFilters;
+    statusOptions: StatusOption[];
+    workStyleOptions: WorkStyleOption[];
+    commercialFlowOptions: CommercialFlowOption[];
+    interviewCountOptions: InterviewCountOption[];
+    sortOptions: SortOption[];
 };
 
 export const PROJECT_STATUS_LABELS: Record<string, string> = {

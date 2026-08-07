@@ -22,9 +22,9 @@ class Project extends Model
     ];
 
     public const WORK_STYLES = [
-        ['key' => 'onsite', 'name' => '常駐'],
-        ['key' => 'hybrid', 'name' => '一部リモート可'],
-        ['key' => 'remote', 'name' => 'フルリモート'],
+        ['value' => 'onsite', 'label' => '常駐'],
+        ['value' => 'hybrid', 'label' => '一部リモート可'],
+        ['value' => 'remote', 'label' => 'フルリモート'],
     ];
 
     public const COMMERCIAL_FLOWS = [
@@ -40,6 +40,12 @@ class Project extends Model
         ['value' => 'pending', 'label' => 'ペンディング'],
     ];
 
+    public const INTERVIEW_COUNTS = [
+        ['value' => 1, 'label' => '1回'],
+        ['value' => 2, 'label' => '2回'],
+        ['value' => 3, 'label' => '3回以上'],
+    ];
+    
     /**
      * 案件 ENUM の表示ラベル（SSOT）。value => label。
      * フォーム選択肢（ProjectController）・マッチング結果の表示ラベル（MatchingResource）は

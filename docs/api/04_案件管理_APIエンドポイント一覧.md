@@ -34,11 +34,11 @@
 | work_style | string[] | 任意 | 稼働形態キー配列 | onsite / hybrid / remote |
 | commercial_flow | string[] | 任意 | 商流キー配列 | prime / secondary / tertiary / other |
 | interview_count | int[] | 任意 | 面談回数配列 | 1 / 2 / 3（3以上を含む） |
-| keyword | string | 任意 | フリーワード検索 | 案件名・スキルラベル・業務内容詳細に対して部分一致。検索対象項目はTBD |
-| sort | string | 任意 | ソート項目 | デフォルト：created_at。有効値：created_at / start_date / rate_max |
+| keyword | string | 任意 | フリーワード検索 | 案件名（部分一致）・スキルラベル（前方一致）が対象。業務内容詳細は対象外（人材一覧と同方針） |
+| sort | string | 任意 | ソート項目 | デフォルト：created_at。有効値：created_at / updated_at / start_date / rate_max |
 | order | string | 任意 | 並び順 | asc / desc（デフォルト：desc） |
 | page | int | 任意 | ページ番号 | デフォルト：1 |
-| per_page | int | 任意 | 1ページあたり件数 | デフォルト：20・上限はTBD |
+| per_page | int | 任意 | 1ページあたり件数 | デフォルト：20・上限：100件 |
 
 > 異なる項目間はAND条件。例：`(募集中) AND (フルリモート) AND (プライム)`  
 > スキル検索は `keyword` のフリーワード検索（スキルラベル前方一致）で対応する。スキルマスタ廃止のため `skill_ids[]` は設けない（WF_06 v2.0確定）  
@@ -64,7 +64,7 @@
                                                // start_date が null → "未定"
                                                // start_date に日付あり → "YYYY/MM/DD〜"
                                                // Controller内で生成する
-                                               // ※ 過去日付の扱いはTBD
+                                               // 過去日付でも特別扱いせず、そのまま"YYYY/MM/DD〜"と表示する
         "rate_min": "int",                     // 単価下限（万円）
         "rate_max": "int",                     // 単価上限（万円）
         "rate_note": "string",                 // 単価備考（"スキル見合い"等）
@@ -377,8 +377,5 @@
 
 | # | 項目 | QA# | 理由 |
 |---|------|-----|------|
-| 1 | 案件一覧フリーワード検索の検索対象項目 | - | スキルラベル前方一致を含む方針だが、案件名以外の対象項目が未確定 |
-| 2 | 案件一覧ページの1ページあたり件数上限値 | - | デフォルト20は確定。上限値（推奨：100件）は未決定 |
-| 3 | start_label の過去日付の扱い | - | 過去日付をそのまま"YYYY/MM/DD〜"と表示するかを確認すること（WF_08注記では「即日〜」廃止・日付表示に統一と記載されているが、人材管理側のTBDと合わせて統一方針を確定すること） |
-| 4 | `description` / `work_env` / `remarks` の文字数上限 | - | DBはTEXT型のため上限なし。バリデーション上の制限値を設けるか確認が必要 |
-| 5 | `interview_count` の上限値 | - | WF_06では「3回以上」という表示があるが、DB上の上限（TINYINT UNSIGNED: 最大255）以外の業務的な上限の要否を確認すること |
+| 1 | `description` / `work_env` / `remarks` の文字数上限 | - | DBはTEXT型のため上限なし。バリデーション上の制限値を設けるか確認が必要 |
+| 2 | `interview_count` の上限値 | - | WF_06では「3回以上」という表示があるが、DB上の上限（TINYINT UNSIGNED: 最大255）以外の業務的な上限の要否を確認すること |

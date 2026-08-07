@@ -282,8 +282,8 @@ export default function ProjectForm({
                     </SelectTrigger>
                     <SelectContent>
                         {work_styles.map((style) => (
-                            <SelectItem key={style.key} value={style.key}>
-                                {style.name}
+                            <SelectItem key={style.value} value={style.value}>
+                                {style.label}
                             </SelectItem>
                         ))}
                     </SelectContent>
