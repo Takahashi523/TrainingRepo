@@ -6,12 +6,7 @@ import {
     SelectValue,
 } from '@/Components/ui/select';
 import { cn } from '@/lib/utils';
-
-export interface SortOption {
-    sort: string;
-    order: string;
-    label: string;
-}
+import { SortOption } from '@/types';
 
 function toValue(sort: string, order: string) {
     return `${sort}:${order}`;

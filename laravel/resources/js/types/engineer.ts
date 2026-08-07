@@ -1,3 +1,5 @@
+import { PaginationMeta, SortOption } from '@/types';
+
 export interface Phase {
     key: string;
     name: string;
@@ -122,25 +124,8 @@ export interface EngineerFilters {
     page: number;
 }
 
-export interface PaginationMeta {
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    from: number | null;
-    to: number | null;
-}
-
-/**
- * ソート選択肢（sort×order のペア＋表示ラベル）。
- * バックエンド（EngineerController の SORT_OPTIONS）を SSOT として props で受け取り、
- * UI の選択肢と許可された組み合わせを常に一致させる。
- */
-export interface SortOption {
-    sort: string;
-    order: string;
-    label: string;
-}
+// PaginationMeta / SortOption は一覧画面共通の型のため types/index.d.ts に集約している
+// （バックエンドの EngineerController の SORT_OPTIONS を SSOT として props で受け取る点は変わらない）。
 
 export type EngineerListPageProps = {
     engineers: {
