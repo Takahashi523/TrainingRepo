@@ -8,6 +8,7 @@ use App\Support\Csv\EngineerCsvSchema;
 use App\Support\Csv\ProjectCsvSchema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use League\Csv\Writer;
 
 /**
@@ -364,6 +365,46 @@ class CsvImportTest extends CsvTestCase
         $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
         $response->assertStatus(422);
         $this->assertNotNull($this->findError($this->importErrors($response), 2, 'main_user_id'));
+    }
+
+    /**
+     * 更新インポートのクエリ数が行数に比例しないこと（担当者id存在照合の N+1 回避＋書き込みの upsert バッチ化）。
+     * 個別 UPDATE / 行ごとの exists クエリだと件数に比例してクエリが増えるため、
+     * 行数を変えてもクエリ数が変わらないことを直接アサートして回帰を検知する。
+     */
+    public function test_update_import_query_count_does_not_scale_with_row_count(): void
+    {
+        $user = $this->makeUser('admin');
+
+        // 既存 n 件を更新するインポートを実行し、その間に発行されたクエリ数を返す。
+        $measure = function (int $n) use ($user): int {
+            // 事前データ作成は計測前（enableQueryLog 前）に行うのでカウントに含めない。
+            $rows = collect(range(1, $n))->map(function () use ($user): array {
+                $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+                return [
+                    'id' => (string) $engineer->id,
+                    'name' => '更新後', 'name_kana' => 'コウシンゴ',
+                    'status' => 'proposable', 'main_user_id' => $user->id,
+                ];
+            })->all();
+            $csv = $this->buildCsv(new EngineerCsvSchema, $rows);
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+            $queryCount = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $queryCount;
+        };
+
+        // 3件と30件でクエリ数が一致すること（preload 1回＋バッチ upsert 1回で一定）。
+        $this->assertSame(
+            $measure(3),
+            $measure(30),
+            '行数に比例してクエリが増えている（個別UPDATEまたは行ごとexistsのN+1の疑い）',
+        );
     }
 
     public function test_boundary_values_are_rejected(): void

@@ -100,6 +100,14 @@ export default function CsvImportSection({
         // 新しいファイル選択＝再インポートの起点。前回結果はクリアする（requirements 表）。
         clearResult();
 
+        // 拡張子の事前ガード（fail-fast）。サーバーと同じ順（拡張子→サイズ）で、明らかな種類違いを送信前に弾く。
+        // D&D は <input accept=".csv"> の絞り込みを迂回できるため、ここでも確認する。文言はサーバーの拡張子エラーと一致させる。
+        // 実形式（mimes）・サイズ上限のサーバー検証は最後の砦として残る。
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            setFileError('ファイルの拡張子を「.csv」にしてください。');
+            return;
+        }
+
         // サイズ事前ガード（fail-fast）。巨大ファイルを送信する前に弾く（通信・サーバー負荷の抑制）。
         // 上限は props（サーバーの CsvImportRequest::MAX_FILE_SIZE_KB 由来）。サーバーの max 検証も最後の砦として残る。
         if (file.size > maxUploadBytes) {

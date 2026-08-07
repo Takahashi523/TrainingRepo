@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
  *   5. 行ごと：レイアウト（列数）先行 → 復元（CsvInjection）→ 正規化 → 項目検証（bail なし・全メッセージ収集）
  *              → 担当者/更新 id の存在照合（メモリ）→ ファイル内 id 重複（O-8）
  *   6. エラーが1件でもあれば書き込まず 422（errors.importErrors に構造化 JSON）
- *   7. エラー0件なら DB::transaction 内でバッチ INSERT / 個別 UPDATE（全項目上書き＝O-1 暫定許容）
+ *   7. エラー0件なら DB::transaction 内で upsert によるバッチ INSERT / UPDATE（全項目上書き＝O-1 暫定許容）
  *
  * 設計原則：SRP（1クラス＝インポートの1責務）／DRY（列定義は CsvSchema・書式ルールは *Rules に集約）／
  * フェイルセーフ（全エラー収集後に一括ロールバック）。
@@ -227,7 +227,15 @@ class CsvImportService
     }
 
     /**
-     * 全行 OK のときのみ呼ばれる。1トランザクション内でバッチ INSERT / 個別 UPDATE する。
+     * 全行 OK のときのみ呼ばれる。1トランザクション内で upsert によりバッチ INSERT / UPDATE する。
+     *
+     * 新規（id=null）と更新（id=既存）を1つの配列にまとめ、500件ずつ upsert する。
+     * MySQL は AUTO_INCREMENT 列への明示的な NULL で通常どおり採番するため、id=null は INSERT、
+     * id=既存は主キー衝突で ON DUPLICATE KEY UPDATE（＝UPDATE）になる。個別 UPDATE を1件ずつ発行していた
+     * 従来方式に比べ、更新中心のインポートでも SQL 発行回数が件数に比例して増えない。
+     * engineers / projects は主キー（id）以外にユニーク制約が無いため、他キー衝突で別レコードを
+     * 取り違えて更新する危険はない（マイグレーション確認済み）。
+     * `created_at` は更新列に含めない（既存行の作成日時を保持）。全項目上書き＝O-1 暫定許容。
      *
      * @param  array<int, array{id: ?string, assoc: array<string, mixed>}>  $writable
      * @return array{total_rows: int, created: int, updated: int}
@@ -238,30 +246,31 @@ class CsvImportService
         $model = $schema->modelClass();
         $now = now();
 
-        $inserts = [];
-        $updates = [];
+        $rows = [];
+        $created = 0;
+        $updated = 0;
+        $updateColumns = null;
         foreach ($writable as $row) {
             $attrs = $schema->buildAttributes($row['assoc']);
-            if ($row['id'] === null) {
-                $inserts[] = $attrs + ['created_at' => $now, 'updated_at' => $now];
-            } else {
-                $updates[] = ['id' => (int) $row['id'], 'attrs' => $attrs + ['updated_at' => $now]];
-            }
+            // 更新時に上書きする列＝全属性＋updated_at。id（一致キー）と created_at は除外し既存値を保持する。
+            $updateColumns ??= array_merge(array_keys($attrs), ['updated_at']);
+            // 全行で列構成を揃える（upsert は先頭行のキーで列を決めるため）。id は新規=null／更新=既存値。
+            $rows[] = ['id' => $row['id'] === null ? null : (int) $row['id']]
+                + $attrs
+                + ['created_at' => $now, 'updated_at' => $now];
+            $row['id'] === null ? $created++ : $updated++;
         }
 
-        DB::transaction(function () use ($model, $inserts, $updates): void {
-            foreach (array_chunk($inserts, 500) as $chunk) {
-                $model::query()->insert($chunk);
-            }
-            foreach ($updates as $update) {
-                $model::query()->whereKey($update['id'])->update($update['attrs']);
+        DB::transaction(function () use ($model, $rows, $updateColumns): void {
+            foreach (array_chunk($rows, 500) as $chunk) {
+                $model::query()->upsert($chunk, ['id'], $updateColumns);
             }
         });
 
         return [
-            'total_rows' => count($inserts) + count($updates),
-            'created' => count($inserts),
-            'updated' => count($updates),
+            'total_rows' => $created + $updated,
+            'created' => $created,
+            'updated' => $updated,
         ];
     }
 
