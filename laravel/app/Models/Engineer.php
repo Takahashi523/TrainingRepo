@@ -89,6 +89,15 @@ class Engineer extends Model
         return $this->hasMany(EngineerSkill::class);
     }
 
+    /**
+     * この人材に紐づくパイプライン（進捗）。
+     * 人材削除時に FK で連鎖削除されるため、詳細画面の削除確認で件数警告に使う（DELETE #7）。
+     */
+    public function pipelines(): HasMany
+    {
+        return $this->hasMany(Pipeline::class);
+    }
+
     public function mainUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'main_user_id');

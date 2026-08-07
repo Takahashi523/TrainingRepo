@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Listeners\UpdateLastLoginAt;
+use App\Services\Ai\AiSummaryClient;
+use App\Services\Ai\HttpAiSummaryClient;
 use App\Services\Matching\HttpMatchingEngineClient;
 use App\Services\Matching\MatchingEngineClient;
 use Illuminate\Auth\Events\Login;
@@ -21,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
         // マッチングエンジン連携の差し替え点はここ1箇所に集約する（DIP）。
         // 通信手段の変更・テスト時の差し替えはこのバインドを変えるだけで済む。
         $this->app->bind(MatchingEngineClient::class, HttpMatchingEngineClient::class);
+
+        // 人材プロフィール要約（Python E2）連携も同様に差し替え点を集約する（DIP）。
+        $this->app->bind(AiSummaryClient::class, HttpAiSummaryClient::class);
     }
 
     /**
