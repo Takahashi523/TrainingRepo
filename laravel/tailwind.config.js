@@ -14,8 +14,11 @@ export default {
     theme: {
     	extend: {
     		fontFamily: {
+    			// 英数字は Inter、日本語は Noto Sans JP を優先する組み合わせ。
+    			// Inter は日本語グリフを持たないため、日本語は自動的に Noto Sans JP へフォールバックする。
     			sans: [
-    				'Figtree',
+    				'Inter',
+    				'Noto Sans JP',
                     ...defaultTheme.fontFamily.sans
                 ]
     		},
