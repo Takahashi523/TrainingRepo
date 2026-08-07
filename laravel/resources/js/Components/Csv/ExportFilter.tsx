@@ -108,10 +108,24 @@ export default function ExportFilter({ options, config }: Props) {
         setExporting(true);
         try {
             // same-origin のため Cookie（セッション）は自動付与される。GET なので CSRF トークンは不要。
+            // Accept に application/json を含めると、バリデーション失敗（422）やセッション切れ（401）で
+            // Laravel が「元ページへリダイレクト」ではなく JSON エラーを返す（expectsJson() が真になる）ため、
+            // fetch がリダイレクトを追従して 200(HTML) を掴み誤成功する事態を根本から防げる。
             const res = await fetch(url, {
-                headers: { Accept: 'text/csv' },
+                headers: { Accept: 'application/json, text/csv' },
                 credentials: 'same-origin',
             });
+
+            // セッション切れ（401）は、アプリ他画面（Inertia 経由）と挙動を揃える。
+            // ここでログインへ直リンクすると intended が保存されず、再ログイン後にダッシュボードへ飛んでしまう。
+            // 代わりに現在の /csv を再読み込みし、標準の auth フロー（未認証→guest リダイレクトで
+            // intended=/csv を保存→再ログイン後に /csv へ復帰）に乗せることで、他画面と同じく元画面へ戻す。
+            // res.redirected も同じ扱いにするのは、fetch が 302→ログインHTML を追従した場合に
+            // 200(HTML) を「成功」として保存させないため。純粋なデータ不正は下の 422 で残す。
+            if (res.redirected || res.status === 401) {
+                window.location.reload();
+                return;
+            }
 
             if (!res.ok) {
                 // 422＝絞り込み条件が実行時に不正（削除済み担当者ID等）。SPA を保ったままインライン表示する。

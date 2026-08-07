@@ -34,4 +34,17 @@ class ProjectCsvExportRequest extends FormRequest
             'work_style.*' => [Rule::in(ProjectRules::workStyleValues())],
         ];
     }
+
+    /**
+     * エラーメッセージ用の属性名を日本語化する（既定だと user_id の exists 失敗が
+     * 「選択されたuser idは存在しません。」と英語キーのまま表示されるため）。
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'user_id' => '担当者',
+        ];
+    }
 }

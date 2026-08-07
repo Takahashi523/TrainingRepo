@@ -128,7 +128,8 @@ export default function CsvUploader({
                 <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                     対応形式：.csv（UTF-8 / BOM付き）
                     {maxSizeLabel && `　最大ファイルサイズ：${maxSizeLabel}`}
-                    　改行コード：CRLF・LF両対応
+                    {/* 地の文で書くと JSX が行頭の全角スペース(U+3000)もトリムし前項目と密着するため、JS 文字列で保持する。 */}
+                    {'　改行コード：CRLF・LF両対応'}
                 </p>
                 <button
                     type="button"
