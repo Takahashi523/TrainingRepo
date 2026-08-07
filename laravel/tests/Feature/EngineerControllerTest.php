@@ -7,6 +7,7 @@ use App\Models\FormFieldSetting;
 use App\Models\Pipeline;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -638,8 +639,9 @@ class EngineerControllerTest extends TestCase
 
         $engineer = Engineer::where('name', '山田太郎')->first();
         $this->assertSame('AI生成要約テキスト', $engineer->ai_summary);
-        // Python 返却の ISO8601 をそのまま保存する（now() で上書きしない）。
-        $this->assertSame('2026-08-07T10:00:00+09:00', $engineer->ai_summary_generated_at);
+        // Python 返却の生成時刻をそのまま採用する（now() で上書きしない）。datetime キャストで Carbon へ
+        // 正規化して保存するため、文字列一致ではなく「同一時点」で検証する（TZ 表記差を吸収）。
+        $this->assertEquals(Carbon::parse('2026-08-07T10:00:00+09:00'), $engineer->ai_summary_generated_at);
         // 成功時は失敗トースト（flash.error）を出さない。
         $response->assertSessionMissing('error');
     }
@@ -1199,7 +1201,7 @@ class EngineerControllerTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), '/api/v1/ai/profile-summary'));
         $engineer = $engineer->fresh();
         $this->assertSame('再生成された要約', $engineer->ai_summary);
-        $this->assertSame('2026-08-07T11:00:00+09:00', $engineer->ai_summary_generated_at);
+        $this->assertEquals(Carbon::parse('2026-08-07T11:00:00+09:00'), $engineer->ai_summary_generated_at);
     }
 
     public function test_update_does_not_regenerate_ai_summary_when_appeal_note_unchanged(): void

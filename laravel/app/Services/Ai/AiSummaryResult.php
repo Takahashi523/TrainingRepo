@@ -7,7 +7,8 @@ namespace App\Services\Ai;
  *
  * Python 側は要約テキストと生成時刻を「返却するのみ」で、DB 保存は Laravel（呼び出し側）の責務
  * （#12 の「Python が登録」は誤りとして Python チームと認識合わせ済み）。生成時刻は Python が返す
- * ISO8601 文字列をそのまま `ai_summary_generated_at` に保存する。
+ * ISO8601 文字列を保持し、保存時に Engineer の datetime キャストで Carbon へ正規化する
+ * （+09:00 / Z / オフセット無しのいずれでも MySQL の DATETIME へ安全に格納するため）。
  */
 final class AiSummaryResult
 {

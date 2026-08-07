@@ -83,7 +83,8 @@ class EngineerService
         try {
             $result = $this->aiSummary->generate($engineer);
             if ($result !== null) {
-                // Python が返す ISO8601 の生成時刻をそのまま保存する。
+                // Python が返す ISO8601 の生成時刻を採用する。Engineer 側の datetime キャストが Carbon へ
+                // 正規化するため、+09:00 / Z / オフセット無しのいずれでも安全に保存できる。
                 $engineer->update([
                     'ai_summary' => $result->summary,
                     'ai_summary_generated_at' => $result->generatedAt,
