@@ -20,12 +20,6 @@ class EngineerController extends Controller
 {
     public function __construct(private AiSummaryService $aiSummary) {}
 
-    private const STATUSES = [
-        ['value' => 'proposable',     'label' => '提案可'],
-        ['value' => 'interviewing',   'label' => '面談中'],
-        ['value' => 'not_proposable', 'label' => '提案不可'],
-    ];
-
     /**
      * 許可されたソートの組み合わせ（sort×order のペア＋表示ラベル）。
      * DB設計書 §8 の4パターンを単一の情報源（SSOT）として定義し、
@@ -39,8 +33,6 @@ class EngineerController extends Controller
         ['sort' => 'available_from', 'order' => 'asc',  'label' => '提案可能タイミング順'],
     ];
 
-    private const ALLOWED_STATUSES = ['proposable', 'interviewing', 'not_proposable'];
-
     private const ALLOWED_WORK_STYLES = ['onsite', 'hybrid', 'remote'];
 
     private const PER_PAGE_DEFAULT = 20;
@@ -52,7 +44,7 @@ class EngineerController extends Controller
         $allowedPhases = array_column(Engineer::PHASES, 'key');
 
         $statuses = array_values(array_intersect(
-            (array) $request->input('status', []), self::ALLOWED_STATUSES
+            (array) $request->input('status', []), array_column(Engineer::STATUSES, 'value')
         ));
         $workStyles = array_values(array_intersect(
             (array) $request->input('work_styles', []), self::ALLOWED_WORK_STYLES
@@ -147,7 +139,7 @@ class EngineerController extends Controller
                 'per_page' => $perPage,
                 'page' => $paginator->currentPage(),
             ],
-            'statusOptions' => self::STATUSES,
+            'statusOptions' => Engineer::STATUSES,
             'workStyleOptions' => Engineer::WORK_STYLES,
             'phaseOptions' => Engineer::PHASES,
             'sortOptions' => self::SORT_OPTIONS,
@@ -262,7 +254,7 @@ class EngineerController extends Controller
             'fieldSettings' => $fieldSettings,
             'phases' => Engineer::PHASES,
             'work_styles' => Engineer::WORK_STYLES,
-            'statuses' => self::STATUSES,
+            'statuses' => Engineer::STATUSES,
             'users' => User::select('id', 'name')->orderBy('name')->get(),
         ];
     }

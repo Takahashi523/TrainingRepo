@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CsvController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EngineerController;
 use App\Http\Controllers\Master\FormSettingController;
@@ -29,6 +30,13 @@ Route::middleware('auth')->group(function () {
     Route::patch('pipelines/{pipeline}', [PipelineController::class, 'update'])->name('pipelines.update');
     Route::delete('pipelines/{pipeline}', [PipelineController::class, 'destroy'])->name('pipelines.destroy');
     Route::post('pipelines', [PipelineController::class, 'store'])->name('pipelines.store');
+
+    // CSV 入出力（WF_11 / api/08）。認可は CsvController 内の Gate（access-csv）で admin/general 双方可。
+    Route::get('csv', [CsvController::class, 'index'])->name('csv.index');
+    Route::post('csv/engineers/import', [CsvController::class, 'importEngineers'])->name('csv.engineers.import');
+    Route::get('csv/engineers/export', [CsvController::class, 'exportEngineers'])->name('csv.engineers.export');
+    Route::post('csv/projects/import', [CsvController::class, 'importProjects'])->name('csv.projects.import');
+    Route::get('csv/projects/export', [CsvController::class, 'exportProjects'])->name('csv.projects.export');
 });
 
 // マスタ管理（管理者専用）。全エンドポイントに admin ミドルウェアを適用する（docs/api/09）。
