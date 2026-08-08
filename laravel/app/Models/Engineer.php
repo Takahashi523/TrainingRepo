@@ -29,10 +29,17 @@ class Engineer extends Model
         ['key' => 'remote', 'name' => 'フルリモート'],
     ];
 
+    /**
+     * 人材ステータスの許容値（SSOT）。value => label。
+     * 共有バリデーション（App\Validation\EngineerRules）・CSV 入出力はこの定数のみを参照し、
+     * ステータスコードの二重管理を避ける。
+     * （EngineerController は表示用に別途 private 定数を保持しているが、
+     *  将来的には本定数へ寄せられる。本作業では横断リファクタを避け参照元は追加しない）
+     */
     public const STATUSES = [
-        ['key' => 'proposable',     'name' => '提案可'],
-        ['key' => 'interviewing',   'name' => '面談中'],
-        ['key' => 'not_proposable', 'name' => '提案不可'],
+        ['value' => 'proposable',     'label' => '提案可'],
+        ['value' => 'interviewing',   'label' => '面談中'],
+        ['value' => 'not_proposable', 'label' => '提案不可'],
     ];
 
     protected $fillable = [

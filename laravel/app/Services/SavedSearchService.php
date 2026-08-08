@@ -40,7 +40,7 @@ class SavedSearchService
             $sanitized = [
                 'status' => array_values(array_intersect(
                     (array) ($conditions['status'] ?? []),
-                    array_column(Engineer::STATUSES, 'key')
+                    array_column(Engineer::STATUSES, 'value')
                 )),
                 'work_styles' => array_values(array_intersect(
                     (array) ($conditions['work_styles'] ?? []),

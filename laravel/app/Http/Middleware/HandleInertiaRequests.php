@@ -42,6 +42,11 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => session('success'),
                 'error' => fn () => session('error'),
+                // CSV インポート成功サマリ（{resource, summary:{total_rows, created, updated}}）。
+                // 成功時のみ redirect back で load され、フロントは onSuccess でトースト表示に使う。
+                // 失敗（ファイル/行エラー）は flash では返さない（onSuccess 誤発火防止）＝422 の
+                // errors.importErrors（JSON 文字列）で返す。
+                'importResult' => fn () => session('importResult'),
             ],
         ];
     }
