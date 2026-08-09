@@ -1039,7 +1039,7 @@
           <div class="modal-delete-confirm" id="confirm-1">
             <span>削除しますか？</span>
             <button class="modal-confirm-yes" onclick="doDelete(1)">削除</button>
-            <button class="modal-confirm-no" onclick="cancelDelete(1)">取消</button>
+            <button class="modal-confirm-no" onclick="cancelDelete(1)">キャンセル</button>
           </div>
         </div>
 
@@ -1049,7 +1049,7 @@
           <div class="modal-delete-confirm" id="confirm-2">
             <span>削除しますか？</span>
             <button class="modal-confirm-yes" onclick="doDelete(2)">削除</button>
-            <button class="modal-confirm-no" onclick="cancelDelete(2)">取消</button>
+            <button class="modal-confirm-no" onclick="cancelDelete(2)">キャンセル</button>
           </div>
         </div>
 
@@ -1059,7 +1059,7 @@
           <div class="modal-delete-confirm" id="confirm-3">
             <span>削除しますか？</span>
             <button class="modal-confirm-yes" onclick="doDelete(3)">削除</button>
-            <button class="modal-confirm-no" onclick="cancelDelete(3)">取消</button>
+            <button class="modal-confirm-no" onclick="cancelDelete(3)">キャンセル</button>
           </div>
         </div>
 
@@ -1116,7 +1116,7 @@ function saveCondition() {
     '<div class="modal-delete-confirm" id="confirm-' + id + '">' +
       '<span>削除しますか？</span>' +
       '<button class="modal-confirm-yes" onclick="doDelete(' + id + ')">削除</button>' +
-      '<button class="modal-confirm-no" onclick="cancelDelete(' + id + ')">取消</button>' +
+      '<button class="modal-confirm-no" onclick="cancelDelete(' + id + ')">キャンセル</button>' +
     '</div>';
   list.insertBefore(item, list.firstChild);
   document.getElementById('saveConditionName').value = '';
