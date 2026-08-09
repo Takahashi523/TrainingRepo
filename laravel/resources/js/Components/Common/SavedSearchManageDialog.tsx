@@ -29,6 +29,12 @@ export default function SavedSearchManageDialog<
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const { toast } = useToast();
 
+    // 1件でも削除処理中は、リスト内の削除系ボタンをすべて無効化する（他行の削除トリガーも含む）。
+    // deletingId は同時に1件しか保持できないため、行ごとの一致判定だけで無効化すると、
+    // 削除中に別の行の削除を開始できてしまい、後から始めた方の deletingId で上書きされて
+    // 先に削除中だった行の無効化表示が剥がれてしまう（実際には削除中のまま）という不整合が起きる。
+    const isDeleting = deletingId !== null;
+
     // モーダルを閉じたら削除確認UIをリセットする
     useEffect(() => {
         if (!open) {
@@ -92,7 +98,7 @@ export default function SavedSearchManageDialog<
                                                 size="sm"
                                                 variant="destructive"
                                                 className="h-6 px-2 text-[11px]"
-                                                disabled={deletingId === item.id}
+                                                disabled={isDeleting}
                                                 onClick={() => handleDelete(item.id)}
                                             >
                                                 {deletingId === item.id ? "削除中..." : "削除"}
@@ -102,7 +108,7 @@ export default function SavedSearchManageDialog<
                                                 size="sm"
                                                 variant="outline"
                                                 className="h-6 px-2 text-[11px]"
-                                                disabled={deletingId === item.id}
+                                                disabled={isDeleting}
                                                 onClick={() => setConfirmDeleteId(null)}
                                             >
                                                 キャンセル
@@ -114,6 +120,7 @@ export default function SavedSearchManageDialog<
                                             size="sm"
                                             variant="outline"
                                             className="h-6 shrink-0 border-destructive px-2 text-[11px] text-destructive hover:bg-destructive/5"
+                                            disabled={isDeleting}
                                             onClick={() => setConfirmDeleteId(item.id)}
                                         >
                                             削除
