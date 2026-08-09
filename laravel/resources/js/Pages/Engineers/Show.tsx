@@ -226,7 +226,7 @@ export default function Show({ engineer }: Props) {
                 {/* 基本情報 */}
                 <SectionCard title="基本情報">
                     <DetailRow label="氏名 / カナ">
-                        {engineer.name}　／　{engineer.name_kana}
+                        {engineer.name}{'　／　'}{engineer.name_kana}
                     </DetailRow>
                     <DetailRow label="年齢（生年月日）">
                         {engineer.age != null ? `${engineer.age}歳` : '—'}
@@ -241,7 +241,7 @@ export default function Show({ engineer }: Props) {
                         )}
                     </DetailRow>
                     <DetailRow label="最寄駅 / 路線">
-                        {engineer.nearest_station || '—'}　／　{engineer.nearest_line || '—'}
+                        {engineer.nearest_station || '—'}{'　／　'}{engineer.nearest_line || '—'}
                     </DetailRow>
                     <DetailRow label="稼働可能時期">
                         {engineer.available_label}
