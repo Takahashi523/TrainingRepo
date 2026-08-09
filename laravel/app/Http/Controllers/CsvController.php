@@ -43,10 +43,22 @@ class CsvController extends Controller
         // 担当者ID一覧は「ID から名前を引く」用途のため ID 昇順で並べる。
         $users = User::query()->select('id', 'name')->orderBy('id')->get();
 
+        // 稼働形態の選択肢はフロント（ExportFilter / CsvFilterOptions 型）が {key, name} 契約で読む。
+        // モデル定数のキー名差（Engineer=key/name／Project=value/label）を境界のここで吸収して正規化する。
+        // これをしないと案件側で w.key / w.name が undefined になり、ラベルが消えて絞り込みも壊れる。
+        // 定数自体は他画面（案件フォーム・バリデーション）が value/label 前提で参照するため変更しない。
+        $normalizeWorkStyles = fn (array $styles) => array_map(
+            fn (array $s) => [
+                'key' => $s['key'] ?? $s['value'],
+                'name' => $s['name'] ?? $s['label'],
+            ],
+            $styles,
+        );
+
         $filterOptions = fn (array $statuses, array $workStyles) => [
             'statuses' => $statuses,
             'users' => $users,
-            'work_styles' => $workStyles,
+            'work_styles' => $normalizeWorkStyles($workStyles),
         ];
 
         return Inertia::render('Csv/Index', [
