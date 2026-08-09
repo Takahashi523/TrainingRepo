@@ -233,7 +233,7 @@ class SavedSearchControllerTest extends TestCase
 
     public function test_engineer_conditions_invalid_sort_order_pair_falls_back_to_default(): void
     {
-        // EngineerController::SORT_OPTIONS に存在しない組み合わせは、
+        // Engineer::SORT_OPTIONS に存在しない組み合わせは、
         // EngineerController::resolveSort() と同じくデフォルト（先頭）へフォールバックする。
         $user = User::factory()->create();
         $payload = $this->validEngineerPayload();
@@ -277,7 +277,7 @@ class SavedSearchControllerTest extends TestCase
 
     public function test_project_conditions_invalid_sort_value_falls_back_to_default(): void
     {
-        // ProjectController::SORT_OPTIONS に存在しないソート項目名は、
+        // Project::SORT_OPTIONS に存在しないソート項目名は、
         // ProjectController::resolveSort() と同じくデフォルト（先頭）へフォールバックする。
         $user = User::factory()->create();
         $payload = $this->validProjectPayload();

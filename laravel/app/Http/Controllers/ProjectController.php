@@ -23,16 +23,6 @@ class ProjectController extends Controller
         private readonly ProjectService $projectService
     ) {}
 
-    // SavedSearchService::sanitizeConditions() でも同じ許可リストを SSOT として参照するため public。
-    public const SORT_OPTIONS = [
-        ['sort' => 'created_at', 'order' => 'desc', 'label' => '登録日順（新しい順）'],
-        ['sort' => 'created_at', 'order' => 'asc',  'label' => '登録日順（古い順）'],
-        ['sort' => 'updated_at', 'order' => 'desc', 'label' => '更新日順（新しい順）'],
-        ['sort' => 'start_date', 'order' => 'asc',  'label' => '稼働開始時期順'],
-        ['sort' => 'rate_max',   'order' => 'desc', 'label' => '単価（高い順）'],
-        ['sort' => 'rate_max',   'order' => 'asc',  'label' => '単価（低い順）'],
-    ];
-
     private const PER_PAGE_DEFAULT = 20;
 
     private const PER_PAGE_MAX = 100;
@@ -164,22 +154,27 @@ class ProjectController extends Controller
             'workStyleOptions' => Project::WORK_STYLES,
             'commercialFlowOptions' => Project::COMMERCIAL_FLOWS,
             'interviewCountOptions' => Project::INTERVIEW_COUNTS,
-            'sortOptions' => self::SORT_OPTIONS,
+            'sortOptions' => Project::SORT_OPTIONS,
         ]);
     }
 
+    /**
+     * ソートを sort×order のペア単位で検証する。
+     * Project::SORT_OPTIONS（許可組の配列。SSOT）に一致するペアだけ採用し、
+     * 無ければ先頭（デフォルト）へフォールバックする。
+     */
     private function resolveSort(Request $request): array
     {
         $sortInput = (string) $request->input('sort', '');
         $orderInput = strtolower((string) $request->input('order', ''));
 
-        foreach (self::SORT_OPTIONS as $opt) {
+        foreach (Project::SORT_OPTIONS as $opt) {
             if ($opt['sort'] === $sortInput && $opt['order'] === $orderInput) {
                 return [$opt['sort'], $opt['order']];
             }
         }
 
-        return [self::SORT_OPTIONS[0]['sort'], self::SORT_OPTIONS[0]['order']];
+        return [Project::SORT_OPTIONS[0]['sort'], Project::SORT_OPTIONS[0]['order']];
     }
     
     /**

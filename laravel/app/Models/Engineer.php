@@ -30,6 +30,20 @@ class Engineer extends Model
     ];
 
     /**
+     * 許可されたソートの組み合わせ（sort×order のペア＋表示ラベル）。SSOT。
+     * DB設計書 §8 の4パターンをこの定数のみで管理する。
+     * EngineerController（一覧のソート検証・sortOptions props）と
+     * SavedSearchService（保存条件の sort/order ホワイトリスト検証）の双方から参照する。
+     * 先頭がデフォルト（created_at DESC）。
+     */
+    public const SORT_OPTIONS = [
+        ['sort' => 'created_at',     'order' => 'desc', 'label' => '登録日順（新しい順）'],
+        ['sort' => 'created_at',     'order' => 'asc',  'label' => '登録日順（古い順）'],
+        ['sort' => 'updated_at',     'order' => 'desc', 'label' => '更新日順（新しい順）'],
+        ['sort' => 'available_from', 'order' => 'asc',  'label' => '提案可能タイミング順'],
+    ];
+
+    /**
      * 人材ステータスの許容値（SSOT）。value => label。
      * 共有バリデーション（App\Validation\EngineerRules）・CSV 入出力はこの定数のみを参照し、
      * ステータスコードの二重管理を避ける。

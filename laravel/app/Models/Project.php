@@ -45,7 +45,22 @@ class Project extends Model
         ['value' => 2, 'label' => '2回'],
         ['value' => 3, 'label' => '3回以上'],
     ];
-    
+
+    /**
+     * 許可されたソートの組み合わせ（sort×order のペア＋表示ラベル）。SSOT。
+     * ProjectController（一覧のソート検証・sortOptions props）と
+     * SavedSearchService（保存条件の sort/order ホワイトリスト検証）の双方から参照する。
+     * 先頭がデフォルト（created_at DESC）。
+     */
+    public const SORT_OPTIONS = [
+        ['sort' => 'created_at', 'order' => 'desc', 'label' => '登録日順（新しい順）'],
+        ['sort' => 'created_at', 'order' => 'asc',  'label' => '登録日順（古い順）'],
+        ['sort' => 'updated_at', 'order' => 'desc', 'label' => '更新日順（新しい順）'],
+        ['sort' => 'start_date', 'order' => 'asc',  'label' => '稼働開始時期順'],
+        ['sort' => 'rate_max',   'order' => 'desc', 'label' => '単価（高い順）'],
+        ['sort' => 'rate_max',   'order' => 'asc',  'label' => '単価（低い順）'],
+    ];
+
     /**
      * 案件 ENUM の表示ラベル（SSOT）。value => label。
      * フォーム選択肢（ProjectController）・マッチング結果の表示ラベル（MatchingResource）は

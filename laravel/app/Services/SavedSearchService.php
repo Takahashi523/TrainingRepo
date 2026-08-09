@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Http\Controllers\EngineerController;
-use App\Http\Controllers\ProjectController;
 use App\Models\Engineer;
 use App\Models\Project;
 use App\Models\SavedSearch;
@@ -32,7 +30,7 @@ class SavedSearchService
     {
         if ($searchType === 'engineer') {
             [$sort, $order] = $this->resolveSortPair(
-                EngineerController::SORT_OPTIONS,
+                Engineer::SORT_OPTIONS,
                 (string) ($conditions['sort'] ?? ''),
                 (string) ($conditions['order'] ?? '')
             );
@@ -57,7 +55,7 @@ class SavedSearchService
             ];
         } else {
             [$sort, $order] = $this->resolveSortPair(
-                ProjectController::SORT_OPTIONS,
+                Project::SORT_OPTIONS,
                 (string) ($conditions['sort'] ?? ''),
                 (string) ($conditions['order'] ?? '')
             );
@@ -89,7 +87,7 @@ class SavedSearchService
     }
 
     /**
-     * sort×order のペアを許可リスト（EngineerController/ProjectController の SORT_OPTIONS。SSOT）
+     * sort×order のペアを許可リスト（Engineer/Project モデルの SORT_OPTIONS。SSOT）
      * と突き合わせて検証する。EngineerController::resolveSort() / ProjectController::resolveSort()
      * と同じ「一致しなければ先頭（デフォルト）へフォールバック」という考え方に合わせている。
      *
