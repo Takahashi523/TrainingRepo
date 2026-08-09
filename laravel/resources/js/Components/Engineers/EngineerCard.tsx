@@ -88,9 +88,12 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                         )}
                     </Section>
 
-                    {/* 工程経験 */}
+                    {/* 工程経験。フルサイズ（16px）ではカードのタイポに対して大きいため、縮小ラッパーで
+                        やや小さめ（15px / ラベル12px）に調整する。マッチングカード（14px）より一段大きい。 */}
                     <Section label="工程経験">
-                        <ProcessCheckboxGroup phases={phaseList} values={phaseValues} readOnly />
+                        <div className="[&_button]:h-[15px] [&_button]:w-[15px] [&_label]:text-xs [&_svg]:h-3 [&_svg]:w-3">
+                            <ProcessCheckboxGroup phases={phaseList} values={phaseValues} readOnly />
+                        </div>
                     </Section>
 
                     {/* 勤務形態 */}

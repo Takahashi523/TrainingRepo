@@ -1,4 +1,5 @@
 import EngineerForm, { EngineerFormData } from '@/Components/Engineers/EngineerForm';
+import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Engineer, EngineerEditPageProps } from '@/types/engineer';
@@ -46,6 +47,10 @@ export default function Edit({ engineer, fieldSettings, phases, work_styles, sta
     const form = useForm<EngineerFormData>(toFormData(engineer));
 
     const { processing } = form;
+
+    // AI 職務要約は appeal_note が変更された更新時のみ再生成される（サーバ側トリガー）。
+    // ローディング表示もその条件に合わせる（更新前の値と比較）。
+    const originalAppealNote = engineer.appeal_note ?? '';
 
     const handleSubmit = () => {
         form.transform((d) => ({
@@ -109,6 +114,15 @@ export default function Edit({ engineer, fieldSettings, phases, work_styles, sta
                 work_styles={work_styles}
                 statuses={statuses}
                 users={users}
+            />
+
+            {/*
+             * 保存リクエスト内で AI 職務要約を同期生成する（最大30秒）。appeal_note が変更された更新のみ
+             * 生成が走るため、その場合だけローディングを表示する。書き込みフローのためキャンセルは付けない。
+             */}
+            <AiLoadingOverlay
+                show={processing && form.data.appeal_note !== originalAppealNote}
+                message="AIが職務要約を生成しています…"
             />
         </AuthenticatedLayout>
     );

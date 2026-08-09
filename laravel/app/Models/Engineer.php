@@ -65,6 +65,10 @@ class Engineer extends Model
             'work_style_onsite' => 'boolean',
             'work_style_hybrid' => 'boolean',
             'work_style_remote' => 'boolean',
+            // Python(E2)が返す ISO8601 文字列（+09:00 / Z / オフセット無し）を DATETIME カラムへ
+            // 生格納すると、MySQL の session TZ とオフセットの組合せ次第でズレ／strict エラー（1292）に
+            // なる。datetime キャストで一旦 Carbon へ正規化してから保存し、読み戻しも ISO8601 に揃える。
+            'ai_summary_generated_at' => 'datetime',
         ];
     }
 
@@ -100,6 +104,15 @@ class Engineer extends Model
     public function skills(): HasMany
     {
         return $this->hasMany(EngineerSkill::class);
+    }
+
+    /**
+     * この人材に紐づくパイプライン（進捗）。
+     * 人材削除時に FK で連鎖削除されるため、詳細画面の削除確認で件数警告に使う（DELETE #7）。
+     */
+    public function pipelines(): HasMany
+    {
+        return $this->hasMany(Pipeline::class);
     }
 
     public function mainUser(): BelongsTo

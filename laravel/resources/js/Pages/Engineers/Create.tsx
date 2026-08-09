@@ -1,4 +1,5 @@
 import EngineerForm, { EngineerFormData } from '@/Components/Engineers/EngineerForm';
+import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerCreatePageProps } from '@/types/engineer';
@@ -97,6 +98,16 @@ export default function Create({ fieldSettings, phases, work_styles, statuses, u
                 work_styles={work_styles}
                 statuses={statuses}
                 users={users}
+            />
+
+            {/*
+             * 保存リクエスト内で AI 職務要約を同期生成する（最大30秒）。appeal_note に入力がある登録のみ
+             * 生成が走るため、その場合だけローディングを表示する。書き込みフローのためキャンセルは付けない
+             * （onCancel を渡さない：クライアントで中断してもサーバーは保存を完了し不整合になるため）。
+             */}
+            <AiLoadingOverlay
+                show={processing && form.data.appeal_note.trim() !== ''}
+                message="AIが職務要約を生成しています…"
             />
         </AuthenticatedLayout>
     );

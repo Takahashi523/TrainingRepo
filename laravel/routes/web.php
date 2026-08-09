@@ -18,7 +18,7 @@ Route::get('/', function () {
 Route::middleware('auth')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::resource('engineers', EngineerController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+    Route::resource('engineers', EngineerController::class);
     Route::resource('projects', ProjectController::class);
 
     Route::get('engineers/{engineer}/matching', [MatchingController::class, 'show'])->name('engineers.matching');
