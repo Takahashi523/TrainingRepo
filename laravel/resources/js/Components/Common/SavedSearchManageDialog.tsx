@@ -7,6 +7,7 @@ import {
     DialogTitle,
 } from "@/Components/ui/dialog";
 import { Input } from "@/Components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { ConditionValue, SavedSearchItem } from "@/types/savedSearch";
 import { router } from "@inertiajs/react";
 import { useEffect, useState } from "react";
@@ -60,6 +61,7 @@ export default function SavedSearchManageDialog<
     const [isSaving, setIsSaving] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const { toast } = useToast();
 
     // モーダルを閉じたら入力内容・削除確認UIをリセットする
     // (このコンポーネントは open の真偽で表示切替するだけで常時マウントされているため、
@@ -94,6 +96,14 @@ export default function SavedSearchManageDialog<
                 onFinish: () => setIsSaving(false),
                 // 保存できたら次回のために入力欄をクリアする（モーダルは開いたまま：WF準拠）
                 onSuccess: () => setName(""),
+                // flash.error は成功レスポンス時のみ拾えるため、419/422/500やネットワーク断など
+                // リクエスト自体が失敗したケースはここで明示的にトースト表示する（Silent Rejection防止）
+                onError: () =>
+                    toast({
+                        description: "検索条件の保存に失敗しました。時間をおいて再度お試しください。",
+                        variant: "destructive",
+                        duration: 5000,
+                    }),
             },
         );
     };
@@ -107,6 +117,12 @@ export default function SavedSearchManageDialog<
                 setDeletingId(null);
                 setConfirmDeleteId(null);
             },
+            onError: () =>
+                toast({
+                    description: "検索条件の削除に失敗しました。時間をおいて再度お試しください。",
+                    variant: "destructive",
+                    duration: 5000,
+                }),
         });
     };
 
