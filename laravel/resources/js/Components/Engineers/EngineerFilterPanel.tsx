@@ -1,12 +1,13 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
 import SavedSearchManageDialog from '@/Components/Common/SavedSearchManageDialog';
+import SavedSearchSaveDialog from '@/Components/Common/SavedSearchSaveDialog';
 import SavedSearchSelect from '@/Components/Common/SavedSearchSelect';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { EngineerFilters, EngineerSearchConditions, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
 import { SavedSearchItem } from '@/types/savedSearch';
-import { Search, Star, X } from 'lucide-react';
+import { List, Search, Star, X } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {
@@ -62,6 +63,7 @@ export default function EngineerFilterPanel({
     ];
 
     const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showManageModal, setShowManageModal] = useState(false);
 
     const hasAnyFilter =
         filters.status.length > 0 ||
@@ -164,26 +166,42 @@ export default function EngineerFilterPanel({
                         savedSearches={savedSearches}
                         onApply={onFilterChange}
                     />
+                    {hasAnyFilter && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1 bg-white text-[11px]"
+                            onClick={() => setShowSaveModal(true)}
+                        >
+                            <Star className="h-3 w-3" />
+                            条件を保存
+                        </Button>
+                    )}
                     <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-7 gap-1 bg-white text-[11px]"
-                        onClick={() => setShowSaveModal(true)}
+                        className="h-8 gap-1 bg-white text-[11px]"
+                        onClick={() => setShowManageModal(true)}
                     >
-                        <Star className="h-3 w-3" />
-                        条件を保存
+                        <List className="h-3 w-3" />
+                        条件管理
                     </Button>
                 </div>
             </div>
 
-            <SavedSearchManageDialog
+            <SavedSearchSaveDialog
                 open={showSaveModal}
                 searchType="engineer"
-                savedSearches={savedSearches}
                 currentConditions={currentConditions}
                 activeTagLabels={activeTagLabels}
                 onClose={() => setShowSaveModal(false)}
+            />
+            <SavedSearchManageDialog
+                open={showManageModal}
+                savedSearches={savedSearches}
+                onClose={() => setShowManageModal(false)}
             />
         </div>
     );
