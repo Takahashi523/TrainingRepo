@@ -6,6 +6,7 @@ use App\Http\Requests\ProjectIndexRequest;
 use App\Http\Requests\ProjectRequest;
 use App\Http\Resources\ProjectResource;
 use App\Http\Resources\ProjectListResource;
+use App\Http\Resources\SavedSearchResource;
 use App\Models\FormFieldSetting;
 use App\Models\SavedSearch;
 use App\Models\User;
@@ -127,7 +128,9 @@ class ProjectController extends Controller
         $paginator = $query->paginate($perPage)->appends($request->query());
  
         return Inertia::render('Projects/Index', [
-            'savedSearches' => SavedSearch::listForUser(Auth::id(), 'project'),
+            'savedSearches' => SavedSearchResource::collection(
+                SavedSearch::listForUser(Auth::id(), 'project')
+            )->collection,
             'projects' => [
                 'data' => ProjectListResource::collection($paginator)->collection,
                 'meta' => [
