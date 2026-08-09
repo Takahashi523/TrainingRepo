@@ -51,6 +51,8 @@ export interface Engineer {
     ai_summary: string | null;
     ai_summary_generated_at: string | null;
     updated_at: string;
+    /** 紐づくパイプライン件数。削除確認ダイアログの件数警告に使用（show() の loadCount 由来）。 */
+    pipelines_count: number;
 }
 
 export type FieldSettings = {

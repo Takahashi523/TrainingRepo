@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Engineer;
 use App\Models\FormFieldSetting;
+use App\Models\Pipeline;
 use App\Models\SavedSearch;
 use App\Models\User;
-use App\Services\AiSummaryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class EngineerControllerTest extends TestCase
@@ -630,36 +632,94 @@ class EngineerControllerTest extends TestCase
     // store: POST /engineers — AI サマリ
     // -------------------------------------------------------
 
-    public function test_ai_summary_and_generated_at_are_saved_when_service_returns_text(): void
+    public function test_ai_summary_and_generated_at_are_saved_when_engine_returns_text(): void
     {
         $this->seedFormFieldSettings();
         $user = User::factory()->create();
 
-        $this->mock(AiSummaryService::class, function ($mock) {
-            $mock->shouldReceive('generate')->once()->andReturn('AI生成要約テキスト');
-        });
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'engineer_id' => 1,
+                'ai_summary' => 'AI生成要約テキスト',
+                'ai_summary_generated_at' => '2026-08-07T10:00:00+09:00',
+            ], 200),
+        ]);
 
-        $this->actingAs($user)->post('/engineers', $this->validPayload($user->id));
+        $response = $this->actingAs($user)->post(
+            '/engineers',
+            $this->validPayload($user->id) + ['appeal_note' => 'アピールポイント']
+        );
 
         $engineer = Engineer::where('name', '山田太郎')->first();
         $this->assertSame('AI生成要約テキスト', $engineer->ai_summary);
-        $this->assertNotNull($engineer->ai_summary_generated_at);
+        // Python 返却の生成時刻をそのまま採用する（now() で上書きしない）。datetime キャストで Carbon へ
+        // 正規化して保存するため、文字列一致ではなく「同一時点」で検証する（TZ 表記差を吸収）。
+        $this->assertEquals(Carbon::parse('2026-08-07T10:00:00+09:00'), $engineer->ai_summary_generated_at);
+        // 成功時は失敗トースト（flash.error）を出さない。
+        $response->assertSessionMissing('error');
     }
 
-    public function test_ai_summary_is_null_and_generated_at_is_not_set_when_service_returns_null(): void
+    public function test_engineer_is_saved_and_error_flash_set_when_ai_engine_fails(): void
     {
         $this->seedFormFieldSettings();
         $user = User::factory()->create();
 
-        $this->mock(AiSummaryService::class, function ($mock) {
-            $mock->shouldReceive('generate')->once()->andReturn(null);
-        });
+        // 上流 5xx（504 相当）。AI 要約は付加情報のため登録自体は成功させる。
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response('gateway timeout', 504),
+        ]);
 
-        $this->actingAs($user)->post('/engineers', $this->validPayload($user->id));
+        $response = $this->actingAs($user)->post(
+            '/engineers',
+            $this->validPayload($user->id) + ['appeal_note' => 'アピールポイント']
+        );
+
+        $engineer = Engineer::where('name', '山田太郎')->first();
+        // 人材は保存され、要約だけ NULL のまま。
+        $this->assertNotNull($engineer);
+        $this->assertNull($engineer->ai_summary);
+        $this->assertNull($engineer->ai_summary_generated_at);
+        // 登録成功フラッシュ＋AI 失敗フラッシュの両方が出る。
+        $response->assertSessionHas('success', '人材情報を登録しました。');
+        $response->assertSessionHas('error');
+    }
+
+    public function test_ai_summary_is_null_and_no_error_flash_when_engine_returns_empty(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+
+        // 空出力（要約対象なし）。失敗ではないためトーストは出さず NULL 据え置き（#12 §4.3）。
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'engineer_id' => 1,
+                'ai_summary' => '',
+                'ai_summary_generated_at' => '2026-08-07T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->post(
+            '/engineers',
+            $this->validPayload($user->id) + ['appeal_note' => 'アピールポイント']
+        );
 
         $engineer = Engineer::where('name', '山田太郎')->first();
         $this->assertNull($engineer->ai_summary);
         $this->assertNull($engineer->ai_summary_generated_at);
+        $response->assertSessionMissing('error');
+    }
+
+    public function test_ai_engine_is_not_called_when_appeal_note_is_empty_on_store(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+
+        Http::fake();
+
+        // validPayload は appeal_note を含まない → 生成トリガーが立たず E2 は呼ばれない。
+        $this->actingAs($user)->post('/engineers', $this->validPayload($user->id));
+
+        Http::assertNothingSent();
     }
 
     // -------------------------------------------------------
@@ -752,6 +812,33 @@ class EngineerControllerTest extends TestCase
 
         $response->assertInertia(fn ($page) => $page
             ->where('engineer.available_label', '2026/08/01〜')
+        );
+    }
+
+    public function test_show_props_pipelines_count_is_zero_when_no_pipelines(): void
+    {
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.pipelines_count', 0)
+        );
+    }
+
+    public function test_show_props_pipelines_count_matches_related_pipelines(): void
+    {
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        Pipeline::factory()->count(3)->create(['engineer_id' => $engineer->id]);
+        // 別人材のパイプラインは件数に含めない。
+        Pipeline::factory()->create();
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.pipelines_count', 3)
         );
     }
 
@@ -911,7 +998,9 @@ class EngineerControllerTest extends TestCase
 
         $response = $this->actingAs($user)->delete("/engineers/{$engineer->id}");
 
-        $response->assertForbidden();
+        // 設計書 DELETE #7：権限不足は 403 を素で投げず、前画面へ戻し flash.error を返す。
+        $response->assertRedirect();
+        $response->assertSessionHas('error', '削除権限がありません。');
         $this->assertDatabaseHas('engineers', ['id' => $engineer->id]);
     }
 
@@ -1110,17 +1199,22 @@ class EngineerControllerTest extends TestCase
             'appeal_note' => '元のアピール',
         ]);
 
-        $this->mock(AiSummaryService::class, function ($mock) {
-            $mock->shouldReceive('generate')->once()->andReturn('再生成された要約');
-        });
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'engineer_id' => $engineer->id,
+                'ai_summary' => '再生成された要約',
+                'ai_summary_generated_at' => '2026-08-07T11:00:00+09:00',
+            ], 200),
+        ]);
 
         $payload = array_merge($this->validPayload($user->id), ['appeal_note' => '更新後のアピール']);
 
         $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
 
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/api/v1/ai/profile-summary'));
         $engineer = $engineer->fresh();
         $this->assertSame('再生成された要約', $engineer->ai_summary);
-        $this->assertNotNull($engineer->ai_summary_generated_at);
+        $this->assertEquals(Carbon::parse('2026-08-07T11:00:00+09:00'), $engineer->ai_summary_generated_at);
     }
 
     public function test_update_does_not_regenerate_ai_summary_when_appeal_note_unchanged(): void
@@ -1132,15 +1226,14 @@ class EngineerControllerTest extends TestCase
             'appeal_note' => 'そのままのアピール',
         ]);
 
-        $this->mock(AiSummaryService::class, function ($mock) {
-            $mock->shouldNotReceive('generate');
-        });
+        Http::fake();
 
         $payload = array_merge($this->validPayload($user->id), ['appeal_note' => 'そのままのアピール']);
 
         $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
 
-        // モック自体が generate を呼ばれないことを保証している
+        // appeal_note が変わらないため AI 生成 API は呼ばれない。
+        Http::assertNothingSent();
         $this->assertSame('そのままのアピール', $engineer->fresh()->appeal_note);
     }
 

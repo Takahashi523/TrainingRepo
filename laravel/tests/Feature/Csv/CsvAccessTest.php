@@ -59,6 +59,30 @@ class CsvAccessTest extends CsvTestCase
             );
     }
 
+    public function test_index_normalizes_work_styles_to_key_name_shape(): void
+    {
+        // フロント（ExportFilter / CsvFilterOptions 型）は work_styles を {key, name} で読む。
+        // 案件モデル定数は value/label のため正規化しないと w.key / w.name が undefined になり、
+        // 稼働形態チェックボックスのラベルが消え・絞り込みも壊れる（本テストはその回帰を防ぐ）。
+        config(['inertia.testing.ensure_pages_exist' => false]);
+
+        $everyHasKeyName = fn ($styles) => count($styles) > 0
+            && collect($styles)->every(fn ($s) => filled($s['key'] ?? null) && filled($s['name'] ?? null));
+
+        $this->actingAs($this->makeUser('admin'))
+            ->get(route('csv.index'))
+            ->assertInertia(fn ($page) => $page
+                ->component('Csv/Index')
+                // 案件：value/label → key/name に正規化されていること（バグの本体）
+                ->where('project_filter_options.work_styles', fn ($styles) => $everyHasKeyName($styles)
+                    && collect($styles)->pluck('key')->contains('onsite')
+                    && collect($styles)->firstWhere('key', 'onsite')['name'] === '常駐'
+                )
+                // 人材：もともと key/name。契約を満たし続けること（回帰の二重防止）
+                ->where('engineer_filter_options.work_styles', fn ($styles) => $everyHasKeyName($styles))
+            );
+    }
+
     public function test_general_can_export_and_import(): void
     {
         $user = $this->makeUser('general');

@@ -129,7 +129,7 @@ export default function Show({ engineer }: Props) {
                         }
                     >
                         <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
-                        マッチング実行
+                        マッチング
                     </Button>
                     <Button
                         variant="outline"
@@ -219,14 +219,14 @@ export default function Show({ engineer }: Props) {
                         <p className="text-sm text-muted-foreground">AI要約は未生成です</p>
                     )}
                     <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-                        ※ AIがプロフィール情報（スキル・工程経験・アピールポイント等）をもとに自動生成した要約です。内容は参考情報としてご確認ください。
+                        ※ AIがアピールポイントをもとに自動生成した要約です。内容は参考情報としてご確認ください。
                     </p>
                 </div>
 
                 {/* 基本情報 */}
                 <SectionCard title="基本情報">
                     <DetailRow label="氏名 / カナ">
-                        {engineer.name}　／　{engineer.name_kana}
+                        {engineer.name}{'　／　'}{engineer.name_kana}
                     </DetailRow>
                     <DetailRow label="年齢（生年月日）">
                         {engineer.age != null ? `${engineer.age}歳` : '—'}
@@ -241,10 +241,7 @@ export default function Show({ engineer }: Props) {
                         )}
                     </DetailRow>
                     <DetailRow label="最寄駅 / 路線">
-                        {engineer.nearest_station || '—'}
-                        {engineer.nearest_line && (
-                            <span className="ml-1">　{engineer.nearest_line}</span>
-                        )}
+                        {engineer.nearest_station || '—'}{'　／　'}{engineer.nearest_line || '—'}
                     </DetailRow>
                     <DetailRow label="稼働可能時期">
                         {engineer.available_label}
@@ -348,6 +345,11 @@ export default function Show({ engineer }: Props) {
                         <h2 className="mb-2 text-base font-bold text-foreground">人材情報を削除しますか？</h2>
                         <p className="mb-5 text-sm text-muted-foreground">
                             <strong>{engineer.name}</strong> の情報を物理削除します。この操作は取り消せません。
+                            {engineer.pipelines_count > 0 && (
+                                <span className="mt-2 block text-destructive">
+                                    この人材に紐づくパイプライン {engineer.pipelines_count} 件も同時に削除されます。
+                                </span>
+                            )}
                         </p>
                         <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>

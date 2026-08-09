@@ -55,4 +55,13 @@ return [
         'connect_timeout' => (int) env('MATCHING_ENGINE_CONNECT_TIMEOUT', 5),
     ],
 
+    // 人材プロフィール要約 API（PR #12 E2）。Python は既定でマッチングと同一サービスだが、
+    // 関心分離のため別ブロックで持つ（接続先は個別に上書き可能）。E2 は AI 呼出を含むため
+    // timeout はマッチング（10s）より長い 30s を既定とする（#12 §4.4）。
+    'ai_summary' => [
+        'url' => env('AI_SUMMARY_URL', env('MATCHING_ENGINE_URL', 'http://python:8001')),
+        'timeout' => (int) env('AI_SUMMARY_TIMEOUT', 30),
+        'connect_timeout' => (int) env('AI_SUMMARY_CONNECT_TIMEOUT', 5),
+    ],
+
 ];

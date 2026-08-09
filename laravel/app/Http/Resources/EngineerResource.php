@@ -52,6 +52,8 @@ class EngineerResource extends JsonResource
             'ai_summary' => $this->ai_summary,
             'ai_summary_generated_at' => $this->ai_summary_generated_at,
             'updated_at' => $this->updated_at,
+            // 削除確認ダイアログの件数警告用。show() の loadCount('pipelines') で付与される。
+            'pipelines_count' => (int) ($this->pipelines_count ?? 0),
         ];
     }
 }
