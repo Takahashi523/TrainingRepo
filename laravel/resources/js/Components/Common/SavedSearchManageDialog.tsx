@@ -113,7 +113,7 @@ export default function SavedSearchManageDialog<
                                             type="button"
                                             size="sm"
                                             variant="outline"
-                                            className="h-6 shrink-0 px-2 text-[11px]"
+                                            className="h-6 shrink-0 border-destructive px-2 text-[11px] text-destructive hover:bg-destructive/5"
                                             onClick={() => setConfirmDeleteId(item.id)}
                                         >
                                             削除
