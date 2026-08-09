@@ -6,7 +6,6 @@ import {
     SelectValue,
 } from "@/Components/ui/select";
 import { ConditionValue, SavedSearchItem } from "@/types/savedSearch";
-import { useState } from "react";
 
 interface Props<TConditions extends Record<string, ConditionValue>> {
     savedSearches: SavedSearchItem<TConditions>[];
@@ -16,20 +15,23 @@ interface Props<TConditions extends Record<string, ConditionValue>> {
 /**
  * 保存済み検索条件を選んで呼び出すだけのプルダウン（WF_03/WF_06の「保存済み条件」selectに対応）。
  * 保存・削除の管理は SavedSearchManageDialog 側の責務とし、ここでは適用のみを扱う。
+ *
+ * value は常に "" 固定（選択状態を保持しない）。
+ * 選択中のIDを保持すると、削除で該当項目が消えたときに空表示のまま固まったり、
+ * 一覧の外で条件を手動変更した後に同じ項目を選び直しても Radix Select が
+ * 「値が変化していない」と判定して onValueChange を発火しない、という問題が起きるため、
+ * そもそも「選ぶたびに毎回 "" → 選択したID という変化」として扱い、常に発火させる。
  */
 export default function SavedSearchSelect<
     TConditions extends Record<string, ConditionValue>,
 >({ savedSearches, onApply }: Props<TConditions>) {
-    const [selectedId, setSelectedId] = useState("");
-
     const handleChange = (id: string) => {
-        setSelectedId(id);
         const item = savedSearches.find((s) => String(s.id) === id);
         if (item) onApply(item.conditions);
     };
 
     return (
-        <Select value={selectedId} onValueChange={handleChange}>
+        <Select value="" onValueChange={handleChange}>
             <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
                 <SelectValue placeholder="条件を選択して呼び出す" />
             </SelectTrigger>

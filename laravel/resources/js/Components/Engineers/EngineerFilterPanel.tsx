@@ -63,15 +63,6 @@ export default function EngineerFilterPanel({
 
     const [showSaveModal, setShowSaveModal] = useState(false);
 
-    // 「すべてクリア」を押したら SavedSearchSelect の選択状態もリセットする。
-    // Select は選択済みの値をもう一度選んでも onValueChange が発火しない仕様のため、
-    // key を変えて強制的に再マウントし、内部の selectedId を "" に戻す。
-    const [savedSearchSelectKey, setSavedSearchSelectKey] = useState(0);
-    const handleClearAll = () => {
-        onClearAll();
-        setSavedSearchSelectKey((k) => k + 1);
-    };
-
     const hasAnyFilter =
         filters.status.length > 0 ||
         filters.work_styles.length > 0 ||
@@ -158,7 +149,7 @@ export default function EngineerFilterPanel({
                 {hasAnyFilter && (
                     <button
                         type="button"
-                        onClick={handleClearAll}
+                        onClick={onClearAll}
                         className="ml-1 inline-flex h-7 items-center gap-1 rounded-md border border-input bg-white px-2.5 text-[11px] text-muted-foreground hover:bg-muted/50"
                     >
                         <X className="h-3 w-3" />
@@ -170,7 +161,6 @@ export default function EngineerFilterPanel({
                 <div className="ml-auto flex items-center gap-2">
                     <span className="text-[11px] text-muted-foreground">保存済み条件</span>
                     <SavedSearchSelect
-                        key={savedSearchSelectKey}
                         savedSearches={savedSearches}
                         onApply={onFilterChange}
                     />
