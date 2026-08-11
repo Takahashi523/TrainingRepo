@@ -14,6 +14,7 @@ import {
     WorkStyleOption,
 } from '@/types/project';
 import { SavedSearchItem } from '@/types/savedSearch';
+import { SortOption } from '@/types';
 import { List, Search, Star, X } from 'lucide-react';
 import { useState } from 'react';
 
@@ -24,6 +25,7 @@ interface Props {
     commercialFlows: CommercialFlowOption[];
     interviewCounts: InterviewCountOption[];
     savedSearches: SavedSearchItem<ProjectSearchConditions>[];
+    sortOptions: SortOption[];
     keywordInput: string;
     onKeywordInput: (value: string) => void;
     onFilterChange: (patch: Partial<ProjectFilters>) => void;
@@ -41,6 +43,7 @@ export default function ProjectFilterPanel({
     commercialFlows,
     interviewCounts,
     savedSearches,
+    sortOptions,
     keywordInput,
     onKeywordInput,
     onFilterChange,
@@ -82,6 +85,16 @@ export default function ProjectFilterPanel({
         ...filters.interview_count.map((v) => interviewCountLabel(String(v))),
         ...(filters.keyword ? [`"${filters.keyword}"`] : []),
     ];
+
+    // 現在のソートが既定（sortOptions の先頭）以外のときだけラベルを渡す。
+    // 既定のままなら保存モーダルの「並び順」セクション自体を出さず、自動生成名にも含めない。
+    const currentSortOption = sortOptions.find(
+        (o) => o.sort === filters.sort && o.order === filters.order
+    );
+    const sortLabel =
+        currentSortOption && currentSortOption !== sortOptions[0]
+            ? currentSortOption.label
+            : undefined;
 
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [showManageModal, setShowManageModal] = useState(false);
@@ -242,6 +255,7 @@ export default function ProjectFilterPanel({
                 searchType="project"
                 currentConditions={currentConditions}
                 activeTagLabels={activeTagLabels}
+                sortLabel={sortLabel}
                 onClose={() => setShowSaveModal(false)}
             />
             <SavedSearchManageDialog

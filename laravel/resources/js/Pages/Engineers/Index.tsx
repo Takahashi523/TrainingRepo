@@ -179,6 +179,7 @@ export default function Index({
                         workStyles={workStyleOptions}
                         phases={phaseOptions}
                         savedSearches={savedSearches}
+                        sortOptions={sortOptions}
                         keywordInput={keywordInput}
                         onKeywordInput={setKeywordInput}
                         onFilterChange={handleFilterChange}

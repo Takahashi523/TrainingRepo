@@ -142,6 +142,7 @@ export default function Index({
                         commercialFlows={commercialFlowOptions}
                         interviewCounts={interviewCountOptions}
                         savedSearches={savedSearches}
+                        sortOptions={sortOptions}
                         keywordInput={keywordInput}
                         onKeywordInput={setKeywordInput}
                         onFilterChange={handleFilterChange}

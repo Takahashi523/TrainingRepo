@@ -22,6 +22,11 @@ interface Props<TConditions extends Record<string, ConditionValue>> {
     currentConditions: TConditions;
     /** モーダル上部に表示する、現在の絞り込み条件のタグ（表示専用） */
     activeTagLabels: string[];
+    /**
+     * 現在のソートが既定（sortOptions の先頭）以外のときだけ渡される表示用ラベル。
+     * 既定のままなら undefined（並び順セクション自体を表示しない＝自動生成名にも含めない）。
+     */
+    sortLabel?: string;
     onClose: () => void;
 }
 
@@ -31,13 +36,18 @@ interface Props<TConditions extends Record<string, ConditionValue>> {
  * （PR #60 レビュー指摘：「保存」ラベルなのに削除も兼ねる1ボタン2責務の解消。
  *  呼び出し元でこのモーダルを開くボタンは絞り込みがある時だけ表示されるため、
  *  ここに到達する時点で activeTagLabels は必ず1件以上ある前提）
+ *
+ * sortLabel は絞り込みタグの「末尾」に追加する（PR #60 レビュー指摘：ソートも保存・復元
+ * されるのに名前・表示に一切出ないのは実態と不一致、という指摘への対応）。末尾にする理由は、
+ * 上限超過時にまず削られるのがソート情報になり、より重要な絞り込み内容が優先的に残るため。
  */
-function buildAutoName(tagLabels: string[]): string {
-    if (tagLabels.length === 0) return "無題の検索条件";
+function buildAutoName(tagLabels: string[], sortLabel?: string): string {
+    const labels = sortLabel ? [...tagLabels, sortLabel] : tagLabels;
+    if (labels.length === 0) return "無題の検索条件";
 
-    // タグを1つずつ足していき、上限を超える手前で止める（単語の途中で切れるのを防ぐ）
+    // ラベルを1つずつ足していき、上限を超える手前で止める（単語の途中で切れるのを防ぐ）
     let result = "";
-    for (const label of tagLabels) {
+    for (const label of labels) {
         const next = result ? `${result} × ${label}` : label;
         if (next.length > NAME_MAX_LENGTH) {
             return result ? `${result}…` : `${label.slice(0, NAME_MAX_LENGTH - 1)}…`;
@@ -49,7 +59,7 @@ function buildAutoName(tagLabels: string[]): string {
 
 export default function SavedSearchSaveDialog<
     TConditions extends Record<string, ConditionValue>,
->({ open, searchType, currentConditions, activeTagLabels, onClose }: Props<TConditions>) {
+>({ open, searchType, currentConditions, activeTagLabels, sortLabel, onClose }: Props<TConditions>) {
     const [name, setName] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const { toast } = useToast();
@@ -65,7 +75,7 @@ export default function SavedSearchSaveDialog<
         if (isSaving) return;
 
         // 未入力ならタグから自動生成した名前を使う（WF準拠。APIには常に非空文字列を送る）
-        const finalName = name.trim() || buildAutoName(activeTagLabels);
+        const finalName = name.trim() || buildAutoName(activeTagLabels, sortLabel);
 
         router.post(
             "/saved-searches",
@@ -125,6 +135,20 @@ export default function SavedSearchSaveDialog<
                             ))}
                         </div>
                     </div>
+
+                    {/* 並び順（既定以外のときだけ表示。既定のままなら名前にも含めない） */}
+                    {sortLabel && (
+                        <div>
+                            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">
+                                並び順
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                <span className="rounded border border-border bg-muted/50 px-2 py-0.5 text-xs">
+                                    {sortLabel}
+                                </span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* 条件名入力 */}
                     <div>

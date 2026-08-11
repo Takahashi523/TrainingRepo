@@ -999,6 +999,16 @@
         <span class="modal-tag">フルリモート</span>
       </div>
 
+      <!-- 並び順（PR #60 レビュー対応：ソートも保存・復元されるのに名前・表示に一切出ないのは
+           実態と不一致、という指摘への対応）。
+           ソートが既定（sortOptions の先頭）のときはこのセクション自体を表示しない。
+           既定以外のときだけ、下のように1件表示する。条件名の自動生成にも、絞り込みタグの
+           「末尾」としてこのラベルを追加する（既定のままなら名前にも含めない）。 -->
+      <div class="modal-section-label">並び順</div>
+      <div class="modal-active-tags">
+        <span class="modal-tag">更新日順（新しい順）</span>
+      </div>
+
       <!-- 条件名入力 -->
       <div class="modal-section-label">条件名（任意）</div>
       <div class="modal-input-row">

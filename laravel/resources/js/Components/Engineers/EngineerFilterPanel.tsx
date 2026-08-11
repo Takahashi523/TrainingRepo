@@ -7,6 +7,7 @@ import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { EngineerFilters, EngineerSearchConditions, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
 import { SavedSearchItem } from '@/types/savedSearch';
+import { SortOption } from '@/types';
 import { List, Search, Star, X } from 'lucide-react';
 import { useState } from 'react';
 
@@ -16,6 +17,7 @@ interface Props {
     workStyles: WorkTypeOption[];
     phases: Phase[];
     savedSearches: SavedSearchItem<EngineerSearchConditions>[];
+    sortOptions: SortOption[];
     keywordInput: string;
     onKeywordInput: (value: string) => void;
     onFilterChange: (patch: Partial<EngineerFilters>) => void;
@@ -31,6 +33,7 @@ export default function EngineerFilterPanel({
     workStyles,
     phases,
     savedSearches,
+    sortOptions,
     keywordInput,
     onKeywordInput,
     onFilterChange,
@@ -61,6 +64,16 @@ export default function EngineerFilterPanel({
         ...filters.phases.map(phaseLabel),
         ...(filters.keyword ? [`"${filters.keyword}"`] : []),
     ];
+
+    // 現在のソートが既定（sortOptions の先頭）以外のときだけラベルを渡す。
+    // 既定のままなら保存モーダルの「並び順」セクション自体を出さず、自動生成名にも含めない。
+    const currentSortOption = sortOptions.find(
+        (o) => o.sort === filters.sort && o.order === filters.order
+    );
+    const sortLabel =
+        currentSortOption && currentSortOption !== sortOptions[0]
+            ? currentSortOption.label
+            : undefined;
 
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [showManageModal, setShowManageModal] = useState(false);
@@ -196,6 +209,7 @@ export default function EngineerFilterPanel({
                 searchType="engineer"
                 currentConditions={currentConditions}
                 activeTagLabels={activeTagLabels}
+                sortLabel={sortLabel}
                 onClose={() => setShowSaveModal(false)}
             />
             <SavedSearchManageDialog
