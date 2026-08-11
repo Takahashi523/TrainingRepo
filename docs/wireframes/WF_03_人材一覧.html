@@ -1011,19 +1011,20 @@
 
       <!-- 条件名入力 -->
       <div class="modal-section-label">条件名（任意）</div>
-      <div class="modal-input-row">
-        <input class="modal-input" id="saveConditionName" type="text"
-          placeholder="例：Java × 提案可 × フルリモート">
-        <button class="btn btn-primary" onclick="saveCondition()" style="height:32px;font-size:12px;">保存する</button>
-      </div>
+      <input class="modal-input" id="saveConditionName" type="text"
+        style="width:100%;" placeholder="例：Java × 提案可 × フルリモート">
       <div style="font-size:11px;color:#aaa;margin-top:4px;">
         未入力の場合はタグの組み合わせを自動で条件名に使用します
       </div>
 
     </div><!-- /modal-body -->
 
+    <!-- 確定ボタンの配置・文言はマスタ管理のユーザー登録/編集モーダル（UserFormDialog）に揃える
+         （再レビュー指摘：入力欄隣接のインライン配置ではなく、フッター右寄せの
+         [キャンセル(outline)] [保存する/保存中...(primary)] が慣習）。 -->
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeSaveModal()">閉じる</button>
+      <button class="btn btn-ghost" onclick="closeSaveModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveCondition()">保存する</button>
     </div>
 
   </div><!-- /modal-box -->

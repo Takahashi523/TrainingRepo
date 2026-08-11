@@ -155,34 +155,29 @@ export default function SavedSearchSaveDialog<
                         <p className="mb-1.5 text-xs font-semibold text-muted-foreground">
                             条件名（任意）
                         </p>
-                        <div className="flex items-center gap-1.5">
-                            <Input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="例：Java × 提案可 × フルリモート"
-                                maxLength={NAME_MAX_LENGTH}
-                                className="h-8 text-xs"
-                            />
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="h-8 shrink-0 px-2.5 text-xs"
-                                disabled={isSaving}
-                                onClick={handleSave}
-                            >
-                                保存する
-                            </Button>
-                        </div>
+                        <Input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="例：Java × 提案可 × フルリモート"
+                            maxLength={NAME_MAX_LENGTH}
+                            className="h-8 text-xs"
+                        />
                         <p className="mt-1 text-[11px] text-muted-foreground">
                             未入力の場合はタグの組み合わせを自動で条件名に使用します
                         </p>
                     </div>
                 </div>
 
+                {/* 確定ボタンの配置・文言・処理中ラベルは UserFormDialog に揃える
+                    （再レビュー指摘：入力欄隣接のインライン配置ではなく、フッター右寄せの
+                    [キャンセル(outline)] [保存する/保存中...(primary)] が慣習） */}
                 <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                        閉じる
+                    <Button variant="outline" onClick={onClose} disabled={isSaving}>
+                        キャンセル
+                    </Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? "保存中..." : "保存する"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
