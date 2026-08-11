@@ -79,7 +79,7 @@ export default function SavedSearchManageDialog<
                             保存済み条件はありません
                         </p>
                     ) : (
-                        <ul className="max-h-72 space-y-0.5 overflow-y-auto pr-1">
+                        <ul className="max-h-72 space-y-0.5 overflow-y-auto pr-3">
                             {savedSearches.map((item) => (
                                 <li
                                     key={item.id}
