@@ -1,6 +1,9 @@
 import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
 import SkillInput from '@/Components/Engineers/SkillInput';
 import WorkStyleCheckboxGroup from '@/Components/Engineers/WorkStyleCheckboxGroup';
+import DateInput from '@/Components/Common/DateInput';
+import NumberInput from '@/Components/Common/NumberInput';
+import { useClientValidity } from '@/hooks/use-client-validity';
 import { Input } from '@/Components/ui/input';
 import {
     Select,
@@ -18,7 +21,7 @@ import {
     WorkTypeOption,
 } from '@/types/engineer';
 import { InertiaFormProps } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { forwardRef, useImperativeHandle, useMemo } from 'react';
 
 export type EngineerFormData = {
     name: string;
@@ -51,6 +54,18 @@ interface Props {
     work_styles: WorkTypeOption[];
     statuses: StatusOption[];
     users: UserOption[];
+}
+
+/** 親ページ（Create / Edit）が送信直前ガードを呼ぶための ref ハンドル。 */
+export interface EngineerFormHandle {
+    validateAll: () => boolean;
+}
+
+/** 今日の日付（ローカルタイム）を YYYY-MM-DD で返す。birth_date の max に使う。 */
+function todayString(): string {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
@@ -98,15 +113,22 @@ function FormRow({
     );
 }
 
-export default function EngineerForm({
-    form,
-    fieldSettings,
-    phases,
-    work_styles,
-    statuses,
-    users,
-}: Props) {
+const EngineerForm = forwardRef<EngineerFormHandle, Props>(function EngineerForm(
+    { form, fieldSettings, phases, work_styles, statuses, users },
+    ref,
+) {
     const { data, setData, errors } = form;
+
+    // 数値・日付欄の silent rejection をクライアント側で検出（onBlur / 送信時ガード）。
+    const { fieldProps, errors: clientErrors, validateAll } = useClientValidity();
+    useImperativeHandle(ref, () => ({ validateAll }), [validateAll]);
+
+    // クライアント検出を優先し、無ければサーバ側 errors を表示する。
+    const fieldError = (name: string): string | undefined =>
+        clientErrors[name] ??
+        (errors as Record<string, string | undefined>)[name];
+
+    const today = todayString();
 
     const calculatedAge = useMemo(() => {
         if (!data.birth_date) return null;
@@ -154,14 +176,15 @@ export default function EngineerForm({
             <FormRow
                 label="生年月日"
                 required={fieldSettings.birth_date.is_required}
-                error={errors.birth_date}
+                error={fieldError('birth_date')}
             >
                 <div className="flex items-center gap-3">
-                    <Input
-                        type="date"
+                    <DateInput
                         value={data.birth_date}
-                        onChange={(e) => setData('birth_date', e.target.value)}
-                        className="w-40"
+                        onChange={(v) => setData('birth_date', v)}
+                        max={today}
+                        className={`w-40 ${fieldError('birth_date') ? 'border-destructive' : ''}`}
+                        {...fieldProps('birth_date', 'date')}
                     />
                     {calculatedAge !== null && (
                         <span className="rounded border border-border bg-muted px-3 py-1.5 text-sm text-muted-foreground">
@@ -204,14 +227,14 @@ export default function EngineerForm({
             <FormRow
                 label="稼働可能時期"
                 required={fieldSettings.available_from.is_required}
-                error={errors.available_from}
+                error={fieldError('available_from')}
             >
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="date"
+                    <DateInput
                         value={data.available_from}
-                        onChange={(e) => setData('available_from', e.target.value)}
-                        className="w-40"
+                        onChange={(v) => setData('available_from', v)}
+                        className={`w-40 ${fieldError('available_from') ? 'border-destructive' : ''}`}
+                        {...fieldProps('available_from', 'date')}
                     />
                     <span className="text-sm text-muted-foreground">〜（以降）</span>
                 </div>
@@ -298,16 +321,16 @@ export default function EngineerForm({
             <FormRow
                 label="希望単価（月額）"
                 required={fieldSettings.desired_rate.is_required}
-                error={errors.desired_rate}
+                error={fieldError('desired_rate')}
             >
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="number"
+                    <NumberInput
                         value={data.desired_rate}
-                        onChange={(e) => setData('desired_rate', e.target.value)}
+                        onChange={(v) => setData('desired_rate', v)}
                         placeholder="60"
-                        className="w-24"
+                        className={`w-24 ${fieldError('desired_rate') ? 'border-destructive' : ''}`}
                         min={0}
+                        {...fieldProps('desired_rate', 'number')}
                     />
                     <span className="text-sm text-muted-foreground">万円</span>
                 </div>
@@ -413,4 +436,6 @@ export default function EngineerForm({
             </FormRow>
         </div>
     );
-}
+});
+
+export default EngineerForm;

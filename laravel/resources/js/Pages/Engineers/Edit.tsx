@@ -1,4 +1,7 @@
-import EngineerForm, { EngineerFormData } from '@/Components/Engineers/EngineerForm';
+import EngineerForm, {
+    EngineerFormData,
+    EngineerFormHandle,
+} from '@/Components/Engineers/EngineerForm';
 import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -6,6 +9,7 @@ import { Engineer, EngineerEditPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Loader2 } from 'lucide-react';
+import { useRef } from 'react';
 
 type Props = PageProps<EngineerEditPageProps>;
 
@@ -48,11 +52,17 @@ export default function Edit({ engineer, fieldSettings, phases, work_styles, sta
 
     const { processing } = form;
 
+    // 数値・日付欄の silent rejection を送信直前に総ざらいするためのハンドル。
+    const formRef = useRef<EngineerFormHandle>(null);
+
     // AI 職務要約は appeal_note が変更された更新時のみ再生成される（サーバ側トリガー）。
     // ローディング表示もその条件に合わせる（更新前の値と比較）。
     const originalAppealNote = engineer.appeal_note ?? '';
 
     const handleSubmit = () => {
+        // クライアント側の不正入力（badInput 等）が残っていれば送信しない。
+        if (!formRef.current?.validateAll()) return;
+
         form.transform((d) => ({
             ...d,
             has_negotiation_exp:
@@ -108,6 +118,7 @@ export default function Edit({ engineer, fieldSettings, phases, work_styles, sta
             </div>
 
             <EngineerForm
+                ref={formRef}
                 form={form}
                 fieldSettings={fieldSettings}
                 phases={phases}

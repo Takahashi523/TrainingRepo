@@ -1,5 +1,8 @@
 import ProcessCheckboxGroup from "@/Components/Engineers/ProcessCheckboxGroup";
 import SkillInput from "@/Components/Engineers/SkillInput";
+import DateInput from "@/Components/Common/DateInput";
+import NumberInput from "@/Components/Common/NumberInput";
+import { useClientValidity } from "@/hooks/use-client-validity";
 import { Checkbox } from "@/Components/ui/checkbox";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
@@ -22,7 +25,7 @@ import {
     CommercialFlowOption,
     UserOption,
 } from "@/types/project";
-import React from "react";
+import React, { forwardRef, useImperativeHandle } from "react";
 
 interface Props {
     form: InertiaFormProps<ProjectFormData>;
@@ -32,6 +35,11 @@ interface Props {
     commercial_flows: CommercialFlowOption[];
     statuses: StatusOption[];
     users: UserOption[];
+}
+
+/** 親ページ（Create / Edit）が送信直前ガードを呼ぶための ref ハンドル。 */
+export interface ProjectFormHandle {
+    validateAll: () => boolean;
 }
 
 const NEGOTIATION_OPTIONS = [
@@ -90,16 +98,28 @@ function FormRow({
     );
 }
 
-export default function ProjectForm({
-    form,
-    fieldSettings,
-    phases,
-    work_styles,
-    commercial_flows,
-    statuses,
-    users,
-}: Props) {
+const ProjectForm = forwardRef<ProjectFormHandle, Props>(function ProjectForm(
+    {
+        form,
+        fieldSettings,
+        phases,
+        work_styles,
+        commercial_flows,
+        statuses,
+        users,
+    },
+    ref,
+) {
     const { data, setData, errors } = form;
+
+    // 数値・日付欄の silent rejection をクライアント側で検出（onBlur / 送信時ガード）。
+    const { fieldProps, errors: clientErrors, validateAll } = useClientValidity();
+    useImperativeHandle(ref, () => ({ validateAll }), [validateAll]);
+
+    // クライアント検出を優先し、無ければサーバ側 errors を表示する。
+    const fieldError = (name: string): string | undefined =>
+        clientErrors[name] ??
+        (errors as Record<string, string | undefined>)[name];
 
     const handleRateNegotiableChange = (checked: boolean) => {
         setData("rate_is_negotiable", checked);
@@ -146,15 +166,15 @@ export default function ProjectForm({
             <FormRow
                 label="募集人数"
                 required={fieldSettings.headcount.is_required}
-                error={errors.headcount}
+                error={fieldError("headcount")}
             >
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="number"
+                    <NumberInput
                         value={data.headcount}
-                        onChange={(e) => setData("headcount", e.target.value)}
+                        onChange={(v) => setData("headcount", v)}
                         placeholder="2"
-                        className={`w-20 ${errors.headcount ? "border-destructive" : ""}`}
+                        className={`w-20 ${fieldError("headcount") ? "border-destructive" : ""}`}
+                        {...fieldProps("headcount", "number")}
                     />
                     <span className="text-sm text-muted-foreground">名</span>
                 </div>
@@ -163,14 +183,14 @@ export default function ProjectForm({
             <FormRow
                 label="参画開始時期"
                 required={fieldSettings.start_date.is_required}
-                error={errors.start_date}
+                error={fieldError("start_date")}
                 hint="稼働開始時期のマッチングスコアリングに使用します"
             >
-                <Input
-                    type="date"
+                <DateInput
                     value={data.start_date}
-                    onChange={(e) => setData("start_date", e.target.value)}
-                    className={`w-40 ${errors.start_date ? "border-destructive" : ""}`}
+                    onChange={(v) => setData("start_date", v)}
+                    className={`w-40 ${fieldError("start_date") ? "border-destructive" : ""}`}
+                    {...fieldProps("start_date", "date")}
                 />
             </FormRow>
 
@@ -179,7 +199,11 @@ export default function ProjectForm({
             <FormRow
                 label="単価（月額）"
                 required={fieldSettings.rate.is_required}
-                error={errors.rate_min ?? errors.rate_max ?? errors.rate_note}
+                error={
+                    fieldError("rate_min") ??
+                    fieldError("rate_max") ??
+                    errors.rate_note
+                }
                 hint="人材の希望単価が案件の単価レンジ内に収まるかの判定に使用します。スキル見合いの場合はチェックを入れてください。"
             >
                 <div className="flex items-center gap-2 mb-2">
@@ -200,26 +224,22 @@ export default function ProjectForm({
 
                 {!data.rate_is_negotiable && (
                     <div className="flex items-center gap-2">
-                        <Input
-                            type="number"
+                        <NumberInput
                             value={data.rate_min}
-                            onChange={(e) =>
-                                setData("rate_min", e.target.value)
-                            }
+                            onChange={(v) => setData("rate_min", v)}
                             placeholder="60"
-                            className={`w-28 ${errors.rate_min ? "border-destructive" : ""}`}
+                            className={`w-28 ${fieldError("rate_min") ? "border-destructive" : ""}`}
+                            {...fieldProps("rate_min", "number")}
                         />
                         <span className="text-sm text-muted-foreground">
                             万円　〜
                         </span>
-                        <Input
-                            type="number"
+                        <NumberInput
                             value={data.rate_max}
-                            onChange={(e) =>
-                                setData("rate_max", e.target.value)
-                            }
+                            onChange={(v) => setData("rate_max", v)}
                             placeholder="80"
-                            className={`w-28 ${errors.rate_max ? "border-destructive" : ""}`}
+                            className={`w-28 ${fieldError("rate_max") ? "border-destructive" : ""}`}
+                            {...fieldProps("rate_max", "number")}
                         />
                         <span className="text-sm text-muted-foreground">
                             万円
@@ -326,17 +346,15 @@ export default function ProjectForm({
             <FormRow
                 label="面談回数"
                 required={fieldSettings.interview_count.is_required}
-                error={errors.interview_count}
+                error={fieldError("interview_count")}
             >
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="number"
+                    <NumberInput
                         value={data.interview_count}
-                        onChange={(e) =>
-                            setData("interview_count", e.target.value)
-                        }
+                        onChange={(v) => setData("interview_count", v)}
                         placeholder="1"
-                        className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
+                        className={`w-20 ${fieldError("interview_count") ? "border-destructive" : ""}`}
+                        {...fieldProps("interview_count", "number")}
                     />
                     <span className="text-sm text-muted-foreground">回</span>
                 </div>
@@ -571,4 +589,6 @@ export default function ProjectForm({
             </FormRow>
         </div>
     );
-}
+});
+
+export default ProjectForm;

@@ -1,11 +1,11 @@
-import ProjectForm from "@/Components/Projects/ProjectForm";
+import ProjectForm, { ProjectFormHandle } from "@/Components/Projects/ProjectForm";
 import { ProjectFormData, ProjectCreatePageProps } from "@/types/project";
 import { Button } from "@/Components/ui/button";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
 import { Head, router, useForm } from "@inertiajs/react";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 type Props = PageProps<ProjectCreatePageProps>;
 
@@ -52,6 +52,9 @@ export default function Create({
 
     const { processing, errors } = form;
 
+    // 数値・日付欄の silent rejection を送信直前に総ざらいするためのハンドル。
+    const formRef = useRef<ProjectFormHandle>(null);
+
     // form.errorsが更新され、DOMに反映された後に実行されることを保証するためuseEffectを使う
     // （onError内でrequestAnimationFrameを使う方式だと、Reactのコミット前にクエリが走ることがあり、
     // 初回のエラー表示時だけスクロールされないことがあった）
@@ -65,6 +68,9 @@ export default function Create({
     }, [errors]);
 
     const handleSubmit = () => {
+        // クライアント側の不正入力（badInput 等）が残っていれば送信しない。
+        if (!formRef.current?.validateAll()) return;
+
         form.transform((data) => ({
             ...data,
             client_name: data.client_name || null,
@@ -141,6 +147,7 @@ export default function Create({
             </div>
 
             <ProjectForm
+                ref={formRef}
                 form={form}
                 fieldSettings={fieldSettings}
                 phases={phases}

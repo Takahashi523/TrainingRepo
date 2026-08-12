@@ -1,4 +1,7 @@
-import EngineerForm, { EngineerFormData } from '@/Components/Engineers/EngineerForm';
+import EngineerForm, {
+    EngineerFormData,
+    EngineerFormHandle,
+} from '@/Components/Engineers/EngineerForm';
 import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -6,6 +9,7 @@ import { EngineerCreatePageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Loader2 } from 'lucide-react';
+import { useRef } from 'react';
 
 type Props = PageProps<EngineerCreatePageProps>;
 
@@ -36,7 +40,13 @@ export default function Create({ fieldSettings, phases, work_styles, statuses, u
 
     const { processing } = form;
 
+    // 数値・日付欄の silent rejection を送信直前に総ざらいするためのハンドル。
+    const formRef = useRef<EngineerFormHandle>(null);
+
     const handleSubmit = () => {
+        // クライアント側の不正入力（badInput 等）が残っていれば送信しない。
+        if (!formRef.current?.validateAll()) return;
+
         form.transform((d) => ({
             ...d,
             has_negotiation_exp:
@@ -92,6 +102,7 @@ export default function Create({ fieldSettings, phases, work_styles, statuses, u
             </div>
 
             <EngineerForm
+                ref={formRef}
                 form={form}
                 fieldSettings={fieldSettings}
                 phases={phases}

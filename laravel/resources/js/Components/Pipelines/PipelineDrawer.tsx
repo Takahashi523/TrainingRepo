@@ -1,4 +1,5 @@
 import ConfirmDialog from '@/Components/Common/ConfirmDialog';
+import DateInput from '@/Components/Common/DateInput';
 import RankBadge, { RANK_BAR_FALLBACK_STYLE, RANK_BAR_STYLES } from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import PipelineStatusBadge from '@/Components/Pipelines/PipelineStatusBadge';
@@ -10,8 +11,8 @@ import {
     AccordionTrigger,
 } from '@/Components/ui/accordion';
 import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
 import { Textarea } from '@/Components/ui/textarea';
+import { useClientValidity } from '@/hooks/use-client-validity';
 import { PageProps } from '@/types';
 import { PipelineDetail, PipelineStatus, StatusOption } from '@/types/pipeline';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
@@ -66,6 +67,9 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
     });
     const { data, setData, processing, errors } = form;
 
+    // 数値・日付欄の silent rejection をクライアント側で検出（onBlur / 送信時ガード）。
+    const { fieldProps, errors: clientErrors, validateAll } = useClientValidity();
+
     // 空文字はサーバへ null として送る（部分更新・nullable 項目）
     form.transform((d) => ({
         ...d,
@@ -84,6 +88,9 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
     };
 
     const handleSave = () => {
+        // クライアント側の不正入力（日付の badInput 等）が残っていれば保存しない（確認ダイアログも出さない）。
+        if (!validateAll()) return;
+
         // 終了ステータスへ変更しての保存は完了済みタブへ移動する不可逆操作のため、保存時に確認ダイアログを挟む。
         // 進行中 → 終了の遷移時のみ確認し、それ以外（進行中のまま・管理情報のみ変更）は即保存する。
         const changingToTerminal =
@@ -286,14 +293,16 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             <label className="text-[10px] font-bold text-muted-foreground">
                                 次回アクション予定日
                             </label>
-                            <Input
-                                type="date"
+                            <DateInput
                                 value={data.next_action_date}
-                                onChange={(e) => setData('next_action_date', e.target.value)}
+                                onChange={(v) => setData('next_action_date', v)}
                                 className="h-8 w-[180px] bg-white px-2.5 text-xs md:text-xs"
+                                {...fieldProps('next_action_date', 'date')}
                             />
-                            {errors.next_action_date && (
-                                <p className="text-[11px] text-destructive">{errors.next_action_date}</p>
+                            {(clientErrors.next_action_date ?? errors.next_action_date) && (
+                                <p className="text-[11px] text-destructive">
+                                    {clientErrors.next_action_date ?? errors.next_action_date}
+                                </p>
                             )}
                         </div>
 
