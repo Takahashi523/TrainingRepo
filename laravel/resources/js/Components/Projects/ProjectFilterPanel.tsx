@@ -1,14 +1,22 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
+import SavedSearchManageDialog from '@/Components/Common/SavedSearchManageDialog';
+import SavedSearchSaveDialog from '@/Components/Common/SavedSearchSaveDialog';
+import SavedSearchSelect from '@/Components/Common/SavedSearchSelect';
+import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import {
     CommercialFlowOption,
     InterviewCountOption,
     ProjectFilters,
+    ProjectSearchConditions,
     StatusOption,
     WorkStyleOption,
 } from '@/types/project';
-import { Search, X } from 'lucide-react';
+import { SavedSearchItem } from '@/types/savedSearch';
+import { SortOption } from '@/types';
+import { List, Search, Star, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface Props {
     filters: ProjectFilters;
@@ -16,6 +24,8 @@ interface Props {
     workStyles: WorkStyleOption[];
     commercialFlows: CommercialFlowOption[];
     interviewCounts: InterviewCountOption[];
+    savedSearches: SavedSearchItem<ProjectSearchConditions>[];
+    sortOptions: SortOption[];
     keywordInput: string;
     onKeywordInput: (value: string) => void;
     onFilterChange: (patch: Partial<ProjectFilters>) => void;
@@ -32,11 +42,24 @@ export default function ProjectFilterPanel({
     workStyles,
     commercialFlows,
     interviewCounts,
+    savedSearches,
+    sortOptions,
     keywordInput,
     onKeywordInput,
     onFilterChange,
     onClearAll,
 }: Props) {
+    // 検索条件保存に送る「今の絞り込み状態」（page/per_page は含めない）
+    const currentConditions: ProjectSearchConditions = {
+        status: filters.status,
+        work_style: filters.work_style,
+        commercial_flow: filters.commercial_flow,
+        interview_count: filters.interview_count,
+        keyword: filters.keyword,
+        sort: filters.sort,
+        order: filters.order,
+    };
+
     const statusOptions: MultiSelectOption[] = statuses.map((s) => ({ value: s.value, label: s.label }));
     const workStyleOptions: MultiSelectOption[] = workStyles.map((w) => ({ value: w.value, label: w.label }));
     const commercialFlowOptions: MultiSelectOption[] = commercialFlows.map((c) => ({
@@ -53,6 +76,28 @@ export default function ProjectFilterPanel({
     const commercialFlowLabel = (v: string) => commercialFlows.find((c) => c.value === v)?.label ?? v;
     const interviewCountLabel = (v: string) =>
         interviewCounts.find((i) => String(i.value) === v)?.label ?? v;
+
+    // 保存モーダルに表示する、現在の絞り込み条件のタグ（表示専用）
+    const activeTagLabels = [
+        ...filters.status.map(statusLabel),
+        ...filters.work_style.map(workStyleLabel),
+        ...filters.commercial_flow.map(commercialFlowLabel),
+        ...filters.interview_count.map((v) => interviewCountLabel(String(v))),
+        ...(filters.keyword ? [`"${filters.keyword}"`] : []),
+    ];
+
+    // 現在のソートが既定（sortOptions の先頭）以外のときだけラベルを渡す。
+    // 既定のままなら保存モーダルの「並び順」セクション自体を出さず、自動生成名にも含めない。
+    const currentSortOption = sortOptions.find(
+        (o) => o.sort === filters.sort && o.order === filters.order
+    );
+    const sortLabel =
+        currentSortOption && currentSortOption !== sortOptions[0]
+            ? currentSortOption.label
+            : undefined;
+
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showManageModal, setShowManageModal] = useState(false);
 
     const hasAnyFilter =
         filters.status.length > 0 ||
@@ -172,7 +217,52 @@ export default function ProjectFilterPanel({
                         すべてクリア
                     </button>
                 )}
+
+                {/* 保存済み条件の呼び出し・保存（WF_06の配置に合わせて右端） */}
+                <div className="ml-auto flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">保存済み条件</span>
+                    <SavedSearchSelect
+                        savedSearches={savedSearches}
+                        onApply={onFilterChange}
+                    />
+                    {hasAnyFilter && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1 bg-white text-[11px]"
+                            onClick={() => setShowSaveModal(true)}
+                        >
+                            <Star className="h-3 w-3" />
+                            条件を保存
+                        </Button>
+                    )}
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1 bg-white text-[11px]"
+                        onClick={() => setShowManageModal(true)}
+                    >
+                        <List className="h-3 w-3" />
+                        条件管理
+                    </Button>
+                </div>
             </div>
+
+            <SavedSearchSaveDialog
+                open={showSaveModal}
+                searchType="project"
+                currentConditions={currentConditions}
+                activeTagLabels={activeTagLabels}
+                sortLabel={sortLabel}
+                onClose={() => setShowSaveModal(false)}
+            />
+            <SavedSearchManageDialog
+                open={showManageModal}
+                savedSearches={savedSearches}
+                onClose={() => setShowManageModal(false)}
+            />
         </div>
     );
 }

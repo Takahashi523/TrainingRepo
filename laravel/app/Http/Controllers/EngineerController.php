@@ -6,32 +6,23 @@ use App\Http\Requests\EngineerIndexRequest;
 use App\Http\Requests\EngineerRequest;
 use App\Http\Resources\EngineerListResource;
 use App\Http\Resources\EngineerResource;
+use App\Http\Resources\SavedSearchResource;
 use App\Models\Engineer;
 use App\Models\FormFieldSetting;
+use App\Models\SavedSearch;
 use App\Models\User;
 use App\Services\EngineerService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class EngineerController extends Controller
 {
     public function __construct(private readonly EngineerService $engineerService) {}
-
-    /**
-     * 許可されたソートの組み合わせ（sort×order のペア＋表示ラベル）。
-     * DB設計書 §8 の4パターンを単一の情報源（SSOT）として定義し、
-     * バリデーションはこのペアを基準に行い、同じ配列を sortOptions として props でフロントへ渡す。
-     * 先頭がデフォルト（created_at DESC）。
-     */
-    private const SORT_OPTIONS = [
-        ['sort' => 'created_at',     'order' => 'desc', 'label' => '登録日順（新しい順）'],
-        ['sort' => 'created_at',     'order' => 'asc',  'label' => '登録日順（古い順）'],
-        ['sort' => 'updated_at',     'order' => 'desc', 'label' => '更新日順（新しい順）'],
-        ['sort' => 'available_from', 'order' => 'asc',  'label' => '提案可能タイミング順'],
-    ];
 
     private const ALLOWED_WORK_STYLES = ['onsite', 'hybrid', 'remote'];
 
@@ -118,6 +109,9 @@ class EngineerController extends Controller
         $paginator = $query->paginate($perPage)->appends($request->query());
 
         return Inertia::render('Engineers/Index', [
+            'savedSearches' => SavedSearchResource::collection(
+                SavedSearch::listForUser(Auth::id(), 'engineer')
+            )->collection,
             'engineers' => [
                 'data' => EngineerListResource::collection($paginator)->collection,
                 'meta' => [
@@ -142,14 +136,15 @@ class EngineerController extends Controller
             'statusOptions' => Engineer::STATUSES,
             'workStyleOptions' => Engineer::WORK_STYLES,
             'phaseOptions' => Engineer::PHASES,
-            'sortOptions' => self::SORT_OPTIONS,
+            'sortOptions' => Engineer::SORT_OPTIONS,
         ]);
     }
 
     /**
      * ソートを sort×order のペア単位で検証する。
-     * SORT_OPTIONS（許可組の配列）に一致するペアだけ採用し、無ければ先頭（デフォルト）へフォールバックする。
-     * これにより仕様外の sort×order の組み合わせを弾き、UI の選択肢と完全に一致させる（SSOT）。
+     * Engineer::SORT_OPTIONS（許可組の配列。SSOT）に一致するペアだけ採用し、
+     * 無ければ先頭（デフォルト）へフォールバックする。
+     * これにより仕様外の sort×order の組み合わせを弾き、UI の選択肢と完全に一致させる。
      *
      * @return array{0: string, 1: string} [$sort, $order]
      */
@@ -158,13 +153,13 @@ class EngineerController extends Controller
         $sortInput = (string) $request->input('sort', '');
         $orderInput = strtolower((string) $request->input('order', ''));
 
-        foreach (self::SORT_OPTIONS as $opt) {
+        foreach (Engineer::SORT_OPTIONS as $opt) {
             if ($opt['sort'] === $sortInput && $opt['order'] === $orderInput) {
                 return [$opt['sort'], $opt['order']];
             }
         }
 
-        return [self::SORT_OPTIONS[0]['sort'], self::SORT_OPTIONS[0]['order']];
+        return [Engineer::SORT_OPTIONS[0]['sort'], Engineer::SORT_OPTIONS[0]['order']];
     }
 
     public function create(): Response

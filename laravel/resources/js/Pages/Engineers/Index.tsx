@@ -47,6 +47,7 @@ export default function Index({
     workStyleOptions,
     phaseOptions,
     sortOptions,
+    savedSearches,
 }: Props) {
     // フリーワード入力はデバウンスのために state を分離。サーバ側 filters.keyword と切り離す。
     const [keywordInput, setKeywordInput] = useState(filters.keyword);
@@ -177,6 +178,8 @@ export default function Index({
                         statuses={statusOptions}
                         workStyles={workStyleOptions}
                         phases={phaseOptions}
+                        savedSearches={savedSearches}
+                        sortOptions={sortOptions}
                         keywordInput={keywordInput}
                         onKeywordInput={setKeywordInput}
                         onFilterChange={handleFilterChange}

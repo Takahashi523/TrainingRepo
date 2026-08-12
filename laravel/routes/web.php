@@ -9,6 +9,7 @@ use App\Http\Controllers\Master\UserController as MasterUserController;
 use App\Http\Controllers\MatchingController;
 use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\SavedSearchController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -30,6 +31,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('pipelines/{pipeline}', [PipelineController::class, 'update'])->name('pipelines.update');
     Route::delete('pipelines/{pipeline}', [PipelineController::class, 'destroy'])->name('pipelines.destroy');
     Route::post('pipelines', [PipelineController::class, 'store'])->name('pipelines.store');
+
+    Route::post('saved-searches', [SavedSearchController::class, 'store'])->name('savedSearches.store');
+    Route::delete('saved-searches/{savedSearch}', [SavedSearchController::class, 'destroy'])->name('savedSearches.destroy');
 
     // CSV 入出力（WF_11 / api/08）。認可は CsvController 内の Gate（access-csv）で admin/general 双方可。
     Route::get('csv', [CsvController::class, 'index'])->name('csv.index');

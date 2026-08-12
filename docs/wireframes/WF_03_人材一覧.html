@@ -662,7 +662,11 @@
             <option>PHP × 開発 × 常駐可</option>
             <option>Python × 要件定義あり</option>
           </select>
+          <!-- 「☆ 条件を保存」は絞り込み条件が1つ以上ある時のみ表示（保存対象がない場合は非表示）。
+               「☰ 条件管理」は絞り込み状態に関わらず常時表示（保存済み条件の参照・削除はいつでも可能）。
+               PR #60 レビュー対応：1ボタンで保存と削除（管理）を兼ねていたのを役割ごとに分離。 -->
           <button class="btn" onclick="openSaveModal()">☆ 条件を保存 <span class="should-badge">Should</span></button>
+          <button class="btn" onclick="openManageModal()">☰ 条件管理</button>
         </div>
       </div>
     </div>
@@ -974,8 +978,10 @@
     - スキルフィルタのグループラベルとWF_12カテゴリ5分類の整合（次バージョン対応）
 -->
 
-<!-- ===== 条件保存モーダル ===== -->
-<div class="modal-overlay" id="saveModal" onclick="handleOverlayClick(event)">
+<!-- ===== 条件保存モーダル（保存専用） =====
+     保存のみを扱う。保存済み条件の一覧・削除は下の条件管理モーダルの責務。
+     保存に成功したら自動的に閉じる（1モーダル1責務になったため、開いたままにしておく理由がない）。 -->
+<div class="modal-overlay" id="saveModal" onclick="handleSaveOverlayClick(event)">
   <div class="modal-box">
 
     <div class="modal-header">
@@ -993,21 +999,49 @@
         <span class="modal-tag">フルリモート</span>
       </div>
 
+      <!-- 並び順（PR #60 レビュー対応：ソートも保存・復元されるのに名前・表示に一切出ないのは
+           実態と不一致、という指摘への対応）。
+           ソートが既定（sortOptions の先頭）のときはこのセクション自体を表示しない。
+           既定以外のときだけ、下のように1件表示する。条件名の自動生成にも、絞り込みタグの
+           「末尾」としてこのラベルを追加する（既定のままなら名前にも含めない）。 -->
+      <div class="modal-section-label">並び順</div>
+      <div class="modal-active-tags">
+        <span class="modal-tag">更新日順（新しい順）</span>
+      </div>
+
       <!-- 条件名入力 -->
       <div class="modal-section-label">条件名（任意）</div>
-      <div class="modal-input-row">
-        <input class="modal-input" id="saveConditionName" type="text"
-          placeholder="例：Java × 提案可 × フルリモート">
-        <button class="btn btn-primary" onclick="saveCondition()" style="height:32px;font-size:12px;">保存する</button>
-      </div>
+      <input class="modal-input" id="saveConditionName" type="text"
+        style="width:100%;" placeholder="例：Java × 提案可 × フルリモート">
       <div style="font-size:11px;color:#aaa;margin-top:4px;">
         未入力の場合はタグの組み合わせを自動で条件名に使用します
       </div>
 
-      <div class="modal-divider"></div>
+    </div><!-- /modal-body -->
 
-      <!-- 保存済み条件の管理 -->
-      <div class="modal-section-label">保存済み条件の管理</div>
+    <!-- 確定ボタンの配置・文言はマスタ管理のユーザー登録/編集モーダル（UserFormDialog）に揃える
+         （再レビュー指摘：入力欄隣接のインライン配置ではなく、フッター右寄せの
+         [キャンセル(outline)] [保存する/保存中...(primary)] が慣習）。 -->
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSaveModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveCondition()">保存する</button>
+    </div>
+
+  </div><!-- /modal-box -->
+</div><!-- /modal-overlay -->
+
+<!-- ===== 条件管理モーダル（管理専用） =====
+     保存済み条件の一覧表示・削除のみを扱う。絞り込み状態に関わらずいつでも開ける。 -->
+<div class="modal-overlay" id="manageModal" onclick="handleManageOverlayClick(event)">
+  <div class="modal-box">
+
+    <div class="modal-header">
+      <span class="modal-title">保存済み条件の管理</span>
+      <button class="modal-close" onclick="closeManageModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+
       <div class="modal-save-list" id="saveList">
 
         <div class="modal-save-item" id="item-1">
@@ -1016,7 +1050,7 @@
           <div class="modal-delete-confirm" id="confirm-1">
             <span>削除しますか？</span>
             <button class="modal-confirm-yes" onclick="doDelete(1)">削除</button>
-            <button class="modal-confirm-no" onclick="cancelDelete(1)">取消</button>
+            <button class="modal-confirm-no" onclick="cancelDelete(1)">キャンセル</button>
           </div>
         </div>
 
@@ -1026,7 +1060,7 @@
           <div class="modal-delete-confirm" id="confirm-2">
             <span>削除しますか？</span>
             <button class="modal-confirm-yes" onclick="doDelete(2)">削除</button>
-            <button class="modal-confirm-no" onclick="cancelDelete(2)">取消</button>
+            <button class="modal-confirm-no" onclick="cancelDelete(2)">キャンセル</button>
           </div>
         </div>
 
@@ -1036,7 +1070,7 @@
           <div class="modal-delete-confirm" id="confirm-3">
             <span>削除しますか？</span>
             <button class="modal-confirm-yes" onclick="doDelete(3)">削除</button>
-            <button class="modal-confirm-no" onclick="cancelDelete(3)">取消</button>
+            <button class="modal-confirm-no" onclick="cancelDelete(3)">キャンセル</button>
           </div>
         </div>
 
@@ -1044,7 +1078,7 @@
     </div><!-- /modal-body -->
 
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeSaveModal()">閉じる</button>
+      <button class="btn btn-ghost" onclick="closeManageModal()">閉じる</button>
     </div>
 
   </div><!-- /modal-box -->
@@ -1064,7 +1098,7 @@ document.addEventListener('click', function(e){
   }
 });
 
-/* ===== 条件保存モーダル ===== */
+/* ===== 条件保存モーダル（保存専用） ===== */
 function openSaveModal() {
   document.getElementById('saveModal').classList.add('open');
   document.getElementById('saveConditionName').focus();
@@ -1072,23 +1106,16 @@ function openSaveModal() {
 
 function closeSaveModal() {
   document.getElementById('saveModal').classList.remove('open');
-  // 確認UIをすべてリセット
-  document.querySelectorAll('.modal-delete-confirm').forEach(function(el){
-    el.classList.remove('show');
-  });
-  document.querySelectorAll('.modal-delete-btn').forEach(function(el){
-    el.style.display = '';
-  });
 }
 
-function handleOverlayClick(e) {
+function handleSaveOverlayClick(e) {
   if (e.target === document.getElementById('saveModal')) closeSaveModal();
 }
 
 function saveCondition() {
   var name = document.getElementById('saveConditionName').value.trim();
   var label = name || 'Java × 提案可 × フルリモート';
-  // WF上のサンプル動作: 保存済みリストの先頭に追加して閉じる
+  // 保存済み一覧（条件管理モーダル側）の先頭に追加
   var list = document.getElementById('saveList');
   var id = Date.now();
   var item = document.createElement('div');
@@ -1100,13 +1127,32 @@ function saveCondition() {
     '<div class="modal-delete-confirm" id="confirm-' + id + '">' +
       '<span>削除しますか？</span>' +
       '<button class="modal-confirm-yes" onclick="doDelete(' + id + ')">削除</button>' +
-      '<button class="modal-confirm-no" onclick="cancelDelete(' + id + ')">取消</button>' +
+      '<button class="modal-confirm-no" onclick="cancelDelete(' + id + ')">キャンセル</button>' +
     '</div>';
   list.insertBefore(item, list.firstChild);
   document.getElementById('saveConditionName').value = '';
-  // 保存完了の視覚フィードバック（WF上はシンプルに）
-  item.style.background = '#f0fff0';
-  setTimeout(function(){ item.style.background = ''; }, 800);
+  // 保存できたらモーダルを閉じる（保存専用モーダルになったため、開いたままにする理由がない）
+  closeSaveModal();
+}
+
+/* ===== 条件管理モーダル（管理専用） ===== */
+function openManageModal() {
+  document.getElementById('manageModal').classList.add('open');
+}
+
+function closeManageModal() {
+  document.getElementById('manageModal').classList.remove('open');
+  // 確認UIをすべてリセット
+  document.querySelectorAll('.modal-delete-confirm').forEach(function(el){
+    el.classList.remove('show');
+  });
+  document.querySelectorAll('.modal-delete-btn').forEach(function(el){
+    el.style.display = '';
+  });
+}
+
+function handleManageOverlayClick(e) {
+  if (e.target === document.getElementById('manageModal')) closeManageModal();
 }
 
 function askDelete(id) {
