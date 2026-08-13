@@ -1,11 +1,14 @@
 <?php
 
+use App\Exceptions\StaleResourceRedirector;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -25,5 +28,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // 削除済みリソースへの操作（stale ページからの削除・編集遷移、編集中の並行削除）で出る 404 を、
+        // 生のエラー画面ではなく「一覧へ戻す＋フラッシュ」に差し替える（issue #44）。
         //
+        // 判定と戻り先の対応表は StaleResourceRedirector に集約し、ここは委譲だけに留める。
+        // null が返った場合は Laravel 既定の 404 応答にフォールバックする
+        // （未定義 URL・意図的な abort(404)・非 Inertia リクエストはこちら）。
+        // このフォールバックが共通エラーページ（issue #70）の差し込み口になる。
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            return app(StaleResourceRedirector::class)->handle($e, $request);
+        });
     })->create();
