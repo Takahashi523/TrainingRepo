@@ -1,4 +1,5 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
+import DateInput from '@/Components/Common/DateInput';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
@@ -111,21 +112,19 @@ export default function CompletedFilterPanel({
                 {/* 終了日範囲 */}
                 <div className="flex items-center gap-1.5">
                     <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">終了日</span>
-                    <Input
-                        type="date"
+                    <DateInput
                         value={filters.ended_from ?? ''}
-                        onChange={(e) =>
-                            onFilterChange({ ended_from: e.target.value === '' ? null : e.target.value })
+                        onChange={(v) =>
+                            onFilterChange({ ended_from: v === '' ? null : v })
                         }
                         className="h-8 w-auto bg-white px-2 text-xs md:text-xs"
                         aria-label="終了日（開始）"
                     />
                     <span className="text-[11px] text-muted-foreground">〜</span>
-                    <Input
-                        type="date"
+                    <DateInput
                         value={filters.ended_to ?? ''}
-                        onChange={(e) =>
-                            onFilterChange({ ended_to: e.target.value === '' ? null : e.target.value })
+                        onChange={(v) =>
+                            onFilterChange({ ended_to: v === '' ? null : v })
                         }
                         className="h-8 w-auto bg-white px-2 text-xs md:text-xs"
                         aria-label="終了日（終了）"

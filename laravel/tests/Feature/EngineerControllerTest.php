@@ -273,6 +273,55 @@ class EngineerControllerTest extends TestCase
         $response->assertSessionHasErrors('name_kana');
     }
 
+    /**
+     * #67：生年月日欄をテキスト化したため未来日文字列がそのままサーバへ届く。
+     * サーバ FormRequest（before_or_equal:today）が弾き、サイレント保存されないことをロックする。
+     */
+    public function test_birth_date_rejects_future_date(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $future = now()->addDay()->format('Y-m-d');
+        $payload = array_merge($this->validPayload($user->id), ['birth_date' => $future]);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionHasErrors('birth_date');
+        $this->assertDatabaseCount('engineers', 0);
+    }
+
+    /**
+     * #67：日付欄をテキスト化したため実在しない日付文字列がそのままサーバへ届く。
+     * サーバ FormRequest（date）が弾き、サイレント保存されないことをロックする。
+     */
+    public function test_birth_date_rejects_invalid_date(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), ['birth_date' => '2000-02-30']);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionHasErrors('birth_date');
+        $this->assertDatabaseCount('engineers', 0);
+    }
+
+    /**
+     * #67：希望単価欄をテキスト化したため非数値文字列がそのままサーバへ届く。
+     * サーバ FormRequest（integer）が弾き、サイレント保存されないことをロックする。
+     */
+    public function test_desired_rate_rejects_non_numeric_value(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), ['desired_rate' => 'あ']);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionHasErrors('desired_rate');
+        $this->assertDatabaseCount('engineers', 0);
+    }
+
     public function test_name_kana_exceeding_max_length_fails(): void
     {
         $this->seedFormFieldSettings();
