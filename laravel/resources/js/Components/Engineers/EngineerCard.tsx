@@ -1,4 +1,4 @@
-import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
+import ProcessCheckboxGroup from '@/Components/Common/ProcessCheckboxGroup';
 import StatusBadge, { STATUS_STYLES } from '@/Components/Common/StatusBadge';
 import SkillTag from '@/Components/Common/SkillTag';
 import { Button } from '@/Components/ui/button';

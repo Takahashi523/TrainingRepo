@@ -1,4 +1,7 @@
 import { Button } from "@/Components/ui/button";
+import ProcessCheckboxGroup, {
+    buildProcessPhaseProps,
+} from "@/Components/Common/ProcessCheckboxGroup";
 import SkillTagDetail from "@/Components/Common/SkillTagDetail";
 import StatusBadge from "@/Components/Common/StatusBadge";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
@@ -10,7 +13,7 @@ import {
 } from "@/types/project";
 import { PageProps } from "@/types";
 import { Head, router, usePage } from "@inertiajs/react";
-import { Check, Clock, Pencil, Trash2, Users } from "lucide-react";
+import { Clock, Pencil, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 
 type Props = PageProps<ProjectShowPageProps>;
@@ -57,6 +60,12 @@ export default function Show({ project }: Props) {
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // 対象工程は共通 ProcessCheckboxGroup で表示する（案件のフラグ名は is_target）。
+    const { phaseList, phaseValues } = buildProcessPhaseProps(
+        project.phases,
+        "is_target",
+    );
 
     const handleDelete = () => {
         router.delete(`/projects/${project.id}`, {
@@ -278,35 +287,14 @@ export default function Show({ project }: Props) {
                         )}
                     </DetailRow>
                     <DetailRow label="対象工程">
-                        <div className="flex flex-wrap gap-3">
-                            {project.phases.map((phase) => (
-                                <span
-                                    key={phase.key}
-                                    className="flex items-center gap-1 text-sm"
-                                >
-                                    <span
-                                        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border text-[9px] font-bold ${
-                                            phase.is_target
-                                                ? "border-primary bg-primary text-primary-foreground"
-                                                : "border-border bg-muted/50 text-transparent"
-                                        }`}
-                                    >
-                                        {phase.is_target && (
-                                            <Check className="h-2.5 w-2.5" />
-                                        )}
-                                    </span>
-                                    <span
-                                        className={
-                                            phase.is_target
-                                                ? "text-foreground"
-                                                : "text-muted-foreground"
-                                        }
-                                    >
-                                        {phase.name}
-                                    </span>
-                                </span>
-                            ))}
-                        </div>
+                        {/* 人材詳細（Pages/Engineers/Show.tsx）と同一の指定にそろえ、
+                            同じ「工程」が画面ごとに違う見え方になるのを防ぐ。 */}
+                        <ProcessCheckboxGroup
+                            phases={phaseList}
+                            values={phaseValues}
+                            readOnly
+                            className="flex-nowrap gap-x-4"
+                        />
                     </DetailRow>
                     <DetailRow label="顧客折衝経験">
                         {project.negotiation_required === true

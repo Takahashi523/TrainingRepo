@@ -1,5 +1,5 @@
-import ProcessCheckboxGroup from "@/Components/Engineers/ProcessCheckboxGroup";
-import SkillInput from "@/Components/Engineers/SkillInput";
+import ProcessCheckboxGroup from "@/Components/Common/ProcessCheckboxGroup";
+import SkillInput from "@/Components/Common/SkillInput";
 import { Checkbox } from "@/Components/ui/checkbox";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";

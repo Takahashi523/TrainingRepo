@@ -1,7 +1,9 @@
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Label } from '@/Components/ui/label';
-import { Phase } from '@/types/engineer';
+// 工程の形は人材・案件・マッチング共通のため、共通部品はドメイン型（@/types/engineer）ではなく
+// 共有の @/types を参照する。
+import { Phase } from '@/types';
 
 /**
  * phases 配列（key/name + 真偽フラグ）を ProcessCheckboxGroup の props（phases + values）へ変換する
