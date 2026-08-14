@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface Props {
@@ -34,10 +35,17 @@ export default function SkillTagDetail({ label, detail }: Props) {
                 {detail && (
                     <button
                         type="button"
-                        className="text-[10px] text-muted-foreground hover:text-foreground"
+                        // アイコンのみのボタンのため、開閉状態を aria で明示する
+                        aria-label={open ? "詳細を閉じる" : "詳細を表示"}
+                        aria-expanded={open}
+                        className="text-muted-foreground hover:text-foreground"
                         onClick={() => setOpen((v) => !v)}
                     >
-                        {open ? "▲" : "▼"}
+                        {open ? (
+                            <ChevronUp className="h-3 w-3" />
+                        ) : (
+                            <ChevronDown className="h-3 w-3" />
+                        )}
                     </button>
                 )}
             </span>
