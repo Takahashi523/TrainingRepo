@@ -320,13 +320,13 @@
 | proc_testing | bool | 任意 | テスト（true:対象）。proc_experience の is_required 設定で制御 |
 | proc_maintenance | bool | 任意 | 保守運用（true:対象）。proc_experience の is_required 設定で制御 |
 | negotiation_required | bool | 任意 | 顧客折衝経験要否（form_field_settings制御）。true=要 / false=不問 |
-| description | string | 任意 | 業務内容詳細（form_field_settings制御） |
-| work_env | string | 任意 | 稼働環境（form_field_settings制御） |
+| description | string | 任意 | 業務内容詳細（form_field_settings制御・最大4000文字） |
+| work_env | string | 任意 | 稼働環境（form_field_settings制御・最大1000文字） |
 | status | string | ✓ | ステータス（システム固定必須）。open / closed / pending |
 | main_user_id | int | ✓ | 主担当ユーザーID（システム固定必須） |
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |
 | billing_range | string | 任意 | 精算幅（form_field_settings制御・最大100文字） |
-| remarks | string | 任意 | 特記事項（form_field_settings制御） |
+| remarks | string | 任意 | 特記事項（form_field_settings制御・最大1000文字） |
 
 ---
 
@@ -377,5 +377,4 @@
 
 | # | 項目 | QA# | 理由 |
 |---|------|-----|------|
-| 1 | `description` / `work_env` / `remarks` の文字数上限 | - | DBはTEXT型のため上限なし。バリデーション上の制限値を設けるか確認が必要 |
-| 2 | `interview_count` の上限値 | - | WF_06では「3回以上」という表示があるが、DB上の上限（TINYINT UNSIGNED: 最大255）以外の業務的な上限の要否を確認すること |
+| 1 | `interview_count` の上限値 | - | WF_06では「3回以上」という表示があるが、DB上の上限（TINYINT UNSIGNED: 最大255）以外の業務的な上限の要否を確認すること |

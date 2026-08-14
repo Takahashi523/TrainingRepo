@@ -370,6 +370,7 @@ export default function ProjectForm({
                     onChange={(e) => setData("remarks", e.target.value)}
                     placeholder="例：基本勤務時間 10:00〜19:00、シフト制なし、出張なし など"
                     className={`min-h-28 ${errors.remarks ? "border-destructive" : ""}`}
+                    maxLength={1000}
                 />
             </FormRow>
 
@@ -462,6 +463,7 @@ export default function ProjectForm({
                     onChange={(e) => setData("description", e.target.value)}
                     placeholder="例：大手金融機関の勘定系システムをJava/Spring Bootでリプレースするプロジェクトです。要件定義フェーズから参画いただき、基本設計〜開発・テストまで一貫して担当していただきます。チームは5名構成、スクラム開発を採用しています。"
                     className={`min-h-40 ${errors.description ? "border-destructive" : ""}`}
+                    maxLength={4000}
                 />
             </FormRow>
 
@@ -476,6 +478,7 @@ export default function ProjectForm({
                     onChange={(e) => setData("work_env", e.target.value)}
                     placeholder="例：OS: CentOS / Windows Server　DBMS: PostgreSQL / SQL Server　開発言語: PHP / JavaScript　クラウド: AWS　その他: Docker / Git"
                     className={`min-h-28 ${errors.work_env ? "border-destructive" : ""}`}
+                    maxLength={1000}
                 />
             </FormRow>
 

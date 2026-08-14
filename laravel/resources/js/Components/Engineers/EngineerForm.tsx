@@ -288,7 +288,8 @@ export default function EngineerForm({
                     value={data.appeal_note}
                     onChange={(e) => setData('appeal_note', e.target.value)}
                     placeholder="例：Java・Spring Bootを用いた金融系システムの開発経験が豊富です。チームリードの経験もあり、コミュニケーション能力にも自信があります。"
-                    rows={4}
+                    className={`min-h-40 ${errors.appeal_note ? 'border-destructive' : ''}`}
+                    maxLength={4000}
                 />
             </FormRow>
 
@@ -335,7 +336,8 @@ export default function EngineerForm({
                     value={data.remarks}
                     onChange={(e) => setData('remarks', e.target.value)}
                     placeholder="例：土日祝休み希望、出張NG、残業月20h以内希望 など"
-                    rows={3}
+                    className={`min-h-28 ${errors.remarks ? 'border-destructive' : ''}`}
+                    maxLength={1000}
                 />
             </FormRow>
 
