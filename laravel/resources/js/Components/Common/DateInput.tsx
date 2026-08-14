@@ -2,7 +2,7 @@ import { Calendar as CalendarIcon } from 'lucide-react';
 import { forwardRef, useRef, type ComponentProps } from 'react';
 
 import { Input } from '@/Components/ui/input';
-import { cn, toHalfWidthDigits } from '@/lib/utils';
+import { cn, isValidYmd, toHalfWidthDigits } from '@/lib/utils';
 
 /**
  * 日付入力用の共通コンポーネント（Issue #67 / 案B：テキスト欄＋ネイティブピッカー）。
@@ -21,6 +21,12 @@ import { cn, toHalfWidthDigits } from '@/lib/utils';
  * value / onChange の契約は 'YYYY-MM-DD' 文字列（空文字可）のまま維持し、表示時に -→/、
  * onChange 時に /→- で橋渡しする（サーバ・年齢計算・隠しネイティブ date は YYYY-MM-DD 前提）。
  * min / max（'YYYY-MM-DD'）は隠し date にそのまま渡し、ネイティブピッカーの選択可否に委ねる。
+ *
+ * **onChange の契約（重要）**：テキスト欄なので **1打鍵ごとに発火し、入力途中の不完全な値
+ * （'2' / '2026-' / '2026-08-0'）もそのまま返す**。旧 `type="date"` の「完成した日付か空しか
+ * 返さない」暗黙の前提はここでは成り立たない。
+ * したがって **値を即サーバーへ送る呼び出し側（ライブフィルタ等）は、`isValidYmd(v) || v === ''`
+ * で送信可否をゲートすること**。保存ボタン等で送る画面はサーバー FormRequest の 422 で足りる。
  */
 interface DateInputProps
     extends Omit<
@@ -46,21 +52,6 @@ function maskYmdSlash(input: string): string {
     if (digits.length >= 6) out += '/';
     out += digits.slice(6, 8);
     return out;
-}
-
-/** 'YYYY-MM-DD' かつ実在日付なら true（2026-02-30 等のロールオーバーは false）。 */
-function isValidYmd(s: string): boolean {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-    if (!m) return false;
-    const y = Number(m[1]);
-    const mo = Number(m[2]);
-    const d = Number(m[3]);
-    const date = new Date(y, mo - 1, d);
-    return (
-        date.getFullYear() === y &&
-        date.getMonth() === mo - 1 &&
-        date.getDate() === d
-    );
 }
 
 const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
