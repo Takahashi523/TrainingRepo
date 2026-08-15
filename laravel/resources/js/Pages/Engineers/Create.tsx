@@ -45,7 +45,9 @@ export default function Create({ fieldSettings, phases, work_styles, statuses, u
                     : d.has_negotiation_exp === '0'
                       ? false
                       : null,
-            desired_rate: d.desired_rate !== '' ? Number(d.desired_rate) : null,
+            // desired_rate は Number() で変換しない。Number("あ")=NaN が JSON 化で null になり
+            // サイレント NULL 保存になるため、生文字列のまま送りサーバ integer ルールで弾く（#67）。
+            desired_rate: d.desired_rate !== '' ? d.desired_rate : null,
             main_user_id: d.main_user_id !== '' ? Number(d.main_user_id) : null,
             sub_user_id: d.sub_user_id !== '' ? Number(d.sub_user_id) : null,
             birth_date: d.birth_date || null,

@@ -1,3 +1,4 @@
+import DateInput from '@/Components/Common/DateInput';
 import { Button } from '@/Components/ui/button';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Input } from '@/Components/ui/input';
@@ -224,22 +225,20 @@ export default function ExportFilter({ options, config }: Props) {
                         {config.dateLabel}
                     </Label>
                     <div className="flex items-center gap-2">
-                        <Input
-                            type="date"
+                        <DateInput
                             value={dateFrom}
-                            onChange={(e) => {
-                                setDateFrom(e.target.value);
+                            onChange={(v) => {
+                                setDateFrom(v);
                                 setDateError(null);
                             }}
                             className="h-8 bg-white px-2 text-xs md:text-xs"
                             aria-label={`${config.dateLabel}（開始）`}
                         />
                         <span className="shrink-0 text-[11px] text-muted-foreground">〜</span>
-                        <Input
-                            type="date"
+                        <DateInput
                             value={dateTo}
-                            onChange={(e) => {
-                                setDateTo(e.target.value);
+                            onChange={(v) => {
+                                setDateTo(v);
                                 setDateError(null);
                             }}
                             className="h-8 bg-white px-2 text-xs md:text-xs"
