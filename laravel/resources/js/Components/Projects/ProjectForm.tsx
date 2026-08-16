@@ -291,36 +291,50 @@ export default function ProjectForm({
             </FormRow>
 
             {data.work_style !== "" && data.work_style !== "remote" && (
-                <FormRow
-                    label="勤務地"
-                    required={fieldSettings.work_location.is_required}
-                    hint="フリーテキスト入力。稼働形態が「常駐」または「一部リモート可」の場合は必須です"
-                    error={
-                        errors.work_location_line ??
-                        errors.work_location_station
-                    }
-                >
-                    <div className="flex gap-2">
-                        <Input
-                            type="text"
-                            value={data.work_location_line}
-                            onChange={(e) =>
-                                setData("work_location_line", e.target.value)
-                            }
-                            placeholder="路線名（例：東京メトロ丸ノ内線）"
-                            className={`w-56 ${errors.work_location_line ? "border-destructive" : ""}`}
-                        />
-                        <Input
-                            type="text"
-                            value={data.work_location_station}
-                            onChange={(e) =>
-                                setData("work_location_station", e.target.value)
-                            }
-                            placeholder="駅名（例：大手町）"
-                            className={`w-48 ${errors.work_location_station ? "border-destructive" : ""}`}
-                        />
-                    </div>
-                </FormRow>
+                <>
+                    <FormRow
+                        label="勤務地（最寄駅）"
+                        required
+                        hint="人材の最寄駅との通勤条件マッチングに使用します。駅名を自由入力（例：大手町）"
+                        error={errors.work_location_station}
+                    >
+                        <div className="flex gap-2">
+                            <Input
+                                type="text"
+                                value={data.work_location_station}
+                                onChange={(e) =>
+                                    setData(
+                                        "work_location_station",
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="駅名（例：大手町）"
+                                className={`w-64 ${errors.work_location_station ? "border-destructive" : ""}`}
+                            />
+                        </div>
+                    </FormRow>
+                    <FormRow
+                        label="勤務地（路線名）"
+                        required={fieldSettings.work_location.is_required}
+                        hint="路線名を自由入力（例：東京メトロ丸ノ内線）"
+                        error={errors.work_location_line}
+                    >
+                        <div className="flex gap-2">
+                            <Input
+                                type="text"
+                                value={data.work_location_line}
+                                onChange={(e) =>
+                                    setData(
+                                        "work_location_line",
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="路線名（例：東京メトロ丸ノ内線）"
+                                className={`w-64 ${errors.work_location_line ? "border-destructive" : ""}`}
+                            />
+                        </div>
+                    </FormRow>
+                </>
             )}
 
             <FormRow

@@ -479,17 +479,29 @@
         </div>
       </div>
 
-      <!-- 勤務地（最寄駅）：フルリモート以外の場合のみ表示・必須 -->
-      <div class="form-row" id="location-row" style="display:none;">
+      <!-- 勤務地（最寄駅・路線名）：常駐/一部リモート可の場合のみ2行とも表示（未選択時はフルリモートと同様に非表示）。
+           [Issue #50] 最寄駅は常に必須（業務ルール固定・form_field_settings対象外、ProjectRequest参照）。
+           路線名はマスタ管理画面の設定（form_field_settings.work_location）に連動する必須/任意。
+           以前は1行に統合し路線名側のバッジのみを表示していたため、マスタで路線名を任意にすると
+           最寄駅側の固定必須と矛盾する表示になっていた。2行に分割し、それぞれ実際のロジック通りの
+           バッジを表示するよう修正（人材登録WF_04の最寄駅/路線と同じ「別行・別バッジ」構成に統一）。 -->
+      <div class="form-row" id="location-row-station" style="display:none;">
         <div class="form-label">
-          <span class="badge-required" id="location-badge">必須</span>勤務地（最寄駅）
+          <span class="badge-required">必須</span>勤務地（最寄駅）
         </div>
         <div class="form-field col">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input class="wf-input w-200" type="text" id="location-line" placeholder="路線名（例：東京メトロ丸ノ内線）">
-            <input class="wf-input w-200" type="text" id="location-sta"  placeholder="駅名（例：大手町）">
-          </div>
-          <span class="hint-text">フリーテキスト入力。稼働形態が「常駐」または「一部リモート可」の場合は必須です</span>
+          <input class="wf-input w-200" type="text" id="location-sta" placeholder="駅名（例：大手町）">
+          <span class="hint-text">人材の最寄駅との通勤条件マッチングに使用します。駅名を自由入力（例：大手町）</span>
+        </div>
+      </div>
+
+      <div class="form-row" id="location-row-line" style="display:none;">
+        <div class="form-label">
+          <span class="badge-required" id="location-badge-line">必須</span>勤務地（路線名）
+        </div>
+        <div class="form-field col">
+          <input class="wf-input w-200" type="text" id="location-line" placeholder="路線名（例：東京メトロ丸ノ内線）">
+          <span class="hint-text">路線名を自由入力（例：東京メトロ丸ノ内線）</span>
         </div>
       </div>
 
@@ -733,7 +745,8 @@
       <div>
         <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>勤務地：フリーテキスト確定。フルリモート選択時は行を非表示・入力値クリア（QA #59）</li>
+          <li>勤務地：フリーテキスト確定。フルリモート・未選択時は行を非表示。入力値クリアはフロントではなく保存時にバックエンド（ProjectService）が行う（QA #59）</li>
+          <li>[Issue #50] 勤務地は「勤務地（最寄駅）」「勤務地（路線名）」の別行・別バッジ表示。最寄駅は常時必須（業務ルール固定）、路線名はマスタ設定（form_field_settings.work_location）に連動</li>
           <li>単価：スキル見合いチェックボックスあり。ON時に数値欄→テキスト入力へ切替（QA #14）</li>
           <li>稼働環境：フリーテキストでスキル要件セクション末尾に追加（QA #67）</li>
           <li>精算幅：フリーテキストで就業条件セクションに独立追加（QA #66）</li>
@@ -753,9 +766,19 @@
 
 <!--
   WF_07_案件登録_編集.html
-  バージョン: v1.1
-  更新日: 2026-04-30
+  バージョン: v1.2
+  更新日: 2026-08-15
   変更履歴:
+    v1.2 (2026-08-15)
+      - [Issue #50] 勤務地を「勤務地（最寄駅）」「勤務地（路線名）」の2行に分割。
+        最寄駅は常駐/一部リモート可の場合は常に必須バッジ（業務ルール固定）、
+        路線名はマスタ設定に連動したバッジを個別表示するよう修正
+        （旧: 1行に統合し路線名側のバッジのみを表示していたため、
+        マスタで路線名を任意にすると最寄駅の実際の必須条件と表示が矛盾していた）
+      - [Issue #50] onWorkStyleChange() を2行対応に変更。入力値クリアの記述を削除
+        （実装はフロントで値をクリアせず、保存時にバックエンドがnull化する）
+      - [Issue #50] 2行のヒント文を実装（ProjectForm.tsx）と一致させ、人材登録WF_04と同じ
+        「用途＋自由入力＋例」の文体に統一（旧版は実装反映前の暫定文言のまま残っていた）
     v1.1 (2026-04-30)
       - [QA #77] システム名を「Nexus（ネクサス）」に統一
       - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
@@ -780,22 +803,21 @@ function toggleSkillMerit(chk) {
 }
 
 function onWorkStyleChange(sel) {
-  var row   = document.getElementById('location-row');
-  var line  = document.getElementById('location-line');
-  var sta   = document.getElementById('location-sta');
-  var val   = sel.value;
+  // [Issue #50] 最寄駅・路線名の2行を同じ条件で出し分ける。
+  // 入力値のクリアはフロントでは行わない（保存時にバックエンド ProjectService が
+  // work_style=remote の場合に work_location_line / work_location_station を null 化する）。
+  var rowStation = document.getElementById('location-row-station');
+  var rowLine    = document.getElementById('location-row-line');
+  var val        = sel.value;
 
-  if (val === 'remote') {
-    // フルリモート：入力値クリア → 行を非表示
-    line.value = '';
-    sta.value  = '';
-    row.style.display = 'none';
-  } else if (val === '' ) {
-    // 未選択：非表示のまま
-    row.style.display = 'none';
+  if (val === 'onsite' || val === 'hybrid') {
+    // 常駐 or 一部リモート可：2行とも表示
+    rowStation.style.display = 'flex';
+    rowLine.style.display    = 'flex';
   } else {
-    // 常駐 or 一部リモート可：行を表示
-    row.style.display = 'flex';
+    // フルリモート、または未選択：2行とも非表示
+    rowStation.style.display = 'none';
+    rowLine.style.display    = 'none';
   }
 }
 </script>
