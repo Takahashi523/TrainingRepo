@@ -379,6 +379,7 @@ export default function ProjectForm({
                 error={errors.remarks}
                 hint="スコア計算には使用しません。営業担当者が把握しておきたい就業条件を自由記述してください"
             >
+                {/* 過大な入力によるPostTooLargeExceptionを避けるため、バックエンドのmax:1000と揃えてフロントでも制限する */}
                 <Textarea
                     value={data.remarks}
                     onChange={(e) => setData("remarks", e.target.value)}
@@ -470,8 +471,8 @@ export default function ProjectForm({
                 label="業務内容詳細"
                 required={fieldSettings.description.is_required}
                 error={errors.description}
-                hint="AIが案件内容を理解してマッチング精度を向上させるために使用します"
             >
+                {/* 過大な入力によるPostTooLargeExceptionを避けるため、バックエンドのmax:4000と揃えてフロントでも制限する */}
                 <Textarea
                     value={data.description}
                     onChange={(e) => setData("description", e.target.value)}
@@ -479,6 +480,15 @@ export default function ProjectForm({
                     className={`min-h-40 ${errors.description ? "border-destructive" : ""}`}
                     maxLength={4000}
                 />
+                {/* ヒントと文字数カウンタ（メール等からの貼り付けで末尾が無言で切り詰められても気付けるように）を同じ行に表示する */}
+                <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                        AIが案件内容を理解してマッチング精度を向上させるために使用します
+                    </p>
+                    <p className="shrink-0 text-[11px] text-muted-foreground">
+                        {data.description.length.toLocaleString()} / 4,000
+                    </p>
+                </div>
             </FormRow>
 
             <FormRow
@@ -487,6 +497,7 @@ export default function ProjectForm({
                 error={errors.work_env}
                 hint="OS・ツール・ミドルウェア等の技術環境をフリーテキストで記述してください"
             >
+                {/* 過大な入力によるPostTooLargeExceptionを避けるため、バックエンドのmax:1000と揃えてフロントでも制限する */}
                 <Textarea
                     value={data.work_env}
                     onChange={(e) => setData("work_env", e.target.value)}

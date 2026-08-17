@@ -332,6 +332,8 @@
 | billing_range | string | 任意 | 精算幅（form_field_settings制御・最大100文字） |
 | remarks | string | 任意 | 特記事項（form_field_settings制御・最大1000文字） |
 
+> **文字数上限について（2026-08-17確定・#34対応）**：`description`(max:4000) / `work_env`(max:1000) / `remarks`(max:1000)は、人材側`appeal_note`(max:4000) / `remarks`(max:1000)と揃える形で確定した。§3 TBDにあった同項目は解消済み。
+
 ---
 
 ### DELETE /projects/{id}（#7）
