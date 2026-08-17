@@ -27,9 +27,9 @@ class ProjectControllerTest extends TestCase
         ];
         foreach ($fields as $key) {
             FormFieldSetting::create([
-                'form_type'          => 'project',
-                'field_key'          => $key,
-                'is_required'        => $overrides[$key] ?? false,
+                'form_type' => 'project',
+                'field_key' => $key,
+                'is_required' => $overrides[$key] ?? false,
                 'is_system_required' => false,
             ]);
         }
@@ -38,10 +38,10 @@ class ProjectControllerTest extends TestCase
     private function validPayload(int $mainUserId): array
     {
         return [
-            'name'         => 'テスト案件',
-            'status'       => 'open',
+            'name' => 'テスト案件',
+            'status' => 'open',
             'main_user_id' => $mainUserId,
-            'sub_user_id'  => null,
+            'sub_user_id' => null,
         ];
     }
 
@@ -54,8 +54,8 @@ class ProjectControllerTest extends TestCase
         $mainUser = $overrides['main_user_id'] ?? User::factory()->create()->id;
 
         return Project::create(array_merge([
-            'name'         => 'テスト案件',
-            'status'       => 'open',
+            'name' => 'テスト案件',
+            'status' => 'open',
             'main_user_id' => $mainUser,
         ], $overrides));
     }
@@ -146,8 +146,8 @@ class ProjectControllerTest extends TestCase
         $project = Project::where('name', 'テスト案件')->first();
         $response->assertRedirect("/projects/{$project->id}");
         $this->assertDatabaseHas('projects', [
-            'name'         => 'テスト案件',
-            'status'       => 'open',
+            'name' => 'テスト案件',
+            'status' => 'open',
             'main_user_id' => $user->id,
         ]);
     }
@@ -181,14 +181,14 @@ class ProjectControllerTest extends TestCase
         $this->assertDatabaseHas('project_skills', [
             'project_id' => $project->id,
             'skill_type' => 'required',
-            'label'      => 'PHP',
-            'detail'     => 'Laravel 5年以上',
+            'label' => 'PHP',
+            'detail' => 'Laravel 5年以上',
         ]);
         $this->assertDatabaseHas('project_skills', [
             'project_id' => $project->id,
             'skill_type' => 'required',
-            'label'      => 'Vue',
-            'detail'     => null,
+            'label' => 'Vue',
+            'detail' => null,
         ]);
     }
 
@@ -209,7 +209,7 @@ class ProjectControllerTest extends TestCase
         $this->assertDatabaseHas('project_skills', [
             'project_id' => $project->id,
             'skill_type' => 'preferred',
-            'label'      => 'Docker',
+            'label' => 'Docker',
         ]);
     }
 
@@ -227,7 +227,7 @@ class ProjectControllerTest extends TestCase
     {
         $this->seedFormFieldSettings();
         $mainUser = User::factory()->create();
-        $subUser  = User::factory()->create();
+        $subUser = User::factory()->create();
 
         $payload = array_merge($this->validPayload($mainUser->id), ['sub_user_id' => $subUser->id]);
         $this->actingAs($mainUser)->post('/projects', $payload);
@@ -242,15 +242,15 @@ class ProjectControllerTest extends TestCase
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
-            'rate_note'          => 'スキル見合い',
+            'rate_note' => 'スキル見合い',
         ]);
 
         $this->actingAs($user)->post('/projects', $payload);
 
         $this->assertDatabaseHas('projects', [
-            'rate_min'           => null,
-            'rate_max'           => null,
-            'rate_note'          => 'スキル見合い',
+            'rate_min' => null,
+            'rate_max' => null,
+            'rate_note' => 'スキル見合い',
         ]);
     }
 
@@ -261,14 +261,14 @@ class ProjectControllerTest extends TestCase
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
-            'rate_note'          => null,  // 未入力
+            'rate_note' => null,  // 未入力
         ]);
 
         $this->actingAs($user)->post('/projects', $payload);
 
         $this->assertDatabaseHas('projects', [
-            'rate_min'  => null,
-            'rate_max'  => null,
+            'rate_min' => null,
+            'rate_max' => null,
             'rate_note' => 'スキル見合い',  // デフォルト値が入る
         ]);
     }
@@ -284,14 +284,14 @@ class ProjectControllerTest extends TestCase
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
-            'rate_note'          => '応相談',
+            'rate_note' => '応相談',
         ]);
 
         $this->actingAs($user)->post('/projects', $payload);
 
         $this->assertDatabaseHas('projects', [
-            'rate_min'  => null,
-            'rate_max'  => null,
+            'rate_min' => null,
+            'rate_max' => null,
             'rate_note' => '応相談',
         ]);
     }
@@ -307,16 +307,16 @@ class ProjectControllerTest extends TestCase
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
-            'rate_min'           => 60,
-            'rate_max'           => 80,
-            'rate_note'          => null, // チェックON直後は未入力（実際の画面操作を再現）
+            'rate_min' => 60,
+            'rate_max' => 80,
+            'rate_note' => null, // チェックON直後は未入力（実際の画面操作を再現）
         ]);
 
         $this->actingAs($user)->post('/projects', $payload);
 
         $this->assertDatabaseHas('projects', [
-            'rate_min'  => null,
-            'rate_max'  => null,
+            'rate_min' => null,
+            'rate_max' => null,
             'rate_note' => 'スキル見合い', // 未入力時のデフォルト値が入る
         ]);
     }
@@ -333,16 +333,16 @@ class ProjectControllerTest extends TestCase
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => false,
-            'rate_min'           => 60,
-            'rate_max'           => 80,
-            'rate_note'          => 'スキル見合い', // 以前スキル見合いだった際の残留値を想定
+            'rate_min' => 60,
+            'rate_max' => 80,
+            'rate_note' => 'スキル見合い', // 以前スキル見合いだった際の残留値を想定
         ]);
 
         $this->actingAs($user)->post('/projects', $payload);
 
         $this->assertDatabaseHas('projects', [
-            'rate_min'  => 60,
-            'rate_max'  => 80,
+            'rate_min' => 60,
+            'rate_max' => 80,
             'rate_note' => null,
         ]);
     }
@@ -353,23 +353,23 @@ class ProjectControllerTest extends TestCase
         $user = User::factory()->create();
 
         $payload = array_merge($this->validPayload($user->id), [
-            'proc_requirements'  => true,
-            'proc_basic_design'  => false,
+            'proc_requirements' => true,
+            'proc_basic_design' => false,
             'proc_detail_design' => false,
-            'proc_development'   => true,
-            'proc_testing'       => false,
-            'proc_maintenance'   => false,
+            'proc_development' => true,
+            'proc_testing' => false,
+            'proc_maintenance' => false,
         ]);
 
         $this->actingAs($user)->post('/projects', $payload);
 
         $this->assertDatabaseHas('projects', [
-            'proc_requirements'  => 1,
-            'proc_development'   => 1,
-            'proc_basic_design'  => 0,
+            'proc_requirements' => 1,
+            'proc_development' => 1,
+            'proc_basic_design' => 0,
             'proc_detail_design' => 0,
-            'proc_testing'       => 0,
-            'proc_maintenance'   => 0,
+            'proc_testing' => 0,
+            'proc_maintenance' => 0,
         ]);
     }
 
@@ -380,7 +380,7 @@ class ProjectControllerTest extends TestCase
     public function test_name_is_required(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id);
         unset($payload['name']);
 
@@ -392,7 +392,7 @@ class ProjectControllerTest extends TestCase
     public function test_name_exceeding_max_length_fails(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'name' => str_repeat('あ', 256),
         ]);
@@ -405,7 +405,7 @@ class ProjectControllerTest extends TestCase
     public function test_status_is_required(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id);
         unset($payload['status']);
 
@@ -417,7 +417,7 @@ class ProjectControllerTest extends TestCase
     public function test_status_rejects_invalid_value(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['status' => 'invalid']);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -425,10 +425,42 @@ class ProjectControllerTest extends TestCase
         $response->assertSessionHasErrors('status');
     }
 
+    /**
+     * #67：数値欄をテキスト化したため非数値文字列がそのままサーバへ届く。
+     * サーバ FormRequest（integer）が弾き、サイレント保存されないことをロックする。
+     */
+    public function test_headcount_rejects_non_numeric_value(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), ['headcount' => 'あ']);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('headcount');
+        $this->assertDatabaseCount('projects', 0);
+    }
+
+    /**
+     * #67：日付欄をテキスト化したため実在しない日付文字列がそのままサーバへ届く。
+     * サーバ FormRequest（date）が弾き、サイレント保存されないことをロックする。
+     */
+    public function test_start_date_rejects_invalid_date(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), ['start_date' => '2026-02-30']);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('start_date');
+        $this->assertDatabaseCount('projects', 0);
+    }
+
     public function test_main_user_id_is_required(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id);
         unset($payload['main_user_id']);
 
@@ -440,7 +472,7 @@ class ProjectControllerTest extends TestCase
     public function test_main_user_id_must_exist_in_users_table(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['main_user_id' => 99999]);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -451,7 +483,7 @@ class ProjectControllerTest extends TestCase
     public function test_sub_user_id_must_differ_from_main_user_id(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['sub_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -462,7 +494,7 @@ class ProjectControllerTest extends TestCase
     public function test_sub_user_id_must_exist_in_users_table(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), ['sub_user_id' => 99999]);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -477,7 +509,7 @@ class ProjectControllerTest extends TestCase
     public function test_dynamic_field_is_required_when_form_field_setting_is_true(): void
     {
         $this->seedFormFieldSettings(['description' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id); // description を含まない
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -488,7 +520,7 @@ class ProjectControllerTest extends TestCase
     public function test_dynamic_field_is_nullable_when_form_field_setting_is_false(): void
     {
         $this->seedFormFieldSettings(['description' => false]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id); // description を含まない
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -499,7 +531,7 @@ class ProjectControllerTest extends TestCase
     public function test_negotiation_required_rejects_invalid_value(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'negotiation_required' => 'invalid',
         ]);
@@ -512,7 +544,7 @@ class ProjectControllerTest extends TestCase
     public function test_proc_fields_are_required_when_proc_experience_setting_is_true(): void
     {
         $this->seedFormFieldSettings(['proc_experience' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = $this->validPayload($user->id);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -524,7 +556,7 @@ class ProjectControllerTest extends TestCase
     public function test_rate_min_is_required_when_rate_setting_is_true_and_not_negotiable(): void
     {
         $this->seedFormFieldSettings(['rate' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => false,
         ]);
@@ -538,7 +570,7 @@ class ProjectControllerTest extends TestCase
     public function test_rate_min_and_max_are_not_required_when_negotiable(): void
     {
         $this->seedFormFieldSettings(['rate' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
         ]);
@@ -552,11 +584,11 @@ class ProjectControllerTest extends TestCase
     public function test_rate_min_must_be_less_than_or_equal_to_rate_max(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => false,
-            'rate_min'           => 80,
-            'rate_max'           => 60, // rate_min > rate_max
+            'rate_min' => 80,
+            'rate_max' => 60, // rate_min > rate_max
         ]);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -568,7 +600,7 @@ class ProjectControllerTest extends TestCase
     public function test_rate_max_is_required_when_rate_min_is_filled(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'rate_min' => 50,
             'rate_max' => null,
@@ -582,10 +614,10 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_station_is_required_when_work_style_is_onsite(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'             => 'onsite',
-            'work_location_station'  => null,
+            'work_style' => 'onsite',
+            'work_location_station' => null,
         ]);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -596,9 +628,9 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_station_is_required_when_work_style_is_hybrid(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'            => 'hybrid',
+            'work_style' => 'hybrid',
             'work_location_station' => null,
         ]);
 
@@ -610,9 +642,9 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_station_is_not_required_when_work_style_is_remote(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'            => 'remote',
+            'work_style' => 'remote',
             'work_location_station' => null,
         ]);
 
@@ -624,10 +656,10 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_line_is_required_when_work_location_setting_is_true_and_work_style_is_onsite(): void
     {
         $this->seedFormFieldSettings(['work_location' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'          => 'onsite',
-            'work_location_line'  => null,
+            'work_style' => 'onsite',
+            'work_location_line' => null,
         ]);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -638,9 +670,9 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_line_is_not_required_when_work_style_is_remote(): void
     {
         $this->seedFormFieldSettings(['work_location' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'         => 'remote',
+            'work_style' => 'remote',
             'work_location_line' => null,
         ]);
 
@@ -652,7 +684,7 @@ class ProjectControllerTest extends TestCase
     public function test_required_skills_is_required_when_form_field_setting_is_true(): void
     {
         $this->seedFormFieldSettings(['required_skills' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'required_skills' => [],
         ]);
@@ -665,7 +697,7 @@ class ProjectControllerTest extends TestCase
     public function test_skill_label_is_required_when_detail_is_present(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'required_skills' => [
                 ['label' => null, 'detail' => '詳細テキスト'],
@@ -680,7 +712,7 @@ class ProjectControllerTest extends TestCase
     public function test_skill_label_max_length_is_15(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'required_skills' => [
                 ['label' => str_repeat('あ', 16), 'detail' => null],
@@ -695,7 +727,7 @@ class ProjectControllerTest extends TestCase
     public function test_skill_label_is_required_when_required_skills_setting_is_true(): void
     {
         $this->seedFormFieldSettings(['required_skills' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'required_skills' => [
                 ['label' => null, 'detail' => null],
@@ -710,7 +742,7 @@ class ProjectControllerTest extends TestCase
     public function test_rate_min_is_required_when_rate_max_is_filled(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'rate_min' => null,
             'rate_max' => 80,
@@ -724,7 +756,7 @@ class ProjectControllerTest extends TestCase
     public function test_commercial_flow_rejects_invalid_value(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'commercial_flow' => 'invalid',
         ]);
@@ -737,7 +769,7 @@ class ProjectControllerTest extends TestCase
     public function test_work_style_rejects_invalid_value(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
             'work_style' => 'invalid',
         ]);
@@ -1091,13 +1123,13 @@ class ProjectControllerTest extends TestCase
         $user = User::factory()->create();
         $this->createProject([
             'main_user_id' => $user->id,
-            'name'         => 'A案件',
-            'description'  => 'バックエンド開発が中心の業務内容です',
+            'name' => 'A案件',
+            'description' => 'バックエンド開発が中心の業務内容です',
         ]);
         $this->createProject([
             'main_user_id' => $user->id,
-            'name'         => 'B案件',
-            'description'  => 'デザイン業務が中心です',
+            'name' => 'B案件',
+            'description' => 'デザイン業務が中心です',
         ]);
 
         $response = $this->actingAs($user)->get('/projects?keyword=バックエンド');
@@ -1412,12 +1444,12 @@ class ProjectControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $project = $this->createProject([
-            'main_user_id'         => $user->id,
-            'description'          => 'これは表示されないはず',
-            'work_env'             => '稼働環境も表示されないはず',
-            'remarks'              => '特記事項も表示されないはず',
-            'billing_range'        => '精算幅も表示されないはず',
-            'work_location_line'   => '勤務地の路線も一覧では非表示',
+            'main_user_id' => $user->id,
+            'description' => 'これは表示されないはず',
+            'work_env' => '稼働環境も表示されないはず',
+            'remarks' => '特記事項も表示されないはず',
+            'billing_range' => '精算幅も表示されないはず',
+            'work_location_line' => '勤務地の路線も一覧では非表示',
             'work_location_station' => '最寄駅も一覧では非表示',
         ]);
         $project->projectSkills()->create(['skill_type' => 'required', 'label' => 'PHP', 'detail' => 'Laravel 5年']);
@@ -1440,10 +1472,10 @@ class ProjectControllerTest extends TestCase
     {
         // main_user_id/sub_user_id をselectし忘れるとmainUserがnullになりクラッシュしていた不具合の回帰テスト
         $mainUser = User::factory()->create(['name' => '田中太郎']);
-        $subUser  = User::factory()->create(['name' => '鈴木花子']);
+        $subUser = User::factory()->create(['name' => '鈴木花子']);
         $this->createProject([
             'main_user_id' => $mainUser->id,
-            'sub_user_id'  => $subUser->id,
+            'sub_user_id' => $subUser->id,
         ]);
 
         $response = $this->actingAs($mainUser)->get('/projects');
@@ -1461,7 +1493,7 @@ class ProjectControllerTest extends TestCase
         $mainUser = User::factory()->create();
         $this->createProject([
             'main_user_id' => $mainUser->id,
-            'sub_user_id'  => null,
+            'sub_user_id' => null,
         ]);
 
         $response = $this->actingAs($mainUser)->get('/projects');
@@ -1517,7 +1549,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_guest_is_redirected_to_login_from_show_page(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $response = $this->get("/projects/{$project->id}");
@@ -1527,7 +1559,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_authenticated_user_can_view_show_page(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['name' => 'テスト案件', 'main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->get("/projects/{$project->id}");
@@ -1542,23 +1574,23 @@ class ProjectControllerTest extends TestCase
 
     public function test_show_page_contains_all_resource_scalar_fields(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject([
-            'main_user_id'          => $user->id,
-            'client_name'           => 'テスト商事',
-            'start_date'            => '2026-08-01',
-            'rate_min'              => 60,
-            'rate_max'              => 80,
-            'commercial_flow'       => 'prime',
-            'work_style'            => 'onsite',
-            'work_location_line'    => 'JR山手線',
+            'main_user_id' => $user->id,
+            'client_name' => 'テスト商事',
+            'start_date' => '2026-08-01',
+            'rate_min' => 60,
+            'rate_max' => 80,
+            'commercial_flow' => 'prime',
+            'work_style' => 'onsite',
+            'work_location_line' => 'JR山手線',
             'work_location_station' => '渋谷',
-            'interview_count'       => 2,
-            'headcount'             => 3,
-            'negotiation_required'  => true,
-            'description'           => '業務内容詳細のテキスト',
-            'work_env'              => '稼働環境のテキスト',
-            'billing_range'         => '精算幅140-180',
+            'interview_count' => 2,
+            'headcount' => 3,
+            'negotiation_required' => true,
+            'description' => '業務内容詳細のテキスト',
+            'work_env' => '稼働環境のテキスト',
+            'billing_range' => '精算幅140-180',
         ]);
 
         $response = $this->actingAs($user)->get("/projects/{$project->id}");
@@ -1595,7 +1627,7 @@ class ProjectControllerTest extends TestCase
     public function test_show_page_contains_main_user_information(): void
     {
         $mainUser = User::factory()->create(['name' => '担当太郎']);
-        $project  = $this->createProject(['main_user_id' => $mainUser->id]);
+        $project = $this->createProject(['main_user_id' => $mainUser->id]);
 
         $response = $this->actingAs($mainUser)->get("/projects/{$project->id}");
 
@@ -1607,7 +1639,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_show_page_sub_user_is_null_when_not_set(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id, 'sub_user_id' => null]);
 
         $response = $this->actingAs($user)->get("/projects/{$project->id}");
@@ -1620,8 +1652,8 @@ class ProjectControllerTest extends TestCase
     public function test_show_page_contains_sub_user_information_when_set(): void
     {
         $mainUser = User::factory()->create();
-        $subUser  = User::factory()->create(['name' => '副担当花子']);
-        $project  = $this->createProject(['main_user_id' => $mainUser->id, 'sub_user_id' => $subUser->id]);
+        $subUser = User::factory()->create(['name' => '副担当花子']);
+        $project = $this->createProject(['main_user_id' => $mainUser->id, 'sub_user_id' => $subUser->id]);
 
         $response = $this->actingAs($mainUser)->get("/projects/{$project->id}");
 
@@ -1633,7 +1665,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_show_page_separates_required_and_preferred_skills(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $project->projectSkills()->createMany([
             ['skill_type' => 'required',  'label' => 'PHP',    'detail' => 'Laravel 5年以上'],
@@ -1653,7 +1685,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_show_page_skills_are_empty_arrays_when_none_registered(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->get("/projects/{$project->id}");
@@ -1666,15 +1698,15 @@ class ProjectControllerTest extends TestCase
 
     public function test_show_page_phases_reflect_proc_boolean_columns(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject([
-            'main_user_id'       => $user->id,
-            'proc_requirements'  => true,
-            'proc_basic_design'  => false,
+            'main_user_id' => $user->id,
+            'proc_requirements' => true,
+            'proc_basic_design' => false,
             'proc_detail_design' => false,
-            'proc_development'   => true,
-            'proc_testing'       => false,
-            'proc_maintenance'   => false,
+            'proc_development' => true,
+            'proc_testing' => false,
+            'proc_maintenance' => false,
         ]);
 
         $response = $this->actingAs($user)->get("/projects/{$project->id}");
@@ -1695,7 +1727,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_guest_cannot_delete_project(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $response = $this->delete("/projects/{$project->id}");
@@ -1706,7 +1738,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_admin_can_delete_project(): void
     {
-        $admin   = User::factory()->create(['role' => 'admin']);
+        $admin = User::factory()->create(['role' => 'admin']);
         $project = $this->createProject(['main_user_id' => $admin->id]);
 
         $response = $this->actingAs($admin)->delete("/projects/{$project->id}");
@@ -1717,7 +1749,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_destroy_sets_success_flash_message(): void
     {
-        $admin   = User::factory()->create(['role' => 'admin']);
+        $admin = User::factory()->create(['role' => 'admin']);
         $project = $this->createProject(['main_user_id' => $admin->id]);
 
         $response = $this->actingAs($admin)->delete("/projects/{$project->id}");
@@ -1727,7 +1759,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_general_user_cannot_delete_project(): void
     {
-        $user    = User::factory()->create(['role' => 'general']);
+        $user = User::factory()->create(['role' => 'general']);
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->delete("/projects/{$project->id}");
@@ -1747,12 +1779,12 @@ class ProjectControllerTest extends TestCase
 
     public function test_deleting_project_cascades_to_project_skills(): void
     {
-        $admin   = User::factory()->create(['role' => 'admin']);
+        $admin = User::factory()->create(['role' => 'admin']);
         $project = $this->createProject(['main_user_id' => $admin->id]);
         $project->projectSkills()->create([
             'skill_type' => 'required',
-            'label'      => 'PHP',
-            'detail'     => null,
+            'label' => 'PHP',
+            'detail' => null,
         ]);
 
         $this->actingAs($admin)->delete("/projects/{$project->id}");
@@ -1768,10 +1800,10 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_station_max_length_is_100(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'             => 'onsite',
-            'work_location_station'  => str_repeat('あ', 101),
+            'work_style' => 'onsite',
+            'work_location_station' => str_repeat('あ', 101),
         ]);
 
         $response = $this->actingAs($user)->post('/projects', $payload);
@@ -1782,10 +1814,10 @@ class ProjectControllerTest extends TestCase
     public function test_project_is_stored_with_work_location_when_work_style_is_onsite(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'            => 'onsite',
-            'work_location_line'    => '東京メトロ丸ノ内線',
+            'work_style' => 'onsite',
+            'work_location_line' => '東京メトロ丸ノ内線',
             'work_location_station' => '大手町',
         ]);
 
@@ -1793,8 +1825,8 @@ class ProjectControllerTest extends TestCase
 
         $response->assertSessionDoesntHaveErrors();
         $this->assertDatabaseHas('projects', [
-            'work_style'             => 'onsite',
-            'work_location_line'    => '東京メトロ丸ノ内線',
+            'work_style' => 'onsite',
+            'work_location_line' => '東京メトロ丸ノ内線',
             'work_location_station' => '大手町',
         ]);
     }
@@ -1807,10 +1839,10 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_is_nulled_when_work_style_is_remote_even_when_values_are_present(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'             => 'remote',
-            'work_location_line'    => '東京メトロ丸ノ内線',
+            'work_style' => 'remote',
+            'work_location_line' => '東京メトロ丸ノ内線',
             'work_location_station' => '大手町',
         ]);
 
@@ -1818,8 +1850,8 @@ class ProjectControllerTest extends TestCase
 
         $response->assertSessionDoesntHaveErrors();
         $this->assertDatabaseHas('projects', [
-            'work_style'             => 'remote',
-            'work_location_line'    => null,
+            'work_style' => 'remote',
+            'work_location_line' => null,
             'work_location_station' => null,
         ]);
     }
@@ -1830,7 +1862,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_guest_is_redirected_to_login_from_edit_page(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $response = $this->get("/projects/{$project->id}/edit");
@@ -1841,7 +1873,7 @@ class ProjectControllerTest extends TestCase
     public function test_authenticated_user_can_view_edit_page(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['name' => 'テスト案件', 'main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->get("/projects/{$project->id}/edit");
@@ -1856,7 +1888,7 @@ class ProjectControllerTest extends TestCase
     public function test_edit_page_props_contain_required_keys(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->get("/projects/{$project->id}/edit");
@@ -1884,10 +1916,10 @@ class ProjectControllerTest extends TestCase
 
     public function test_edit_page_project_prop_reflects_existing_data(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject([
-            'name'         => '既存案件A',
-            'status'       => 'pending',
+            'name' => '既存案件A',
+            'status' => 'pending',
             'main_user_id' => $user->id,
         ]);
 
@@ -1905,7 +1937,7 @@ class ProjectControllerTest extends TestCase
 
     public function test_guest_cannot_put_to_update(): void
     {
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $response = $this->put("/projects/{$project->id}", []);
@@ -1926,11 +1958,11 @@ class ProjectControllerTest extends TestCase
     public function test_project_is_updated_with_valid_payload(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['name' => '旧案件名', 'status' => 'open', 'main_user_id' => $user->id]);
 
         $payload = array_merge($this->validPayload($user->id), [
-            'name'   => '新案件名',
+            'name' => '新案件名',
             'status' => 'closed',
         ]);
 
@@ -1938,8 +1970,8 @@ class ProjectControllerTest extends TestCase
 
         $response->assertRedirect("/projects/{$project->id}");
         $this->assertDatabaseHas('projects', [
-            'id'     => $project->id,
-            'name'   => '新案件名',
+            'id' => $project->id,
+            'name' => '新案件名',
             'status' => 'closed',
         ]);
     }
@@ -1947,7 +1979,7 @@ class ProjectControllerTest extends TestCase
     public function test_update_sets_success_flash_message(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $response = $this->actingAs($user)->put("/projects/{$project->id}", $this->validPayload($user->id));
@@ -1958,12 +1990,12 @@ class ProjectControllerTest extends TestCase
     public function test_required_skills_are_replaced_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $project->projectSkills()->create([
             'skill_type' => 'required',
-            'label'      => 'PHP',
-            'detail'     => null,
+            'label' => 'PHP',
+            'detail' => null,
         ]);
 
         $payload = array_merge($this->validPayload($user->id), [
@@ -1976,24 +2008,24 @@ class ProjectControllerTest extends TestCase
 
         $this->assertDatabaseMissing('project_skills', [
             'project_id' => $project->id,
-            'label'      => 'PHP',
+            'label' => 'PHP',
         ]);
         $this->assertDatabaseHas('project_skills', [
             'project_id' => $project->id,
             'skill_type' => 'required',
-            'label'      => 'Go',
+            'label' => 'Go',
         ]);
     }
 
     public function test_preferred_skills_are_replaced_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $project->projectSkills()->create([
             'skill_type' => 'preferred',
-            'label'      => 'Docker',
-            'detail'     => null,
+            'label' => 'Docker',
+            'detail' => null,
         ]);
 
         $payload = array_merge($this->validPayload($user->id), [
@@ -2006,19 +2038,19 @@ class ProjectControllerTest extends TestCase
 
         $this->assertDatabaseMissing('project_skills', [
             'project_id' => $project->id,
-            'label'      => 'Docker',
+            'label' => 'Docker',
         ]);
         $this->assertDatabaseHas('project_skills', [
             'project_id' => $project->id,
             'skill_type' => 'preferred',
-            'label'      => 'AWS',
+            'label' => 'AWS',
         ]);
     }
 
     public function test_skills_are_all_deleted_when_empty_array_sent_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $project->projectSkills()->createMany([
             ['skill_type' => 'required',  'label' => 'PHP',    'detail' => null],
@@ -2026,7 +2058,7 @@ class ProjectControllerTest extends TestCase
         ]);
 
         $payload = array_merge($this->validPayload($user->id), [
-            'required_skills'  => [],
+            'required_skills' => [],
             'preferred_skills' => [],
         ]);
 
@@ -2039,8 +2071,8 @@ class ProjectControllerTest extends TestCase
     {
         $this->seedFormFieldSettings();
         $mainUser = User::factory()->create();
-        $subUser  = User::factory()->create();
-        $project  = $this->createProject(['main_user_id' => $mainUser->id, 'sub_user_id' => $subUser->id]);
+        $subUser = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $mainUser->id, 'sub_user_id' => $subUser->id]);
 
         $payload = array_merge($this->validPayload($mainUser->id), ['sub_user_id' => null]);
 
@@ -2052,18 +2084,18 @@ class ProjectControllerTest extends TestCase
     public function test_rate_negotiable_stores_null_for_rate_min_and_max_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id, 'rate_min' => 60, 'rate_max' => 80]);
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
-            'rate_note'          => 'スキル見合い',
+            'rate_note' => 'スキル見合い',
         ]);
 
         $this->actingAs($user)->put("/projects/{$project->id}", $payload);
 
         $this->assertDatabaseHas('projects', [
-            'id'       => $project->id,
+            'id' => $project->id,
             'rate_min' => null,
             'rate_max' => null,
             'rate_note' => 'スキル見合い',
@@ -2077,20 +2109,20 @@ class ProjectControllerTest extends TestCase
     public function test_rate_negotiable_stores_custom_rate_note_as_is_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id, 'rate_min' => 60, 'rate_max' => 80]);
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
-            'rate_note'          => '応相談',
+            'rate_note' => '応相談',
         ]);
 
         $this->actingAs($user)->put("/projects/{$project->id}", $payload);
 
         $this->assertDatabaseHas('projects', [
-            'id'        => $project->id,
-            'rate_min'  => null,
-            'rate_max'  => null,
+            'id' => $project->id,
+            'rate_min' => null,
+            'rate_max' => null,
             'rate_note' => '応相談',
         ]);
     }
@@ -2102,22 +2134,22 @@ class ProjectControllerTest extends TestCase
     public function test_rate_negotiable_stores_null_even_when_rate_min_and_max_are_present_in_payload_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id, 'rate_min' => 60, 'rate_max' => 80]);
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
-            'rate_min'           => 60,
-            'rate_max'           => 80,
-            'rate_note'          => null, // チェックON直後は未入力（実際の画面操作を再現）
+            'rate_min' => 60,
+            'rate_max' => 80,
+            'rate_note' => null, // チェックON直後は未入力（実際の画面操作を再現）
         ]);
 
         $this->actingAs($user)->put("/projects/{$project->id}", $payload);
 
         $this->assertDatabaseHas('projects', [
-            'id'        => $project->id,
-            'rate_min'  => null,
-            'rate_max'  => null,
+            'id' => $project->id,
+            'rate_min' => null,
+            'rate_max' => null,
             'rate_note' => 'スキル見合い', // 未入力時のデフォルト値が入る
         ]);
     }
@@ -2131,27 +2163,27 @@ class ProjectControllerTest extends TestCase
     public function test_rate_note_is_nulled_when_not_negotiable_even_if_value_is_present_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject([
             'main_user_id' => $user->id,
-            'rate_min'     => null,
-            'rate_max'     => null,
-            'rate_note'    => 'スキル見合い',
+            'rate_min' => null,
+            'rate_max' => null,
+            'rate_note' => 'スキル見合い',
         ]);
 
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => false,
-            'rate_min'           => 60,
-            'rate_max'           => 80,
-            'rate_note'          => 'スキル見合い', // 以前スキル見合いだった際の残留値を想定
+            'rate_min' => 60,
+            'rate_max' => 80,
+            'rate_note' => 'スキル見合い', // 以前スキル見合いだった際の残留値を想定
         ]);
 
         $this->actingAs($user)->put("/projects/{$project->id}", $payload);
 
         $this->assertDatabaseHas('projects', [
-            'id'        => $project->id,
-            'rate_min'  => 60,
-            'rate_max'  => 80,
+            'id' => $project->id,
+            'rate_min' => 60,
+            'rate_max' => 80,
             'rate_note' => null,
         ]);
     }
@@ -2159,35 +2191,35 @@ class ProjectControllerTest extends TestCase
     public function test_proc_fields_are_stored_as_boolean_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $payload = array_merge($this->validPayload($user->id), [
-            'proc_requirements'  => true,
-            'proc_basic_design'  => false,
+            'proc_requirements' => true,
+            'proc_basic_design' => false,
             'proc_detail_design' => false,
-            'proc_development'   => true,
-            'proc_testing'       => false,
-            'proc_maintenance'   => false,
+            'proc_development' => true,
+            'proc_testing' => false,
+            'proc_maintenance' => false,
         ]);
 
         $this->actingAs($user)->put("/projects/{$project->id}", $payload);
 
         $this->assertDatabaseHas('projects', [
-            'id'                 => $project->id,
-            'proc_requirements'  => 1,
-            'proc_development'   => 1,
-            'proc_basic_design'  => 0,
+            'id' => $project->id,
+            'proc_requirements' => 1,
+            'proc_development' => 1,
+            'proc_basic_design' => 0,
             'proc_detail_design' => 0,
-            'proc_testing'       => 0,
-            'proc_maintenance'   => 0,
+            'proc_testing' => 0,
+            'proc_maintenance' => 0,
         ]);
     }
 
     public function test_name_is_required_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['name' => '元の案件名', 'main_user_id' => $user->id]);
 
         $payload = $this->validPayload($user->id);
@@ -2202,7 +2234,7 @@ class ProjectControllerTest extends TestCase
     public function test_main_user_id_must_exist_in_users_table_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $payload = array_merge($this->validPayload($user->id), ['main_user_id' => 99999]);
@@ -2215,7 +2247,7 @@ class ProjectControllerTest extends TestCase
     public function test_sub_user_id_must_differ_from_main_user_id_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $payload = array_merge($this->validPayload($user->id), ['sub_user_id' => $user->id]);
@@ -2228,7 +2260,7 @@ class ProjectControllerTest extends TestCase
     public function test_skill_label_is_required_when_detail_is_present_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $payload = array_merge($this->validPayload($user->id), [
@@ -2245,12 +2277,12 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_station_is_required_when_work_style_is_onsite_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'             => 'onsite',
-            'work_location_station'  => null,
+            'work_style' => 'onsite',
+            'work_location_station' => null,
         ]);
 
         $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
@@ -2261,12 +2293,12 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_station_is_not_required_when_work_style_is_remote_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
 
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'             => 'remote',
-            'work_location_station'  => null,
+            'work_style' => 'remote',
+            'work_location_station' => null,
         ]);
 
         $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
@@ -2282,17 +2314,17 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_is_nulled_when_work_style_is_remote_even_when_values_are_present_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject([
-            'main_user_id'           => $user->id,
-            'work_style'             => 'onsite',
-            'work_location_line'    => '東京メトロ丸ノ内線',
+            'main_user_id' => $user->id,
+            'work_style' => 'onsite',
+            'work_location_line' => '東京メトロ丸ノ内線',
             'work_location_station' => '大手町',
         ]);
 
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'             => 'remote',
-            'work_location_line'    => '東京メトロ丸ノ内線',
+            'work_style' => 'remote',
+            'work_location_line' => '東京メトロ丸ノ内線',
             'work_location_station' => '大手町',
         ]);
 
@@ -2300,9 +2332,9 @@ class ProjectControllerTest extends TestCase
 
         $response->assertSessionDoesntHaveErrors();
         $this->assertDatabaseHas('projects', [
-            'id'                     => $project->id,
-            'work_style'             => 'remote',
-            'work_location_line'    => null,
+            'id' => $project->id,
+            'work_style' => 'remote',
+            'work_location_line' => null,
             'work_location_station' => null,
         ]);
     }
@@ -2316,7 +2348,7 @@ class ProjectControllerTest extends TestCase
     public function test_name_exceeding_max_length_fails_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'name' => str_repeat('あ', 256),
@@ -2330,7 +2362,7 @@ class ProjectControllerTest extends TestCase
     public function test_status_is_required_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = $this->validPayload($user->id);
         unset($payload['status']);
@@ -2343,7 +2375,7 @@ class ProjectControllerTest extends TestCase
     public function test_status_rejects_invalid_value_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), ['status' => 'invalid']);
 
@@ -2355,7 +2387,7 @@ class ProjectControllerTest extends TestCase
     public function test_main_user_id_is_required_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = $this->validPayload($user->id);
         unset($payload['main_user_id']);
@@ -2368,7 +2400,7 @@ class ProjectControllerTest extends TestCase
     public function test_sub_user_id_must_exist_in_users_table_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), ['sub_user_id' => 99999]);
 
@@ -2380,7 +2412,7 @@ class ProjectControllerTest extends TestCase
     public function test_dynamic_field_is_required_when_form_field_setting_is_true_on_update(): void
     {
         $this->seedFormFieldSettings(['description' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = $this->validPayload($user->id); // description を含まない
 
@@ -2392,7 +2424,7 @@ class ProjectControllerTest extends TestCase
     public function test_dynamic_field_is_nullable_when_form_field_setting_is_false_on_update(): void
     {
         $this->seedFormFieldSettings(['description' => false]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = $this->validPayload($user->id); // description を含まない
 
@@ -2404,7 +2436,7 @@ class ProjectControllerTest extends TestCase
     public function test_negotiation_required_rejects_invalid_value_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'negotiation_required' => 'invalid',
@@ -2418,7 +2450,7 @@ class ProjectControllerTest extends TestCase
     public function test_proc_fields_are_required_when_proc_experience_setting_is_true_on_update(): void
     {
         $this->seedFormFieldSettings(['proc_experience' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = $this->validPayload($user->id);
 
@@ -2431,7 +2463,7 @@ class ProjectControllerTest extends TestCase
     public function test_rate_min_is_required_when_rate_setting_is_true_and_not_negotiable_on_update(): void
     {
         $this->seedFormFieldSettings(['rate' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => false,
@@ -2446,7 +2478,7 @@ class ProjectControllerTest extends TestCase
     public function test_rate_min_and_max_are_not_required_when_negotiable_on_update(): void
     {
         $this->seedFormFieldSettings(['rate' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => true,
@@ -2461,12 +2493,12 @@ class ProjectControllerTest extends TestCase
     public function test_rate_min_must_be_less_than_or_equal_to_rate_max_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'rate_is_negotiable' => false,
-            'rate_min'           => 80,
-            'rate_max'           => 60, // rate_min > rate_max
+            'rate_min' => 80,
+            'rate_max' => 60, // rate_min > rate_max
         ]);
 
         $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
@@ -2478,7 +2510,7 @@ class ProjectControllerTest extends TestCase
     public function test_rate_max_is_required_when_rate_min_is_filled_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'rate_min' => 50,
@@ -2493,7 +2525,7 @@ class ProjectControllerTest extends TestCase
     public function test_rate_min_is_required_when_rate_max_is_filled_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'rate_min' => null,
@@ -2508,10 +2540,10 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_station_is_required_when_work_style_is_hybrid_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'            => 'hybrid',
+            'work_style' => 'hybrid',
             'work_location_station' => null,
         ]);
 
@@ -2523,10 +2555,10 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_line_is_required_when_work_location_setting_is_true_and_work_style_is_onsite_on_update(): void
     {
         $this->seedFormFieldSettings(['work_location' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'         => 'onsite',
+            'work_style' => 'onsite',
             'work_location_line' => null,
         ]);
 
@@ -2538,10 +2570,10 @@ class ProjectControllerTest extends TestCase
     public function test_work_location_line_is_not_required_when_work_style_is_remote_on_update(): void
     {
         $this->seedFormFieldSettings(['work_location' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
-            'work_style'         => 'remote',
+            'work_style' => 'remote',
             'work_location_line' => null,
         ]);
 
@@ -2553,7 +2585,7 @@ class ProjectControllerTest extends TestCase
     public function test_required_skills_is_required_when_form_field_setting_is_true_on_update(): void
     {
         $this->seedFormFieldSettings(['required_skills' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'required_skills' => [],
@@ -2567,7 +2599,7 @@ class ProjectControllerTest extends TestCase
     public function test_skill_label_max_length_is_15_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'required_skills' => [
@@ -2583,7 +2615,7 @@ class ProjectControllerTest extends TestCase
     public function test_skill_label_is_required_when_required_skills_setting_is_true_on_update(): void
     {
         $this->seedFormFieldSettings(['required_skills' => true]);
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'required_skills' => [
@@ -2599,7 +2631,7 @@ class ProjectControllerTest extends TestCase
     public function test_commercial_flow_rejects_invalid_value_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'commercial_flow' => 'invalid',
@@ -2613,7 +2645,7 @@ class ProjectControllerTest extends TestCase
     public function test_work_style_rejects_invalid_value_on_update(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $project = $this->createProject(['main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), [
             'work_style' => 'invalid',
@@ -2632,7 +2664,7 @@ class ProjectControllerTest extends TestCase
     public function test_general_role_user_can_update_project(): void
     {
         $this->seedFormFieldSettings();
-        $user    = User::factory()->create(['role' => 'general']);
+        $user = User::factory()->create(['role' => 'general']);
         $project = $this->createProject(['name' => '旧案件名', 'main_user_id' => $user->id]);
         $payload = array_merge($this->validPayload($user->id), ['name' => '新案件名']);
 
