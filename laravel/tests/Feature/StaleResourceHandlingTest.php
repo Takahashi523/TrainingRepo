@@ -263,9 +263,14 @@ class StaleResourceHandlingTest extends TestCase
     public function test_guest_is_redirected_to_login_not_to_index(): void
     {
         // 未ログインは auth ミドルウェアが先に効くため、一覧ではなくログインへ。
+        //
+        // 応答は 302 リダイレクトではなく 409 + X-Inertia-Location（UnauthenticatedInertiaRedirector,
+        // issue #63）。302のままだとInertiaがDELETEを引き継いだままログイン画面を叩き直し、
+        // 405になってしまうため。詳細な検証は UnauthenticatedInertiaRedirectTest を参照。
         $response = $this->delete('/projects/99999', [], $this->inertiaHeaders());
 
-        $response->assertRedirect('/login');
+        $response->assertStatus(409);
+        $response->assertHeader('X-Inertia-Location', route('login'));
         $this->assertNull(session('error'));
     }
 

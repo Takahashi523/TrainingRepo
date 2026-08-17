@@ -3,7 +3,7 @@
 > 技術方針：Laravel + Inertia.js + React  
 > ルーティング定義：`routes/web.php`  
 > 認証方式：Laravel Breeze（セッション認証）  
-> 最終更新：2026-05-27  
+> 最終更新：2026-08-17  
 
 ---
 
@@ -67,7 +67,15 @@ Props           → JSONツリー形式（jsonc）
 |---|---|
 | `200 OK` | GET 正常取得・PUT 正常更新 |
 | `201 Created` | POST 正常作成 |
-| `302 Found` | POST・PUT・DELETE 後の Inertia リダイレクト |
+| `302 Found` | GET リクエスト後の Inertia リダイレクト |
+| `303 See Other` | POST・PUT・DELETE 後の Inertia リダイレクト。Inertiaは非GET（PUT/PATCH/DELETE）への302リダイレクトを追えない（ブラウザがメソッドを保持したまま追ってしまう）ため、非安全メソッドへの応答は302ではなく303を返す（issue #44 / #63） |
+| `401 Unauthorized` | 未ログイン状態でのアクセス。JSONを期待する非Inertiaリクエスト（APIコール等）の場合 |
 | `403 Forbidden` | ロール権限不足（例：一般営業が DELETE を呼んだ場合） |
 | `404 Not Found` | 存在しない ID を指定 |
+| `409 Conflict` | 未ログイン状態でのInertiaリクエスト。ログイン画面への強制的なフルページ遷移を指示する `X-Inertia-Location` ヘッダーを付与する（`UnauthenticatedInertiaRedirector`、issue #63） |
+| `419 Page Expired` | CSRFトークン不一致（主にセッション切れ後の再送信）。Inertiaリクエストの場合は元の画面へ303リダイレクトし、「セッションの有効期限が切れました。もう一度お試しください。」のフラッシュメッセージを表示する（`TokenMismatchInertiaRedirector`、issue #63） |
 | `422 Unprocessable Entity` | バリデーションエラー。詳細形式はバリデーション・エラー表示設計書を参照 |
+
+> **【2026-08-17 追加】未ログイン・セッション切れ時のInertia向けエラーハンドリングを追加（issue #63）**
+> **背景：** auth ミドルウェア（`AuthenticationException`）・CSRF検証（`TokenMismatchException`）はいずれも `HandleInertiaRequests`（Inertia\Middleware）の後処理より前で例外を投げるため、Inertiaが標準で行う「非GETへの302→303書き換え」を経由しない。302のまま返すと、DELETE/PUT/PATCHのようなリクエストがメソッドを保持したままログイン画面等を再度叩いてしまい、`405 MethodNotAllowedHttpException` になる不具合があった。
+> **対応：** `bootstrap/app.php` に例外ごとの `render()` ハンドラを追加し、Inertiaリクエストかどうかで応答を出し分ける（非Inertiaは従来どおりLaravel標準の挙動）。未ログイン（401/302だったもの）は409 + `X-Inertia-Location` でフルページ遷移、CSRFトークン切れ（419）は303 + `back()` で元画面へ戻す。実装は `app/Exceptions/UnauthenticatedInertiaRedirector.php` / `app/Exceptions/TokenMismatchInertiaRedirector.php`。既存の `StaleResourceRedirector`（issue #44）と同じ「例外種別ごとに1クラスへ委譲する」構成に揃えている。

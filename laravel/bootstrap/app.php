@@ -1,13 +1,17 @@
 <?php
 
 use App\Exceptions\StaleResourceRedirector;
+use App\Exceptions\TokenMismatchInertiaRedirector;
+use App\Exceptions\UnauthenticatedInertiaRedirector;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -37,5 +41,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // このフォールバックが共通エラーページ（issue #70）の差し込み口になる。
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
             return app(StaleResourceRedirector::class)->handle($e, $request);
+        });
+
+        // セッション切れ状態でのInertia非GETリクエスト（DELETE/PUT/PATCH）が、ログイン画面への
+        // 302リダイレクトを経由して405になる問題への対応（issue #63・①）。詳細は
+        // UnauthenticatedInertiaRedirector のクラスコメントを参照。
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return app(UnauthenticatedInertiaRedirector::class)->handle($e, $request);
+        });
+
+        // CSRFトークン不一致（419、主にセッション切れ後の再送信で発生）で生の例外画面が
+        // 出る問題への対応（issue #63・②）。詳細は TokenMismatchInertiaRedirector の
+        // クラスコメントを参照。
+        $exceptions->render(function (TokenMismatchException $e, Request $request) {
+            return app(TokenMismatchInertiaRedirector::class)->handle($e, $request);
         });
     })->create();
