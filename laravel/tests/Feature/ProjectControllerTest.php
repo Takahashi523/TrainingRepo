@@ -1764,7 +1764,9 @@ class ProjectControllerTest extends TestCase
 
         $response = $this->actingAs($user)->delete("/projects/{$project->id}");
 
-        $response->assertForbidden();
+        // 設計書 04_案件管理 DELETE #7：権限不足は 403 を素で投げず、前画面へ戻し flash.error を返す。
+        $response->assertRedirect();
+        $response->assertSessionHas('error', '削除権限がありません。');
         $this->assertDatabaseHas('projects', ['id' => $project->id]);
     }
 

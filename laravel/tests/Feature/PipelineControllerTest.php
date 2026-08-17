@@ -779,7 +779,11 @@ class PipelineControllerTest extends TestCase
         $user = User::factory()->create(['role' => 'general']);
         $pipeline = $this->makePipeline($user, ['status' => 'proposed']);
 
-        $this->actingAs($user)->delete('/pipelines/'.$pipeline->id)->assertForbidden();
+        $response = $this->actingAs($user)->delete('/pipelines/'.$pipeline->id);
+
+        // 設計書 06_進捗管理 DELETE #5：権限不足は 403 を素で投げず、前画面へ戻し flash.error を返す。
+        $response->assertRedirect();
+        $response->assertSessionHas('error', '削除権限がありません。');
         $this->assertDatabaseHas('pipelines', ['id' => $pipeline->id]);
     }
 
