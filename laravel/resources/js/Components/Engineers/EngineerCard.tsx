@@ -1,9 +1,9 @@
-import ProcessCheckboxGroup from '@/Components/Common/ProcessCheckboxGroup';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import StatusBadge, { STATUS_STYLES } from '@/Components/Common/StatusBadge';
 import SkillTag from '@/Components/Common/SkillTag';
 import { Button } from '@/Components/ui/button';
 import { cn } from '@/lib/utils';
-import { EngineerListItem, Phase } from '@/types/engineer';
+import { EngineerListItem } from '@/types/engineer';
 import { router } from '@inertiajs/react';
 import { ArrowLeftRight, Clock } from 'lucide-react';
 
@@ -25,8 +25,8 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
     const visibleSkills = engineer.skills.slice(0, MAX_SKILLS_VISIBLE);
     const hiddenSkillsCount = Math.max(0, engineer.skills.length - MAX_SKILLS_VISIBLE);
 
-    const phaseList: Phase[] = engineer.phases.map(({ key, name }) => ({ key, name }));
-    const phaseValues = Object.fromEntries(engineer.phases.map((p) => [p.key, p.has_experience]));
+    // 工程経験は他画面（人材詳細・マッチング）と同じ共通アダプタで変換する（人材は has_experience）。
+    const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
     const updatedAt = new Date(engineer.updated_at).toLocaleDateString('ja-JP', {
         year: 'numeric',

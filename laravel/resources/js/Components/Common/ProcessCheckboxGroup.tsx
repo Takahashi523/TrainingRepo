@@ -5,14 +5,20 @@ import { Label } from '@/Components/ui/label';
 // 共有の @/types を参照する。
 import { Phase } from '@/types';
 
+/** T のうち値が boolean のプロパティ名だけを取り出す（フラグ以外のキーを渡せないようにする）。 */
+type BooleanKeys<T> = { [K in keyof T]: T[K] extends boolean ? K : never }[keyof T];
+
 /**
  * phases 配列（key/name + 真偽フラグ）を ProcessCheckboxGroup の props（phases + values）へ変換する
  * 共通アダプタ。案件（is_target）・人材（has_experience）などフラグのキー名だけが異なる同型の変換を
  * 一元化する（DRY）。呼び出し側は `const { phaseList, phaseValues } = buildProcessPhaseProps(xs, 'is_target')`。
+ *
+ * flagKey は `keyof T` ではなく boolean 値のキーに限定する。`'name'` のような文字列キーを渡せてしまうと
+ * `Boolean(p['name'])` が常に true となり「全工程がチェック済みに見える」誤りが型で防げないため。
  */
 export function buildProcessPhaseProps<T extends Phase>(
     phases: T[],
-    flagKey: keyof T,
+    flagKey: BooleanKeys<T>,
 ): { phaseList: Phase[]; phaseValues: Record<string, boolean> } {
     return {
         phaseList: phases.map(({ key, name }) => ({ key, name })),
