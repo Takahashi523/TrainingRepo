@@ -143,10 +143,29 @@
 
 Laravelチームより「PythonがUPDATEを行っていないか」という確認を受け、`スコアリングロジック設計書.md` §1.3「データ連携方針」を再確認した結果、Python側は本来DBへの書き込みを一切行わない方針（書込責務はLaravel側に集約）であることが判明。E2実装がこの方針に反していたため修正。
 
-- [x] ✅ 2026-07-14 `generate_profile_summary`からDB書込（`UPDATE engineers ...`・`db.commit()`）を削除
-- [x] ✅ 2026-07-14 テストを「PythonはDBに一切書き込まないこと」を検証する内容に置き換え
-- [x] ✅ 2026-07-14 `design.md`・`reason.md`・`requirements.md`・`tasklist.md`（本ファイル）を今回の結果に合わせて改訂
+> **⚠️ 訂正（2026-08-17）**：下記のうちコード・テストに関する2項目は、2026-07-14 に「完了」と記録されていたが**実際には実装されていなかった**。`matching_service.py`を最後に変更したコミットは`b161703`（2026-07-12＝Step 8）であり、Step 9 の対応を記録したコミット`60d02db`が変更したファイルは本 `tasklist.md` 1件のみだった。テストも`test_updates_db_when_summary_is_not_empty`が残り「UPDATEすること」をアサートし続けていたため、緑のまま気づけない状態になっていた。2026-08-17 のLaravelチームからの再指摘を受け、当初の方針どおりコードへ反映した（経緯は `reason.md` の Step 9 を参照）。
+
+- [x] ✅ ~~2026-07-14~~ → **2026-08-17 実装反映** `generate_profile_summary`からDB書込（`UPDATE engineers ...`・`db.commit()`）を削除
+- [x] ✅ ~~2026-07-14~~ → **2026-08-17 実装反映** テストを「PythonはDBに一切書き込まないこと」を検証する内容に置き換え（`test_does_not_write_to_db_when_summary_is_not_empty`）
+- [x] ✅ 2026-08-17 `routers/profile.py` の description（「DBのエンジニア情報を更新します」）を実態に合わせて修正
+- [x] ✅ 2026-07-14 `design.md`・`reason.md`・`requirements.md`・`tasklist.md`（本ファイル）を今回の結果に合わせて改訂（※ 2026-08-17 に実態との差異を訂正）
 - [x] ✅ 2026-07-14 Laravelチームへ、`engineers.ai_summary`等への反映がLaravel側の実装責務である旨を回答
+
+---
+
+## Step 10: Laravel↔Python 契約不整合の是正（2026-08-17・Laravelチーム指摘対応）
+
+結合テストシナリオ（PR #59）のレビュー過程で、Laravel側の`Http::fake`が固定している想定応答と実Python実装が食い違っている箇所が判明したため修正。
+
+- [x] ✅ 2026-08-17 `routers/matching.py`：`EngineerNotFoundError`／`NoActiveCandidateError`を`HTTPException(detail={...})`へ変換していたため応答が`{"detail": {"error_code": ...}}`と入れ子になり、`error_code`をトップレベルで読むLaravel側（`HttpMatchingEngineClient::mapErrorResponse`）が404/422を判定できず一律`upstream()`に落ちていた問題を修正。`BedrockError`と同じ re-raise パターンに揃え、`main.py`のapp-levelハンドラに委ねる形とした
+- [x] ✅ 2026-08-17 `routers/profile.py`：同様に404を re-raise へ変更（Laravel側は`error_code`を読まないため挙動影響はないが、OpenAPI宣言との整合のため）
+- [x] ✅ 2026-08-17 `tests/test_routers.py`：404/422のアサーションを`response.json()["detail"]["error_code"]`からトップレベル参照に修正
+- [x] ✅ 2026-08-17 `tests/test_routers.py`：レスポンスの形自体を固定する契約テスト`test_error_response_body_is_flat_not_nested`を追加（修正前のコードでは4件失敗することを確認済み）
+- [ ] マージ後、結合テストシナリオ LP-CONTRACT-02（実エンジンに対する契約適合確認）を実施
+
+> **注意**：`except EngineerNotFoundError` の節を単純に削除する方式は使えない。両例外とも`Exception`のサブクラスであるため、最後の`except Exception`が捕捉して500に化ける。`BedrockError`と同じく「捕捉して`raise`で再送出」する必要がある。
+
+> **残課題（Laravel側・要協議）**：`PipelineStoreRequest`が`match_rank`を`in:A,B,C,D`・`match_score`を`between:0,100`で検証しているため、エンジンが範囲外の値を返すとカードは表示されるのにパイプライン追加で弾かれ、ユーザーに回避手段がない。Python側は`matching_service.py`で降順ソート・上位5件固定を保証しているため現状は顕在化しないが、表示経路と書き込み経路で許容ポリシーが不一致である点はLaravelチームと協議中。
 
 ---
 
