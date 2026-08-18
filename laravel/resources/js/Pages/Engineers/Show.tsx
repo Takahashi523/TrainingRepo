@@ -1,4 +1,6 @@
 import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
+import EmptyValue from '@/Components/Common/EmptyValue';
+import FieldRow from '@/Components/Common/FieldRow';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
@@ -24,16 +26,6 @@ function SectionCard({ title, children }: { title: string; children: React.React
     );
 }
 
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="flex items-start border-b border-border/50 px-4 py-2.5 last:border-b-0">
-            <div className="w-44 shrink-0 pr-4 pt-0.5 text-xs font-semibold text-muted-foreground">
-                {label}
-            </div>
-            <div className="min-w-0 flex-1 text-sm text-foreground">{children}</div>
-        </div>
-    );
-}
 
 
 export default function Show({ engineer }: Props) {
@@ -167,14 +159,24 @@ export default function Show({ engineer }: Props) {
                         </p>
                         <div className="mt-2.5 flex flex-wrap items-center gap-2">
                             <StatusBadge status={engineer.status} />
-                            <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
-                                <Clock className="mr-1 inline h-3 w-3" />{engineer.available_label}
-                            </span>
+                            {/* サマリーは「値がある項目だけを出す」（下部の項目表に全項目が必ず出るため）。
+                                最寄駅・年齢と同じ扱いにそろえ、未定のときはピルごと出さない。
+                                アイコンは視覚的なスキャン補助で、項目名は sr-only で支援技術に渡す。 */}
+                            {engineer.available_from && (
+                                <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
+                                    <span className="sr-only">稼働可能時期：</span>
+                                    <Clock aria-hidden="true" className="mr-1 inline h-3 w-3 text-muted-foreground" />
+                                    {engineer.available_label}
+                                </span>
+                            )}
                         </div>
                         <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
+                            {/* 最寄駅はラベル語を出さず sr-only で項目名を渡す（表示規約の型2。
+                                一覧カード・マッチングサマリーと同じ表現）。担当／サブは同型の人名が
+                                並ぶため型3 のラベルを維持する。 */}
                             {(engineer.nearest_station || engineer.nearest_line) && (
                                 <span>
-                                    <span className="mr-1 font-semibold text-foreground/60">最寄駅</span>
+                                    <span className="sr-only">最寄駅：</span>
                                     {[engineer.nearest_station, engineer.nearest_line]
                                         .filter(Boolean)
                                         .join('（') + (engineer.nearest_line ? '）' : '')}
@@ -225,11 +227,11 @@ export default function Show({ engineer }: Props) {
 
                 {/* 基本情報 */}
                 <SectionCard title="基本情報">
-                    <DetailRow label="氏名 / カナ">
+                    <FieldRow density="detail" label="氏名 / カナ">
                         {engineer.name}{'　／　'}{engineer.name_kana}
-                    </DetailRow>
-                    <DetailRow label="年齢（生年月日）">
-                        {engineer.age != null ? `${engineer.age}歳` : '—'}
+                    </FieldRow>
+                    <FieldRow density="detail" label="年齢（生年月日）">
+                        {engineer.age != null ? `${engineer.age}歳` : <EmptyValue field="age" />}
                         {engineer.birth_date && (
                             <span className="ml-2 text-xs">
                                 （{new Date(engineer.birth_date).toLocaleDateString('ja-JP', {
@@ -239,18 +241,25 @@ export default function Show({ engineer }: Props) {
                                 })}生まれ）
                             </span>
                         )}
-                    </DetailRow>
-                    <DetailRow label="最寄駅 / 路線">
-                        {engineer.nearest_station || '—'}{'　／　'}{engineer.nearest_line || '—'}
-                    </DetailRow>
-                    <DetailRow label="稼働可能時期">
-                        {engineer.available_label}
-                    </DetailRow>
+                    </FieldRow>
+                    <FieldRow density="detail" label="最寄駅 / 路線">
+                        {engineer.nearest_station || <EmptyValue field="nearestStation" />}{'　／　'}
+                        {engineer.nearest_line || <EmptyValue field="nearestLine" />}
+                    </FieldRow>
+                    <FieldRow density="detail" label="稼働可能時期">
+                        {/* サーバの available_label は null のとき「未定」という文字列を返すが、
+                            欠損は控えめな色で見せるため、値の有無で描き分ける（色をトークン側に持たせる）。 */}
+                        {engineer.available_from ? (
+                            engineer.available_label
+                        ) : (
+                            <EmptyValue field="availableFrom" />
+                        )}
+                    </FieldRow>
                 </SectionCard>
 
                 {/* スキル情報 */}
                 <SectionCard title="スキル情報">
-                    <DetailRow label="経験スキル">
+                    <FieldRow density="detail" label="経験スキル">
                         {engineer.skills.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {engineer.skills.map((skill, i) => (
@@ -258,43 +267,43 @@ export default function Show({ engineer }: Props) {
                                 ))}
                             </div>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="skills" />
                         )}
-                    </DetailRow>
-                    <DetailRow label="経験工程">
+                    </FieldRow>
+                    <FieldRow density="detail" label="経験工程">
                         <ProcessCheckboxGroup
                             phases={phaseList}
                             values={phaseValues}
                             readOnly
                             className="flex-nowrap gap-x-4"
                         />
-                    </DetailRow>
-                    <DetailRow label="顧客折衝経験">
+                    </FieldRow>
+                    <FieldRow density="detail" label="顧客折衝経験">
                         {engineer.has_negotiation_exp === true
                             ? '有'
                             : engineer.has_negotiation_exp === false
                               ? '無'
-                              : '—'}
-                    </DetailRow>
+                              : <EmptyValue field="negotiationExp" />}
+                    </FieldRow>
                 </SectionCard>
 
                 {/* 経歴・PR */}
                 <SectionCard title="経歴・PR">
-                    <DetailRow label="アピールポイント">
+                    <FieldRow density="detail" label="アピールポイント">
                         {engineer.appeal_note ? (
                             <p className="whitespace-pre-wrap leading-relaxed">{engineer.appeal_note}</p>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="appealNote" />
                         )}
-                    </DetailRow>
+                    </FieldRow>
                 </SectionCard>
 
                 {/* 希望条件 */}
                 <SectionCard title="希望条件">
-                    <DetailRow label="希望単価（月額）">
-                        {engineer.desired_rate != null ? `${engineer.desired_rate}万円` : '—'}
-                    </DetailRow>
-                    <DetailRow label="勤務形態">
+                    <FieldRow density="detail" label="希望単価（月額）">
+                        {engineer.desired_rate != null ? `${engineer.desired_rate}万円` : <EmptyValue field="desiredRate" />}
+                    </FieldRow>
+                    <FieldRow density="detail" label="勤務形態">
                         {engineer.work_styles.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {engineer.work_styles.map((wt) => (
@@ -307,33 +316,33 @@ export default function Show({ engineer }: Props) {
                                 ))}
                             </div>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="workStyle" />
                         )}
-                    </DetailRow>
-                    <DetailRow label="特記事項">
+                    </FieldRow>
+                    <FieldRow density="detail" label="特記事項">
                         {engineer.remarks ? (
                             <p className="whitespace-pre-wrap leading-relaxed">
                                 {engineer.remarks}
                             </p>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="remarks" />
                         )}
-                    </DetailRow>
+                    </FieldRow>
                 </SectionCard>
 
                 {/* 管理情報 */}
                 <SectionCard title="管理情報">
-                    <DetailRow label="ステータス">
+                    <FieldRow density="detail" label="ステータス">
                         <StatusBadge status={engineer.status} />
-                    </DetailRow>
-                    <DetailRow label="担当営業">
+                    </FieldRow>
+                    <FieldRow density="detail" label="担当営業">
                         <span>担当：{engineer.users.main.name}</span>
                         {engineer.users.sub && (
                             <span className="ml-3">
                                 ／　サブ：{engineer.users.sub.name}
                             </span>
                         )}
-                    </DetailRow>
+                    </FieldRow>
                 </SectionCard>
 
             </div>

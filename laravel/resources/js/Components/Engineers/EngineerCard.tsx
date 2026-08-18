@@ -1,13 +1,16 @@
+import EmptyValue from '@/Components/Common/EmptyValue';
+import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
+import FieldRow from '@/Components/Common/FieldRow';
+import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import StatusBadge, { STATUS_STYLES } from '@/Components/Common/StatusBadge';
 import SkillTag from '@/Components/Common/SkillTag';
 import { Button } from '@/Components/ui/button';
+import { emptyText } from '@/lib/emptyValue';
 import { cn } from '@/lib/utils';
 import { EngineerListItem } from '@/types/engineer';
 import { router } from '@inertiajs/react';
 import { ArrowLeftRight, Clock } from 'lucide-react';
-
-const MAX_SKILLS_VISIBLE = 5;
 
 interface Props {
     engineer: EngineerListItem;
@@ -22,8 +25,8 @@ interface Props {
 export default function EngineerCard({ engineer, onMatch }: Props) {
     const accentClass = STATUS_STYLES[engineer.status]?.accentClass ?? 'bg-gray-400';
 
-    const visibleSkills = engineer.skills.slice(0, MAX_SKILLS_VISIBLE);
-    const hiddenSkillsCount = Math.max(0, engineer.skills.length - MAX_SKILLS_VISIBLE);
+    // スキルはマッチング結果カード・案件一覧カードと同じ CollapsibleTagRow で表示する
+    // （固定件数で切らず、実幅で「1行に収まる分」を判定してあふれた分はトグルで展開する）。
 
     // 工程経験は他画面（人材詳細・マッチング）と同じ共通アダプタで変換する（人材は has_experience）。
     const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
@@ -44,21 +47,32 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                     <div className="flex flex-wrap items-start gap-3">
                         <div className="min-w-0">
                             <p className="text-base font-bold text-foreground">{engineer.name}</p>
-                            <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                {engineer.age != null && <>{engineer.age}歳</>}
-                                {(engineer.nearest_station || engineer.nearest_line) && (
-                                    <>
-                                        　｜　最寄駅：{engineer.nearest_station ?? ''}
-                                        {engineer.nearest_line && <>（{engineer.nearest_line}）</>}
-                                    </>
-                                )}
-                            </p>
+                            {/* 見出し直下メタ（表示規約の型2）：ラベル語は出さず、項目名は sr-only で支援技術に渡す。
+                                値が無いときもセグメントごと消さず、項目名入りトークンで「未設定である」ことを見せる
+                                （消すと読み落としと区別できないため）。マッチングサマリーと同じ表現。 */}
+                            <MetaRow className="mt-0.5">
+                                <MetaItem field="age">
+                                    {engineer.age != null ? `${engineer.age}歳` : emptyText('age', true)}
+                                </MetaItem>
+                                <MetaItem field="nearestStation">
+                                    {engineer.nearest_station || emptyText('nearestStation', true)}
+                                    {engineer.nearest_line
+                                        ? `（${engineer.nearest_line}）`
+                                        : `（${emptyText('nearestLine', true)}）`}
+                                </MetaItem>
+                            </MetaRow>
                         </div>
                         <div className="ml-auto flex flex-wrap items-center gap-2">
                             <StatusBadge status={engineer.status} />
                             <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-muted/50 px-2.5 py-0.5 text-[11px]">
-                                <Clock className="h-3 w-3" />
-                                {engineer.available_label}
+                                {/* アイコンは視覚的なスキャン補助。項目名は sr-only で支援技術に渡す。 */}
+                                <span className="sr-only">稼働可能時期：</span>
+                                <Clock aria-hidden="true" className="h-3 w-3 text-muted-foreground" />
+                                {engineer.available_from ? (
+                                    engineer.available_label
+                                ) : (
+                                    <EmptyValue field="availableFrom" withFieldName />
+                                )}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
                                 担当：{engineer.users.main.name}
@@ -71,28 +85,23 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                     <div className="my-2 h-px bg-border/60" />
 
                     {/* スキル */}
-                    <Section label="スキル">
-                        {visibleSkills.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                {visibleSkills.map((s, i) => (
-                                    <SkillTag key={i} label={s.label ?? ''} />
+                    <FieldRow label="スキル">
+                        {engineer.skills.length > 0 ? (
+                            <CollapsibleTagRow>
+                                {engineer.skills.map((s, i) => (
+                                    <SkillTag key={`${s.label ?? ''}-${i}`} label={s.label ?? ''} />
                                 ))}
-                                {hiddenSkillsCount > 0 && (
-                                    <span className="rounded border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground">
-                                        +{hiddenSkillsCount}
-                                    </span>
-                                )}
-                            </div>
+                            </CollapsibleTagRow>
                         ) : (
-                            <span className="text-[11px] text-muted-foreground">—</span>
+                            <EmptyValue field="skills" className="text-[11px]" />
                         )}
-                    </Section>
+                    </FieldRow>
 
                     {/* 工程経験。フルサイズ（16px）ではカードのタイポに対して大きいため、縮小ラッパーで
                         やや小さめ（15px / ラベル12px）に調整する。マッチングカード（14px）より一段大きい。
                         一覧では本カードが人材ごとに複数枚描画されるため、id はカードごとに一意化（idPrefix）して
                         重複を防ぐ（マッチング結果カードと同じ扱い）。 */}
-                    <Section label="工程経験">
+                    <FieldRow label="工程経験">
                         <div className="[&_button]:h-[15px] [&_button]:w-[15px] [&_label]:text-xs [&_svg]:h-3 [&_svg]:w-3">
                             <ProcessCheckboxGroup
                                 phases={phaseList}
@@ -101,10 +110,10 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                                 idPrefix={`engineer-${engineer.id}-`}
                             />
                         </div>
-                    </Section>
+                    </FieldRow>
 
                     {/* 勤務形態 */}
-                    <Section label="勤務形態">
+                    <FieldRow label="勤務形態">
                         {engineer.work_styles.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {engineer.work_styles.map((w) => (
@@ -117,9 +126,9 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                                 ))}
                             </div>
                         ) : (
-                            <span className="text-[11px] text-muted-foreground">—</span>
+                            <EmptyValue field="workStyle" className="text-[11px]" />
                         )}
-                    </Section>
+                    </FieldRow>
                 </div>
 
                 {/* 右側アクション */}
@@ -154,13 +163,3 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
     );
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="mb-1.5 flex items-start gap-2">
-            <span className="w-14 shrink-0 pt-0.5 text-[10px] font-bold text-muted-foreground">
-                {label}
-            </span>
-            <div className="min-w-0 flex-1">{children}</div>
-        </div>
-    );
-}

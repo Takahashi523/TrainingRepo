@@ -345,7 +345,7 @@
 
   .rate-unit { font-size: 11px; font-weight: 400; color: #777; }
 
-  /* 稼働開始バッジ */
+  /* 参画開始バッジ */
   .timing-badge {
     padding: 3px 8px;
     border: 1.5px dashed #888; border-radius: 20px;
@@ -398,6 +398,15 @@
 </style>
 </head>
 <body>
+<!--
+  【2026-08-17 確定】メタ行から項目ラベル語（クライアント：／商流：）を削除
+  背景：同じ条件が人材一覧・案件一覧・マッチング結果で別表現になっており（WF 側も WF_03=最寄駅にラベルあり／
+        WF_09=なし、WF_06=全項目にラベル／WF_09 カード=ラベルなし と不統一だった）、issue #57 で表示規約を制定した。
+  理由：見出し直下の圧縮メタ行は「型2＝ラベル語を出さず、値の書式で自己識別させる」に統一した（docs/UI表示規約.md §2）。
+        項目名は捨てず sr-only で支援技術に渡すため、情報は失われない。欠損時は「クライアント未設定」のように
+        項目名入りトークンを表示する。
+-->
+
 
 <div class="app-shell">
 
@@ -572,7 +581,7 @@
           <select class="wf-select">
             <option>登録日順（新しい順）</option>
             <option>登録日順（古い順）</option>
-            <option>稼働開始時期順</option>
+            <option>参画開始時期順</option>
             <option>単価順（高い順）</option>
             <option>単価順（低い順）</option>
           </select>
@@ -587,7 +596,7 @@
             <div class="card-top-row">
               <div>
                 <div class="project-name">大手金融系 勘定系システム リプレース開発</div>
-                <div class="project-meta">クライアント：○○銀行　｜　商流：プライム　｜　担当：田中　/　サブ：鈴木
+                <div class="project-meta">○○銀行　｜　プライム　｜　担当：田中　/　サブ：鈴木
                 </div>
               </div>
               <div class="card-badges">
@@ -618,7 +627,7 @@
               </div>
             </div>
 
-            <!-- 単価 + 稼働開始 + 勤務形態 -->
+            <!-- 単価 + 参画開始 + 勤務形態 -->
             <div class="section-row">
               <span class="section-label">単価</span>
               <div style="display:flex;flex-direction:column;gap:2px;">
@@ -627,7 +636,7 @@
                 </div>
               </div>
               <div class="filter-sep" style="margin: 0 6px;"></div>
-              <span class="section-label">稼働開始</span>
+              <span class="section-label">参画開始</span>
               <span class="timing-badge">⏱ 2026/05/01〜</span>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">勤務形態</span>
@@ -652,7 +661,7 @@
             <div class="card-top-row">
               <div>
                 <div class="project-name">ECサイト フロントエンド刷新プロジェクト</div>
-                <div class="project-meta">クライアント：○○通販　｜　商流：プライム　｜　担当：鈴木　/　サブ：田中
+                <div class="project-meta">○○通販　｜　プライム　｜　担当：鈴木　/　サブ：田中
                 </div>
               </div>
               <div class="card-badges">
@@ -689,7 +698,7 @@
                 </div>
               </div>
               <div class="filter-sep" style="margin: 0 6px;"></div>
-              <span class="section-label">稼働開始</span>
+              <span class="section-label">参画開始</span>
               <span class="timing-badge">⏱ 2026/06/01〜</span>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">勤務形態</span>
@@ -714,7 +723,7 @@
             <div class="card-top-row">
               <div>
                 <div class="project-name">製造業 生産管理システム 新規構築</div>
-                <div class="project-meta">クライアント：○○製作所　｜　商流：2次　｜　担当：田中　/　サブ：佐藤
+                <div class="project-meta">○○製作所　｜　2次　｜　担当：田中　/　サブ：佐藤
                 </div>
               </div>
               <div class="card-badges">
@@ -751,7 +760,7 @@
                 </div>
               </div>
               <div class="filter-sep" style="margin: 0 6px;"></div>
-              <span class="section-label">稼働開始</span>
+              <span class="section-label">参画開始</span>
               <span class="timing-badge">⏱ 2026/07/01〜</span>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">勤務形態</span>
@@ -768,15 +777,15 @@
         </div>
       </div>
 
-      <!-- ===== CARD 4：充足済（opacity低め） ===== -->
-      <div class="project-card" style="opacity:0.65;">
+      <!-- ===== CARD 4：充足済 ===== -->
+      <div class="project-card">
         <div class="card-inner">
           <div class="card-accent" style="background:#aaa;"></div>
           <div class="card-body">
             <div class="card-top-row">
               <div>
                 <div class="project-name">社内基幹システム 保守運用</div>
-                <div class="project-meta">クライアント：○○商事　｜　商流：プライム　｜　担当：佐藤　/　サブ：未割当
+                <div class="project-meta">○○商事　｜　プライム　｜　担当：佐藤　/　サブ：未割当
                 </div>
               </div>
               <div class="card-badges">
@@ -808,7 +817,7 @@
                 </div>
               </div>
               <div class="filter-sep" style="margin: 0 6px;"></div>
-              <span class="section-label">稼働開始</span>
+              <span class="section-label">参画開始</span>
               <span class="timing-badge">⏱ 未定</span>
               <div class="filter-sep" style="margin: 0 6px;"></div>
               <span class="section-label">勤務形態</span>
@@ -872,8 +881,8 @@
         <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト判断・人材一覧との差分</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>スキルタグを必須（実線）と尚可（点線）で視覚的に区別（フリーテキストラベルで表示）</li>
-          <li>単価・稼働開始・勤務形態を1行にまとめて横並び配置</li>
-          <li>終了カードはopacity低め＋アクション非活性で表示</li>
+          <li>単価・参画開始・勤務形態を1行にまとめて横並び配置<!-- 【2026-08-18 確定】「稼働開始」→「参画開始」。背景：同じ start_date がカード=稼働開始／詳細・フォーム・CSV・マスタ管理=参画開始時期 と食い違っていた。理由：正式名称（参画開始時期）に統一し、カードは幅の都合で「参画開始」と省略する。 --></li>
+          <li>終了カードはステータスバッジ（終了）で示す。<!-- 【2026-08-18 確定】旧「opacity低め＋アクション非活性」から変更。 背景：淡色化が案件一覧だけの扱いで、人材一覧（提案不可）と食い違っていた。 理由：終了案件でも詳細閲覧・編集は行えるため、カード全体の淡色化は「そのカード上のアクションが実行できない」場合（マッチング結果の追加不可）に限る。 docs/UI表示規約.md §5 参照。 --></li>
           <li>ソートに「単価順（高い順／低い順）」を追加</li>
         </ul>
       </div>

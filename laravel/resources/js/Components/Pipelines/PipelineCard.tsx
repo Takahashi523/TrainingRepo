@@ -1,6 +1,7 @@
 import RankBadge from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import StatusSelect from '@/Components/Pipelines/StatusSelect';
+import { emptyText } from '@/lib/emptyValue';
 import { cn } from '@/lib/utils';
 import { PipelineCard as PipelineCardType, PipelineStatus, StatusOption } from '@/types/pipeline';
 import { router } from '@inertiajs/react';
@@ -69,7 +70,7 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
             <div className="mt-1.5 flex items-center gap-1.5">
                 <RankBadge rank={card.match_rank} />
                 <span className="text-[11px] font-bold text-muted-foreground">
-                    {card.match_score != null ? `${card.match_score}点` : '—'}
+                    {card.match_score != null ? `${card.match_score}点` : emptyText('matchScore')}
                 </span>
             </div>
 
@@ -81,7 +82,7 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
                 <TruncatedText as="div" text={`担当：${card.engineer.main_user?.name ?? '未割当'}`} />
                 <div className="flex items-center gap-1">
                     <span className="shrink-0">
-                        次回：{card.next_action_date ? formatDate(card.next_action_date) : '—'}
+                        次回：{card.next_action_date ? formatDate(card.next_action_date) : emptyText('nextActionDate')}
                     </span>
                     <span className="shrink-0 text-muted-foreground/50">/</span>
                     <span className="shrink-0">更新：{formatDate(card.updated_at)}</span>

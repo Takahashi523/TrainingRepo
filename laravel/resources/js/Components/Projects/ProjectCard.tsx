@@ -1,6 +1,12 @@
+import CollapsibleTagRow from "@/Components/Common/CollapsibleTagRow";
+import EmptyValue from "@/Components/Common/EmptyValue";
+import FieldRow from "@/Components/Common/FieldRow";
+import MetaRow, { MetaItem } from "@/Components/Common/MetaRow";
+import Rate from "@/Components/Common/Rate";
 import StatusBadge, { STATUS_STYLES } from "@/Components/Common/StatusBadge";
 import SkillTag from "@/Components/Common/SkillTag";
 import { Button } from "@/Components/ui/button";
+import { emptyText } from "@/lib/emptyValue";
 import { cn } from "@/lib/utils";
 import {
     COMMERCIAL_FLOW_LABELS,
@@ -9,70 +15,28 @@ import {
     WORK_STYLE_LABELS,
 } from "@/types/project";
 import { router } from "@inertiajs/react";
-import { Clock, Users } from "lucide-react";
-
-const MAX_SKILLS_VISIBLE = 5;
+import { Clock, MessagesSquare, Users } from "lucide-react";
 
 interface Props {
     project: ProjectListItem;
 }
 
-// 単価表示ロジック（API doc 04 参照）：
-// ① rate_min/rate_max があれば範囲表示 ② 無くても rate_note があればそれを表示 ③ どちらも無ければ「—」
-// 数値のときは金額（濃色・太字）と単位「万円」（淡色・通常ウェイト）を分けて描画する
-// （WF_06 .rate-display / .rate-unit 準拠。PRレビュー #53 指摘：単価のみ一律太字だと見出しと焦点が競合するため）。
-// ※単価描画の共通部品化（MatchCard等との統合）は別issueで扱う想定で、ここではProjectCard内の見た目改善に留める。
-function RateValue({
-    rateMin,
-    rateMax,
-    rateNote,
-}: {
-    rateMin: number | null;
-    rateMax: number | null;
-    rateNote: string | null;
-}) {
-    if (rateMin != null && rateMax != null) {
-        return (
-            <span className="break-words text-[13px] font-semibold text-foreground">
-                {rateMin}
-                <span className="text-[11px] font-normal text-muted-foreground">
-                    万円
-                </span>
-                〜{rateMax}
-                <span className="text-[11px] font-normal text-muted-foreground">
-                    万円
-                </span>
-            </span>
-        );
-    }
-    return (
-        <span className="break-words text-[13px] font-semibold text-foreground">
-            {rateNote ?? "—"}
-        </span>
-    );
-}
-
 export default function ProjectCard({ project }: Props) {
     const accentClass =
         STATUS_STYLES[project.status]?.accentClass ?? "bg-gray-400";
-    const isClosed = project.status === "closed";
 
-    const visibleRequired = project.required_skills.slice(
-        0,
-        MAX_SKILLS_VISIBLE,
-    );
-    const hiddenRequiredCount = Math.max(
-        0,
-        project.required_skills.length - MAX_SKILLS_VISIBLE,
-    );
-    const visiblePreferred = project.preferred_skills.slice(
-        0,
-        MAX_SKILLS_VISIBLE,
-    );
-    const hiddenPreferredCount = Math.max(
-        0,
-        project.preferred_skills.length - MAX_SKILLS_VISIBLE,
-    );
+    // スキルは必須→尚可の順に結合し、マッチング結果カードと同じ CollapsibleTagRow で表示する。
+    // 固定件数で切ると幅の広い/狭いタグで見え方が変わるため、実幅で「1行に収まる分」を判定させる。
+    const skills = [
+        ...project.required_skills.map((s) => ({
+            label: s.label ?? "",
+            skillType: "required" as const,
+        })),
+        ...project.preferred_skills.map((s) => ({
+            label: s.label ?? "",
+            skillType: "preferred" as const,
+        })),
+    ];
 
     const updatedAt = new Date(project.updated_at).toLocaleDateString("ja-JP", {
         year: "numeric",
@@ -82,11 +46,10 @@ export default function ProjectCard({ project }: Props) {
 
     return (
         <div
-            className={cn(
-                "mb-4 overflow-hidden rounded-md border border-border bg-white",
-                // 終了案件はopacity低めで表示（WF_06確定事項）
-                isClosed && "opacity-[0.65]",
-            )}
+            // 終了案件もカード全体は淡色化しない。状態は StatusBadge（終了）が示しており、
+            // 終了案件でも詳細閲覧・編集は行えるため。カード全体の淡色化は「そのカード上の
+            // アクションが実行できない」ことを示す用途に限る（例：マッチング結果カードの追加不可）。
+            className="mb-4 overflow-hidden rounded-md border border-border bg-white"
         >
             <div className="flex items-stretch">
                 <div className={cn("w-1.5 shrink-0", accentClass)} />
@@ -98,15 +61,21 @@ export default function ProjectCard({ project }: Props) {
                             <p className="break-words text-base font-bold text-foreground">
                                 {project.name}
                             </p>
-                            <p className="mt-0.5 break-words text-[11px] text-muted-foreground">
-                                クライアント：{project.client_name ?? "—"}
-                                　｜　商流：
-                                {project.commercial_flow
-                                    ? (COMMERCIAL_FLOW_LABELS[
-                                          project.commercial_flow
-                                      ] ?? project.commercial_flow)
-                                    : "—"}
-                            </p>
+                            {/* 見出し直下メタ（表示規約の型2）：ラベル語は出さず、項目名は sr-only で支援技術に渡す。
+                                マッチング結果カード・マッチングサマリーと同じ表現に揃える。 */}
+                            <MetaRow className="mt-0.5">
+                                <MetaItem field="clientName">
+                                    {project.client_name ??
+                                        emptyText("clientName", true)}
+                                </MetaItem>
+                                <MetaItem field="commercialFlow">
+                                    {project.commercial_flow
+                                        ? (COMMERCIAL_FLOW_LABELS[
+                                              project.commercial_flow
+                                          ] ?? project.commercial_flow)
+                                        : emptyText("commercialFlow", true)}
+                                </MetaItem>
+                            </MetaRow>
                         </div>
                         <div className="ml-auto flex flex-wrap items-center gap-2">
                             <StatusBadge
@@ -116,16 +85,28 @@ export default function ProjectCard({ project }: Props) {
                                     project.status
                                 }
                             />
-                            {project.interview_count != null && (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px]">
-                                    面談 {project.interview_count}回
-                                </span>
-                            )}
+                            {/* 面談回数・募集人数は未設定でもバッジごと消さない（消すと「値が無い」のか
+                                「読み落とした」のか区別できないため）。欠損は項目名入りトークンで示す。 */}
                             <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px]">
-                                <Users className="h-3 w-3" />
-                                {project.headcount != null
-                                    ? `${project.headcount}名`
-                                    : "—"}
+                                {/* アイコンは装飾（隣の募集人数バッジと体裁を揃えるため）。
+                                    「2回」だけでは何の回数か分からないため、項目名は語「面談」が担う
+                                    （型3＝値だけで自己識別できない項目にのみラベルを付ける）。 */}
+                                <MessagesSquare aria-hidden="true" className="h-3 w-3 text-muted-foreground" />
+                                {project.interview_count != null ? (
+                                    `面談 ${project.interview_count}回`
+                                ) : (
+                                    <EmptyValue field="interviewCount" withFieldName />
+                                )}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px]">
+                                {/* アイコンは視覚的なスキャン補助。項目名は sr-only で支援技術に渡す。 */}
+                                <span className="sr-only">募集人数：</span>
+                                <Users aria-hidden="true" className="h-3 w-3 text-muted-foreground" />
+                                {project.headcount != null ? (
+                                    `${project.headcount}名`
+                                ) : (
+                                    <EmptyValue field="headcount" withFieldName />
+                                )}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
                                 担当：{project.users.main.name}
@@ -140,80 +121,57 @@ export default function ProjectCard({ project }: Props) {
 
                     <div className="my-2 h-px bg-border/60" />
 
-                    {/* 必須スキル／尚可スキル */}
-                    <Section label="必須スキル">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                            {visibleRequired.length > 0 ? (
-                                <>
-                                    {visibleRequired.map((s, i) => (
-                                        <SkillTag
-                                            key={`r-${i}`}
-                                            label={s.label ?? ""}
-                                        />
-                                    ))}
-                                    {hiddenRequiredCount > 0 && (
-                                        <span className="rounded border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground">
-                                            +{hiddenRequiredCount}
-                                        </span>
-                                    )}
-                                </>
-                            ) : (
-                                <span className="text-[11px] text-muted-foreground">
-                                    —
-                                </span>
-                            )}
-                            {visiblePreferred.length > 0 && (
-                                <>
-                                    <span className="ml-1 text-[10px] text-muted-foreground">
-                                        尚可→
-                                    </span>
-                                    {visiblePreferred.map((s, i) => (
-                                        <SkillTag
-                                            key={`p-${i}`}
-                                            label={s.label ?? ""}
-                                            skillType="preferred"
-                                        />
-                                    ))}
-                                    {hiddenPreferredCount > 0 && (
-                                        <span className="rounded border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground">
-                                            +{hiddenPreferredCount}
-                                        </span>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </Section>
+                    {/* スキル（必須→尚可の順）。必須=実線 / 尚可=点線 のタグで区別できるため、
+                        マッチング結果カードと同じく「尚可→」の区切り語は置かない。
+                        ラベルも人材一覧カードと同じ「スキル」に揃える。 */}
+                    <FieldRow label="スキル">
+                        {skills.length > 0 ? (
+                            <CollapsibleTagRow>
+                                {skills.map((s, i) => (
+                                    <SkillTag
+                                        key={`${s.skillType}-${s.label}-${i}`}
+                                        label={s.label}
+                                        skillType={s.skillType}
+                                    />
+                                ))}
+                            </CollapsibleTagRow>
+                        ) : (
+                            <EmptyValue field="skills" className="text-[11px]" />
+                        )}
+                    </FieldRow>
 
-                    {/* 単価 + 稼働開始 + 勤務形態 */}
-                    <div className="flex flex-wrap items-start gap-x-4 gap-y-1.5">
-                        <Section label="単価">
-                            <RateValue
-                                rateMin={project.rate_min}
-                                rateMax={project.rate_max}
-                                rateNote={project.rate_note}
+                    {/* 単価 + 参画開始 + 勤務形態。ここだけ FieldRow を横並びで使うため、
+                        縦積み用の既定（上端そろえ・下マージン）を打ち消して中央そろえにする
+                        （値ごとに高さが違うと横並びでは縦ズレとして見えるため）。 */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                        <FieldRow label="単価" align="center">
+                            <Rate
+                                min={project.rate_min}
+                                max={project.rate_max}
+                                note={project.rate_note}
+                                // カード内は周囲（メタ・タグ 11px）に合わせて 12px。詳細画面は既定の 13px。
+                                className="text-xs"
                             />
-                        </Section>
-                        <Section label="稼働開始">
-                            {/* ラベル「稼働開始」と重複しないよう、装飾ピルは外して単価行と同型の
+                        </FieldRow>
+                        <FieldRow label="参画開始" align="center">
+                            {/* ラベル「参画開始」と重複しないよう、装飾ピルは外して単価行と同型の
                                 「ラベル＋値テキスト」にする（PRレビュー #53 指摘）。スキャン用の
                                 小さなClockアイコンはインラインで残す。 */}
-                            <span className="inline-flex items-center gap-1 break-words text-[13px] font-semibold text-foreground">
-                                <Clock className="h-3 w-3 shrink-0 text-muted-foreground" />
+                            <span className="inline-flex items-center gap-1 break-words text-xs font-semibold text-foreground">
+                                <Clock aria-hidden="true" className="h-3 w-3 shrink-0 text-muted-foreground" />
                                 {project.start_label}
                             </span>
-                        </Section>
-                        <Section label="勤務形態">
+                        </FieldRow>
+                        <FieldRow label="勤務形態" align="center">
                             {project.work_style ? (
                                 <span className="rounded border border-dashed border-border px-2 py-0.5 text-[11px]">
                                     {WORK_STYLE_LABELS[project.work_style] ??
                                         project.work_style}
                                 </span>
                             ) : (
-                                <span className="text-[11px] text-muted-foreground">
-                                    —
-                                </span>
+                                <EmptyValue field="workStyle" className="text-[11px]" />
                             )}
-                        </Section>
+                        </FieldRow>
                     </div>
                 </div>
 
@@ -235,19 +193,3 @@ export default function ProjectCard({ project }: Props) {
     );
 }
 
-function Section({
-    label,
-    children,
-}: {
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="mb-1.5 flex min-w-0 items-start gap-2">
-            <span className="w-14 shrink-0 pt-0.5 text-[10px] font-bold text-muted-foreground">
-                {label}
-            </span>
-            <div className="min-w-0 flex-1">{children}</div>
-        </div>
-    );
-}

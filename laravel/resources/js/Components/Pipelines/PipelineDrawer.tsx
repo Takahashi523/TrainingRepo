@@ -12,6 +12,7 @@ import {
 } from '@/Components/ui/accordion';
 import { Button } from '@/Components/ui/button';
 import { Textarea } from '@/Components/ui/textarea';
+import { emptyText } from '@/lib/emptyValue';
 import { PageProps } from '@/types';
 import { PipelineDetail, PipelineStatus, StatusOption } from '@/types/pipeline';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
@@ -197,8 +198,17 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             <div className="flex shrink-0 flex-col items-center gap-1">
                                 <RankBadge rank={pipeline.match_rank} className="text-xs" />
                                 <div className="text-3xl font-bold leading-none text-foreground">
-                                    {score != null ? score : '—'}
-                                    <span className="text-xs font-normal text-muted-foreground"> 点</span>
+                                    {score != null ? (
+                                        <>
+                                            {score}
+                                            <span className="text-xs font-normal text-muted-foreground"> 点</span>
+                                        </>
+                                    ) : (
+                                        // 未算出のときは単位「点」ごと出さない（「未算出 点」にならないようにする）
+                                        <span className="text-sm font-normal text-muted-foreground">
+                                            {emptyText('matchScore')}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex-1">

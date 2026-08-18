@@ -139,7 +139,7 @@
     // { "sort": "created_at",     "order": "desc", "label": "登録日順（新しい順）" }
     // { "sort": "created_at",     "order": "asc",  "label": "登録日順（古い順）" }
     // { "sort": "updated_at",     "order": "desc", "label": "更新日順（新しい順）" }
-    // { "sort": "available_from", "order": "asc",  "label": "提案可能タイミング順" }
+    // { "sort": "available_from", "order": "asc",  "label": "稼働可能時期順" }  ※2026-08-18 に項目名へ統一
   ]
 }
 ```

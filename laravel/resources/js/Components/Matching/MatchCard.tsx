@@ -1,19 +1,14 @@
 import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
+import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import RankBadge, { RANK_BAR_STYLES, RANK_BAR_FALLBACK_STYLE } from '@/Components/Common/RankBadge';
+import Rate from '@/Components/Common/Rate';
 import SkillTag from '@/Components/Common/SkillTag';
 import TruncatedText from '@/Components/Common/TruncatedText';
+import { emptyText } from '@/lib/emptyValue';
 import { cn } from '@/lib/utils';
 import { MatchResult } from '@/types/matching';
 import { Ban, Check } from 'lucide-react';
-
-/** 単価レンジの表示（下限〜上限。無ければ備考、それも無ければ —）。 */
-export function formatRate(min: number | null, max: number | null, note: string | null): string {
-    if (min != null && max != null) return `${min}万円〜${max}万円`;
-    if (min != null) return `${min}万円〜`;
-    if (max != null) return `〜${max}万円`;
-    return note || '—';
-}
 
 interface Props {
     result: MatchResult;
@@ -33,10 +28,6 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
 
     // 工程はサマリーと同じ共通 ProcessCheckboxGroup で表示する（DRY）。案件は is_target フラグ。
     const { phaseList, phaseValues } = buildProcessPhaseProps(project.phases, 'is_target');
-
-    // 単価は下限/上限が無ければ formatRate が備考、それも無ければ '—' を返す。
-    // ラベルなしメタでは '—' だと何の項目か伝わらないため、真の未設定（'—'）は「単価未定」に置き換える。
-    const rateText = formatRate(project.rate_min, project.rate_max, project.rate_note);
 
     // スキルは必須→尚可の順に結合。既定は「1 行に収まる分だけ」表示し、あふれた分はトグルで
     // カード内に全件展開する（CollapsibleTagRow が実幅を計測して判定）。マッチ検証（必須スキルを
@@ -115,42 +106,61 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                             いずれも「追加済み」と体裁を揃える（枠なし・アイコン＋文字・muted）。 */}
                         {is_in_pipeline ? (
                             <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
-                                <Check className="h-2.5 w-2.5" />
+                                <Check aria-hidden="true" className="h-2.5 w-2.5" />
                                 パイプライン追加済み
                             </span>
                         ) : !is_available ? (
                             /* open 以外（closed=終了 / pending=ペンディング）は追加不可。ステータス別ラベル。 */
                             <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
-                                <Ban className="h-2.5 w-2.5" />
+                                <Ban aria-hidden="true" className="h-2.5 w-2.5" />
                                 {project.status_label}
                             </span>
                         ) : (
                             /* 掲載中だが既存パイプラインが上限（5件）到達で追加不可。 */
                             is_project_full && (
                                 <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
-                                    <Ban className="h-2.5 w-2.5" />
+                                    <Ban aria-hidden="true" className="h-2.5 w-2.5" />
                                     上限到達
                                 </span>
                             )
                         )}
                     </div>
 
-                    {/* メタ：ラベルなしで値のみを横一列に並べる（`｜` 区切り・折返し可）。
-                        値ありはフォーマットで項目を自己識別。未指定は横長を避けつつ項目が分かるよう
-                        「フィールド名入りトークン」で表示する。案件登録時に既知の属性（クライアント・商流）は
-                        未入力を表す「未設定」、後から決まり得る条件（募集人数・開始時期・単価・勤務形態）は「未定」と語を使い分ける。 */}
-                    <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] text-muted-foreground">
-                        {/* 顧客名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（max-w で幅を抑える）。 */}
-                        <TruncatedText
-                            text={project.client_name || 'クライアント未設定'}
-                            className="min-w-0 max-w-[12rem]"
-                        />
-                        <span>｜ {project.commercial_flow_label ?? '商流未設定'}</span>
-                        <span>｜ {project.headcount != null ? `${project.headcount}名` : '募集人数未定'}</span>
-                        <span>｜ {project.start_date ? project.start_label : '参画開始時期未定'}</span>
-                        <span>｜ {rateText === '—' ? '単価未定' : rateText}</span>
-                        <span>｜ {project.work_style_label ?? '勤務形態未定'}</span>
-                    </div>
+                    {/* メタ（表示規約の型2）：ラベル語は出さず値のみを横一列に並べる（`｜` 区切り・折返し可）。
+                        値ありはフォーマットで項目を自己識別し、項目名は MetaItem が sr-only で支援技術に渡す。
+                        未指定は横長を避けつつ項目が分かるよう「項目名入りトークン」で表示する。案件登録時に
+                        既知の属性（クライアント・商流）は「未設定」、後から決まり得る条件（募集人数・開始時期・
+                        単価・勤務形態）は「未定」と語を使い分ける（emptyValue.ts が語彙の SSOT）。 */}
+                    <MetaRow>
+                        <MetaItem field="clientName">
+                            {/* 顧客名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（max-w で幅を抑える）。 */}
+                            <TruncatedText
+                                text={project.client_name || emptyText('clientName', true)}
+                                className="min-w-0 max-w-[12rem]"
+                            />
+                        </MetaItem>
+                        <MetaItem field="commercialFlow">
+                            {project.commercial_flow_label ?? emptyText('commercialFlow', true)}
+                        </MetaItem>
+                        <MetaItem field="headcount">
+                            {project.headcount != null ? `${project.headcount}名` : emptyText('headcount', true)}
+                        </MetaItem>
+                        <MetaItem field="startDate">
+                            {project.start_date ? project.start_label : emptyText('startDate', true)}
+                        </MetaItem>
+                        <MetaItem field="rate">
+                            <Rate
+                                min={project.rate_min}
+                                max={project.rate_max}
+                                note={project.rate_note}
+                                variant="plain"
+                                withFieldName
+                            />
+                        </MetaItem>
+                        <MetaItem field="workStyle">
+                            {project.work_style_label ?? emptyText('workStyle', true)}
+                        </MetaItem>
+                    </MetaRow>
 
                     {/* スキルタグ：必須=実線 / 尚可=点線 / 勤務形態=薄枠。
                         必須・尚可が無い案件でもタグ行が空にならないようプレースホルダを出し、カード高さのばらつきを防ぐ。 */}
@@ -162,7 +172,7 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                         </CollapsibleTagRow>
                     ) : (
                         <div className="mt-1.5">
-                            <span className="text-[11px] text-muted-foreground">スキル未設定</span>
+                            <span className="text-[11px] text-muted-foreground">{emptyText('skills', true)}</span>
                         </div>
                     )}
 
