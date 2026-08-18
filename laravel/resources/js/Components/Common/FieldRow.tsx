@@ -63,6 +63,9 @@ export default function FieldRow({
                     'min-w-0 flex-1',
                     // 詳細画面は長い自由文（備考・作業環境）を折り返す前提の体裁を維持する。
                     isDetail && 'break-words text-sm text-foreground',
+                    // 一覧カードは値がタグ（枠線＋padding で約22px）のときとテキスト（約16px）のときで
+                    // 行の高さが変わり、カードを並べたときにラベル位置がそろわない。最低高さをタグに合わせる。
+                    !isDetail && 'flex min-h-[22px] flex-wrap items-center',
                 )}
             >
                 {children}

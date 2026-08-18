@@ -18,7 +18,7 @@ type Props = PageProps<EngineerShowPageProps>;
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <div className="mb-4 overflow-visible rounded-md border border-border">
+        <div className="mb-4 overflow-visible rounded-md border border-border bg-white">
             <div className="rounded-t-md border-b border-border bg-muted/50 px-4 py-2.5 text-xs font-bold text-foreground">
                 {title}
             </div>
@@ -65,7 +65,7 @@ export default function Show({ engineer }: Props) {
         : null;
 
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="人材詳細" />
             {/* マッチング実行の遷移中（Python AI 同期計算）に全画面で計算中を表示する。
                 共通部品のデフォルトは汎用文言のため、ここではマッチング用途の具体文言を渡す。
@@ -192,7 +192,8 @@ export default function Show({ engineer }: Props) {
                 </div>
 
                 {/* AI summary */}
-                <div className="mb-4 rounded-md border border-border bg-muted/30 px-5 py-4">
+                {/* ページの地色が bg-muted/30 のため、同じ塗りだと枠が沈む。白にして浮かせる。 */}
+                <div className="mb-4 rounded-md border border-border bg-white px-5 py-4">
                     <div className="mb-2.5 flex items-center gap-2">
                         <span className="rounded bg-purple-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
                             AI

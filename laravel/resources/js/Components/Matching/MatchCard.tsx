@@ -52,8 +52,9 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                 }
             }}
             className={cn(
-                // ホバー時は進捗管理カード（PipelineCard）と同じく背景色を変える（transition-colors hover:bg-muted/50）
-                'flex w-full cursor-pointer items-stretch overflow-hidden rounded-md border bg-white text-left transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                // ホバーは進捗管理カード（PipelineCard）と同じ表現に揃える：淡いプライマリの塗り＋枠線＋影。
+                // グレーの塗りはカンバン列などグレー地の上で背景と同化するため、色相を変えて示す。
+                'flex w-full cursor-pointer items-stretch overflow-hidden rounded-md border bg-white text-left transition hover:border-primary/50 hover:bg-primary/5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                 selected ? 'border-primary ring-1 ring-primary/40' : 'border-border',
                 // 追加不可（掲載停止 or 上限到達）はカードを淡くして非アクティブを示す（クリックで詳細は開ける）。
                 // 「追加済み」は完了状態として淡色化しない。

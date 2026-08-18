@@ -50,7 +50,9 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
                 if (e.key === 'Enter') onOpen(card.id);
             }}
             className={cn(
-                'w-full cursor-pointer rounded border border-transparent bg-white p-2.5 text-left transition-colors hover:bg-muted/50',
+                // ホバーは「淡いプライマリの塗り＋枠線＋影」で示す。カンバン列自体がグレー地のため、
+                // グレーで塗ると列の背景と同化してホバーが分からなくなる（色相を変えて区別する）。
+                'w-full cursor-pointer rounded border border-transparent bg-white p-2.5 text-left transition hover:border-primary/50 hover:bg-primary/5 hover:shadow-md',
                 isActive ? 'border-primary shadow-[0_0_0_2px_rgba(0,0,0,0.1)]' : 'border-border',
             )}
         >

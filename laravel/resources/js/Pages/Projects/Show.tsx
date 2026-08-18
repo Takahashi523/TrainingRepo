@@ -30,7 +30,7 @@ function SectionCard({
     children: React.ReactNode;
 }) {
     return (
-        <div className="mb-4 overflow-visible rounded-md border border-border">
+        <div className="mb-4 overflow-visible rounded-md border border-border bg-white">
             <div className="rounded-t-md border-b border-border bg-muted/50 px-4 py-2.5 text-xs font-bold text-foreground">
                 {title}
             </div>
@@ -72,7 +72,7 @@ export default function Show({ project }: Props) {
             : null;
 
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="案件詳細" />
 
             <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between border-b border-border bg-white px-10 py-4">

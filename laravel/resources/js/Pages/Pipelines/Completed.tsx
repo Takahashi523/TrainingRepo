@@ -228,7 +228,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                 </div>
 
                 {/* テーブル本体（残り高さを占有・内部スクロール・muted 背景を最下部まで） */}
-                <div className="flex-1 overflow-y-auto bg-muted/60 px-6 py-5">
+                <div className="flex-1 overflow-y-auto bg-muted/30 px-6 py-5">
                 {/* テーブル上部：件数（左）＋ソート（右）を同一行に配置（WF_10 準拠） */}
                 <div className="mb-3 flex items-center">
                     <span className="text-xs text-muted-foreground">
