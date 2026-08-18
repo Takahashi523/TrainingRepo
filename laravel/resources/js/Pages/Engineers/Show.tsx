@@ -1,6 +1,7 @@
 import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import EmptyValue from '@/Components/Common/EmptyValue';
 import FieldRow from '@/Components/Common/FieldRow';
+import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
@@ -150,53 +151,43 @@ export default function Show({ engineer }: Props) {
                 {/* Profile summary */}
                 <div className="mb-6 flex items-start gap-5 border-b border-border pb-6">
                     <div className="min-w-0 flex-1">
-                        <p className="text-2xl font-bold text-foreground">{engineer.name}</p>
-                        <p className="mt-0.5 text-xs">
-                            {engineer.name_kana}
-                            {engineer.age != null && (
-                                <span className="ml-2">　{engineer.age}歳</span>
-                            )}
-                        </p>
-                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <StatusBadge status={engineer.status} />
-                            {/* サマリーは「値がある項目だけを出す」（下部の項目表に全項目が必ず出るため）。
-                                最寄駅・年齢と同じ扱いにそろえ、未定のときはピルごと出さない。
-                                アイコンは視覚的なスキャン補助で、項目名は sr-only で支援技術に渡す。 */}
-                            {engineer.available_from && (
-                                <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
-                                    <span className="sr-only">稼働可能時期：</span>
-                                    <Clock aria-hidden="true" className="mr-1 inline h-3 w-3 text-muted-foreground" />
-                                    {engineer.available_label}
-                                </span>
-                            )}
+                        {/* ステータスは氏名の右に置く（マッチングサマリーと同じ構成）。 */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-2xl font-bold text-foreground">{engineer.name}</p>
+                            <StatusBadge status={engineer.status} className="shrink-0" />
                         </div>
-                        <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
-                            {/* 最寄駅はラベル語を出さず sr-only で項目名を渡す（表示規約の型2。
-                                一覧カード・マッチングサマリーと同じ表現）。担当／サブは同型の人名が
-                                並ぶため型3 のラベルを維持する。 */}
+                        <p className="mt-0.5 text-xs">{engineer.name_kana}</p>
+                        {/* 属性メタ（型2）と担当／サブ（型3）を1つの流れに並べる。
+                            担当・サブは同型の人名が並ぶため型3 のラベルを維持する。
+                            サマリーなので値がある項目だけを出す（全項目は下部の項目表に出る）。 */}
+                        <MetaRow className="mt-2.5 text-xs">
+                            {engineer.age != null && (
+                                <MetaItem field="age">{engineer.age}歳</MetaItem>
+                            )}
                             {(engineer.nearest_station || engineer.nearest_line) && (
-                                <span>
-                                    <span className="sr-only">最寄駅：</span>
+                                <MetaItem field="nearestStation">
                                     {[engineer.nearest_station, engineer.nearest_line]
                                         .filter(Boolean)
                                         .join('（') + (engineer.nearest_line ? '）' : '')}
-                                </span>
+                                </MetaItem>
                             )}
-                            {(engineer.nearest_station || engineer.nearest_line) && (
-                                <span className="h-3.5 w-px bg-border" />
+                            {engineer.available_from && (
+                                <MetaItem field="availableFrom" icon={Clock}>
+                                    {engineer.available_label}
+                                </MetaItem>
                             )}
+                            {/* 担当・サブは同型の人名が並ぶため型3 のラベルを維持する。 */}
                             <span>
-                                <span className="mr-1 font-semibold text-foreground/60">担当</span>
-                                {engineer.users.main.name}
+                                担当：{engineer.users.main.name}
                                 {engineer.users.sub && (
                                     <>
                                         <span className="mx-1 text-border">／</span>
-                                        <span className="mr-1 font-semibold text-foreground/60">サブ</span>
-                                        {engineer.users.sub.name}
+                                        サブ：{engineer.users.sub.name}
                                     </>
                                 )}
                             </span>
-                        </div>
+                        </MetaRow>
+
                     </div>
                 </div>
 

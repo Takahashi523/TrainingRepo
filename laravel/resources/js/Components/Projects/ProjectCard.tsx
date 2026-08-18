@@ -5,6 +5,7 @@ import MetaRow, { MetaItem } from "@/Components/Common/MetaRow";
 import Rate from "@/Components/Common/Rate";
 import StatusBadge, { STATUS_STYLES } from "@/Components/Common/StatusBadge";
 import SkillTag from "@/Components/Common/SkillTag";
+import UserAvatar from "@/Components/Common/UserAvatar";
 import { Button } from "@/Components/ui/button";
 import { emptyText } from "@/lib/emptyValue";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,8 @@ export default function ProjectCard({ project }: Props) {
                                 </MetaItem>
                             </MetaRow>
                         </div>
+                        {/* 右上：属性バッジと担当／サブのアバターを1行に並べる
+                            （アバターは幅が固定なのでバッジを押し出さない）。 */}
                         <div className="ml-auto flex flex-wrap items-center gap-2">
                             <StatusBadge
                                 status={project.status}
@@ -108,13 +111,22 @@ export default function ProjectCard({ project }: Props) {
                                     <EmptyValue field="headcount" withFieldName />
                                 )}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
-                                担当：{project.users.main.name}
-                                <span className="mx-1">/</span>
-                                サブ：
-                                {project.users.sub
-                                    ? project.users.sub.name
-                                    : "未割当"}
+                            {/* 担当／サブはイニシャルアバターに圧縮する（幅が固定されカード間で比較しやすい）。
+                                氏名はホバーのツールチップ、支援技術には sr-only の「担当：氏名」を渡す。 */}
+                            <span className="flex items-center gap-1">
+                                {/* アバターが置き換えたのは「氏名」であって項目名ではない。
+                                    型3（同型の人名が2つ並ぶ）は項目名が要るため、ラベルは残す。 */}
+                                <span className="text-[11px] text-muted-foreground">
+                                    担当
+                                </span>
+                                <UserAvatar
+                                    role="担当"
+                                    name={project.users.main.name}
+                                />
+                                <UserAvatar
+                                    role="サブ"
+                                    name={project.users.sub?.name ?? null}
+                                />
                             </span>
                         </div>
                     </div>

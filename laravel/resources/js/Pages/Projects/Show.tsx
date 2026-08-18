@@ -111,72 +111,57 @@ export default function Show({ project }: Props) {
             <div className="max-w-3xl">
                 {/* 案件サマリー */}
                 <div className="mb-6 border-b border-border pb-6">
-                    <p className="break-words text-2xl font-bold text-foreground">
-                        {project.name}
-                    </p>
-                    {/* 見出し直下サマリー（表示規約の型2）：ラベル語は出さず、項目名は sr-only で渡す。
-                        一覧カード・マッチング結果と同じ表現。ここは下部の項目表に全項目が必ず出るため、
-                        値がある項目だけを出してよい（規約 §2 の例外）。 */}
-                    {(project.client_name || project.commercial_flow) && (
-                        <MetaRow className="mt-0.5 text-xs">
-                            {project.client_name && (
-                                <MetaItem field="clientName">
-                                    {project.client_name}
-                                </MetaItem>
-                            )}
-                            {project.commercial_flow && (
-                                <MetaItem field="commercialFlow">
-                                    {COMMERCIAL_FLOW_LABELS[
-                                        project.commercial_flow
-                                    ] ?? project.commercial_flow}
-                                </MetaItem>
-                            )}
-                        </MetaRow>
-                    )}
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                    {/* ステータスは案件名の右に置く（マッチングサマリー・人材詳細と同じ構成）。 */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="break-words text-2xl font-bold text-foreground">
+                            {project.name}
+                        </p>
                         <StatusBadge
                             status={project.status}
                             label={
                                 PROJECT_STATUS_LABELS[project.status] ??
                                 project.status
                             }
+                            className="shrink-0"
                         />
-                        {project.headcount != null && (
-                            <span className="rounded-full border border-border bg-muted/50 px-3 py-0.5 text-xs">
-                                {/* アイコンは装飾。項目名は sr-only で支援技術に渡す。 */}
-                                <span className="sr-only">募集人数：</span>
-                                <Users aria-hidden="true" className="mr-1 inline h-3 w-3 text-muted-foreground" />
-                                {project.headcount}名
-                            </span>
-                        )}
-                        {/* サマリーは「値がある項目だけを出す」（下部の項目表に全項目が必ず出るため）。
-                            募集人数バッジ・クライアント／商流と同じ扱いにそろえ、未定のときはピルごと出さない。
-                            アイコンは視覚的なスキャン補助で、項目名は sr-only で支援技術に渡す。 */}
-                        {project.start_date && (
-                            <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
-                                <span className="sr-only">参画開始時期：</span>
-                                <Clock aria-hidden="true" className="mr-1 inline h-3 w-3 text-muted-foreground" />
-                                {project.start_label}
-                            </span>
-                        )}
                     </div>
-                    <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
+                    {/* 属性メタ（型2）と担当／サブ（型3）を1つの流れに並べる。
+                        担当・サブは同型の人名が並ぶため型3 のラベルを維持する。
+                        サマリーなので値がある項目だけを出す（全項目は下部の項目表に出る）。 */}
+                    <MetaRow className="mt-2.5 text-xs">
+                        {project.client_name && (
+                            <MetaItem field="clientName">
+                                {project.client_name}
+                            </MetaItem>
+                        )}
+                        {project.commercial_flow && (
+                            <MetaItem field="commercialFlow">
+                                {COMMERCIAL_FLOW_LABELS[project.commercial_flow] ??
+                                    project.commercial_flow}
+                            </MetaItem>
+                        )}
+                        {project.headcount != null && (
+                            <MetaItem field="headcount" icon={Users}>
+                                {project.headcount}名
+                            </MetaItem>
+                        )}
+                        {project.start_date && (
+                            <MetaItem field="startDate" icon={Clock}>
+                                {project.start_label}
+                            </MetaItem>
+                        )}
+                        {/* 担当・サブは同型の人名が並ぶため型3 のラベルを維持する。 */}
                         <span>
-                            <span className="mr-1 font-semibold text-foreground/60">
-                                担当
-                            </span>
-                            {project.users.main.name}
+                            担当：{project.users.main.name}
                             {project.users.sub && (
                                 <>
                                     <span className="mx-1 text-border">／</span>
-                                    <span className="mr-1 font-semibold text-foreground/60">
-                                        サブ
-                                    </span>
-                                    {project.users.sub.name}
+                                    サブ：{project.users.sub.name}
                                 </>
                             )}
                         </span>
-                    </div>
+                    </MetaRow>
+
                 </div>
 
                 {/* 基本情報 */}
