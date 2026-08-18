@@ -513,6 +513,64 @@ class CsvImportTest extends CsvTestCase
         $this->assertNotNull($this->findError($errors, 2, 'rate_max'));
     }
 
+    public function test_project_rate_min_only_is_rejected(): void
+    {
+        // 片側だけのレンジは取込では作れない（フォームの相互必須と同じ制約）。
+        // 許すと「取込はできるが編集画面では保存できない」レコードが生まれる。
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '下限のみ', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '50', 'rate_max' => '',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'rate_max'));
+        $this->assertDatabaseCount('projects', 0);
+    }
+
+    public function test_project_rate_max_only_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '上限のみ', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '', 'rate_max' => '80',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'rate_min'));
+        $this->assertDatabaseCount('projects', 0);
+    }
+
+    public function test_project_rate_note_only_is_accepted(): void
+    {
+        // 単価未定（スキル見合い）の行は従来どおり取り込める＝相互必須が過剰にならないことの確認。
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '単価備考のみ', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '', 'rate_max' => '', 'rate_note' => 'スキル見合い',
+        ]]);
+
+        $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv))->assertRedirect();
+        $this->assertDatabaseHas('projects', ['name' => '単価備考のみ', 'rate_note' => 'スキル見合い']);
+    }
+
+    public function test_project_rate_range_with_note_is_rejected(): void
+    {
+        // 単価備考は「スキル見合い」を表す欄。レンジと同時入力はフォームでは作れない状態のため取込でも弾く。
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => 'レンジと備考', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '50', 'rate_max' => '80', 'rate_note' => '応相談',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'rate_note'));
+        $this->assertDatabaseCount('projects', 0);
+    }
+
     public function test_project_station_required_when_onsite(): void
     {
         $user = $this->makeUser('admin');

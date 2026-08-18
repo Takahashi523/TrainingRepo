@@ -38,6 +38,8 @@ export default function UserAvatar({ role, name, className }: Props) {
         <>
         <span
             ref={ref}
+            // sr-only で氏名は読めるが、キーボード操作でもツールチップ（全文）に到達できるようにする。
+            tabIndex={0}
             {...triggerProps}
             className={cn(
                 // サイズ・ウェイトは同じ行に並ぶ他のバッジ（面談回数・募集人数）に合わせる。

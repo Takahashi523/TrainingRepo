@@ -58,9 +58,15 @@ interface MetaItemProps {
  * 値そのもの（`children`）は呼び出し側が組み立てる（欠損時は emptyText(key, true) を渡す）。
  */
 export function MetaItem({ field, icon: Icon, children, className }: MetaItemProps) {
+    // 欠損時の値は「クライアント未設定」のように項目名を含む（型2 の規則）。
+    // その場合に sr-only を足すと「クライアント：クライアント未設定」と二重に読まれるため、
+    // 値が項目名で始まるときは sr-only を出さない（項目名は必ず1回だけ、という大原則を保つ）。
+    const label = fieldName(field);
+    const valueHasFieldName = typeof children === 'string' && children.startsWith(label);
+
     return (
         <span className={cn('inline-flex min-w-0 items-baseline gap-1', className)}>
-            <span className="sr-only">{fieldName(field)}：</span>
+            {!valueHasFieldName && <span className="sr-only">{label}：</span>}
             {Icon && <Icon aria-hidden="true" className="h-3 w-3 shrink-0 self-center" />}
             {children}
         </span>

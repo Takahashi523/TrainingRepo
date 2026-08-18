@@ -1,6 +1,7 @@
 import RankBadge, { RANK_BAR_STYLES, RANK_BAR_FALLBACK_STYLE } from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import { Button } from '@/Components/ui/button';
+import { emptyText } from '@/lib/emptyValue';
 import { MatchResult } from '@/types/matching';
 import { useForm } from '@inertiajs/react';
 import { Ban, Check, Plus, X } from 'lucide-react';
@@ -138,7 +139,7 @@ export default function MatchDrawer({ result, engineerId, onAdded, onClose }: Pr
                                     {result.ai_score_reason}
                                 </p>
                             ) : (
-                                <p className="text-xs text-muted-foreground">—</p>
+                                <p className="text-xs text-muted-foreground">{emptyText('aiScoreReason')}</p>
                             )}
                         </AiBlock>
                     </div>

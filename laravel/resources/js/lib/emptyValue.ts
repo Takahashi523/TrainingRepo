@@ -53,9 +53,12 @@ export const EMPTY_FIELDS = {
     interviewCount: { name: '面談回数', kind: 'undecided' },
     workStyle: { name: '勤務形態', kind: 'undecided' },
     // --- 割当（未割当） ---
+    mainUser: { name: '担当', kind: 'unassigned' },
     subUser: { name: 'サブ担当', kind: 'unassigned' },
     // --- 算出結果（未算出）。入力漏れではなく「まだ計算されていない」ことを表す ---
     matchScore: { name: 'マッチスコア', kind: 'uncalculated' },
+    matchRank: { name: 'マッチランク', kind: 'uncalculated' },
+    aiScoreReason: { name: 'スコア算出理由', kind: 'uncalculated' },
     // --- 進捗管理（完了タブ）の表示項目 ---
     ngReason: { name: 'NG理由', kind: 'unset' },
     endedAt: { name: '終了日', kind: 'unset' },

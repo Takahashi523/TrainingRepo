@@ -171,7 +171,13 @@ export default function ProjectCard({ project }: Props) {
                                 小さなClockアイコンはインラインで残す。 */}
                             <span className="inline-flex items-center gap-1 break-words text-xs font-semibold text-foreground">
                                 <Clock aria-hidden="true" className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                {project.start_label}
+                                {/* start_label はサーバが null のとき文字列「未定」を返す。そのまま出すと
+                                    欠損だけ濃色・太字になるため、値の有無で分岐して EmptyValue を描く。 */}
+                                {project.start_date ? (
+                                    project.start_label
+                                ) : (
+                                    <EmptyValue field="startDate" />
+                                )}
                             </span>
                         </FieldRow>
                         <FieldRow label="勤務形態" align="center">

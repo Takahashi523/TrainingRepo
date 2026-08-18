@@ -291,7 +291,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                                             />
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-muted-foreground">
-                                            <TruncatedText as="div" text={row.engineer.main_user?.name ?? '未割当'} />
+                                            <TruncatedText as="div" text={row.engineer.main_user?.name ?? emptyText('mainUser')} />
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-muted-foreground">
                                             {formatEndedAt(row.ended_at)}

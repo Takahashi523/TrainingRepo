@@ -81,7 +81,7 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
              * 画面に出ていない項目でソートさせるのは UX 上不適切なため、あえてカードにも「次回」を表示している。
              */}
             <div className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
-                <TruncatedText as="div" text={`担当：${card.engineer.main_user?.name ?? '未割当'}`} />
+                <TruncatedText as="div" text={`担当：${card.engineer.main_user?.name ?? emptyText('mainUser')}`} />
                 <div className="flex items-center gap-1">
                     <span className="shrink-0">
                         次回：{card.next_action_date ? formatDate(card.next_action_date) : emptyText('nextActionDate')}

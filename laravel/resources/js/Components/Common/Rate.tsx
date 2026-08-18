@@ -41,6 +41,7 @@ export default function Rate({ min, max, note, variant = 'strong', withFieldName
     // サイズは詰まって見えないよう数値と同じまま。
     const connector = <span className={isStrong ? 'font-normal text-muted-foreground' : undefined}>〜</span>;
 
+
     if (min != null && max != null) {
         return (
             <span className={valueClass}>

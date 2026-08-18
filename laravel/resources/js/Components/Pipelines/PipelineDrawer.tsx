@@ -288,7 +288,7 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             </span>
                             {/* 氏名は最大255文字になり得るため break-all で折り返す（レビュー指摘 #9） */}
                             <span className="break-all py-1 text-xs text-foreground">
-                                {pipeline.engineer.main_user?.name ?? '未割当'}
+                                {pipeline.engineer.main_user?.name ?? emptyText('mainUser')}
                             </span>
                         </div>
 
