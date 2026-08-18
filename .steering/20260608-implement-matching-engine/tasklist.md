@@ -171,7 +171,7 @@ Laravelチームより「PythonがUPDATEを行っていないか」という確�
 
 ## 完了基準
 
-- [x] ✅ 2026-07-14 pytest 全件通過（103件）
+- [x] ✅ ~~2026-07-14 pytest 全件通過（103件）~~ → **2026-08-17 pytest 全件通過（104件）**（Step 10 で契約テスト `test_error_response_body_is_flat_not_nested` を1件追加）
 - [x] ✅ 2026-07-14 カバレッジ90%以上（96% 達成）
 - [x] ✅ 2026-07-14 `SELECT *` が存在しないこと
 - [x] ✅ 2026-07-14 Pydantic 型定義がすべてのリクエスト/レスポンスに存在すること
@@ -186,5 +186,5 @@ Laravelチームより「PythonがUPDATEを行っていないか」という確�
 - [ ] `MOCK_MODE`の無効化・削除（AWS本番アカウント整備後）
 - [ ] Laravel⇔Python間の通信経路確定（スコアリングロジック設計書 v0.6 §6 T29、インフラ担当確認待ち）
 - [ ] `スコアリングロジック設計書.md` §3.2の出力文字数表記を`AIプロンプト設計書.md`の数値に同期（文書オーナーへ確認予定、低優先度）
-- [ ] Laravel側：`app/Services/AiSummaryService.php`のPython API連携実装（現状`// TODO`のまま。Laravelチームの最新ブランチで進捗確認中）
-- [ ] Laravel側：E2レスポンス（`ai_summary`・`ai_summary_generated_at`）を受け取った後の`engineers`テーブルへのUPDATE処理の実装
+- [x] ✅ 2026-08-17 Laravel側：Python API連携の実装 — `develop` にて実装済みを確認。ファイル名は当時の想定（`app/Services/AiSummaryService.php`）から変更され、`app/Services/Ai/HttpAiSummaryClient.php` として実装されている
+- [x] ✅ 2026-08-17 Laravel側：E2レスポンス（`ai_summary`・`ai_summary_generated_at`）の`engineers`テーブルへの反映 — `develop` にて `EngineerService::refreshAiSummary()` が `$engineer->update([...])` で実施していることを確認。これによりStep 9の「保存責務はLaravel側」が両側で成立する
