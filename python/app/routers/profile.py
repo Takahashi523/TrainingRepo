@@ -17,7 +17,8 @@ router = APIRouter()
     summary="人材プロフィール要約文生成（E2）",
     description=(
         "engineers.appeal_note を入力として、AIが強み・特徴を要約したプロフィール紹介文を生成し、\n"
-        "DBのエンジニア情報（ai_summary / ai_summary_generated_at）を更新します。"
+        "ai_summary / ai_summary_generated_at を返却します。\n"
+        "DBへの保存は行いません（スコアリングロジック設計書 v0.6 §1.3：保存責務は Laravel 側）。"
     ),
     responses={
         status.HTTP_404_NOT_FOUND: {"model": ErrorResponse, "description": "エンジニアが見つかりません。"}
@@ -40,12 +41,15 @@ def profile_summary(request: ProfileSummaryRequest, db: Session = Depends(get_db
             ai_summary_generated_at=generated_at.isoformat(),  # ISO8601形式文字列に変換
         )
 
-    except EngineerNotFoundError as e:
-        # サービス層で発生したエンジニア不存例外を正確にキャッチし、404エラーで返却
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "ENGINEER_NOT_FOUND", "message": str(e)}
-        )
+    except EngineerNotFoundError:
+        # ここで HTTPException に変換せず、そのまま re-raise する（BedrockError と同じ方式）。
+        # main.py の @app.exception_handler(EngineerNotFoundError) が捕捉し、
+        # 404 ENGINEER_NOT_FOUND をトップレベル形式 {"error_code": ..., "message": ...} で返す。
+        # HTTPException に変換すると {"detail": {"error_code": ...}} と入れ子になり、
+        # OpenAPI の responses={404: {"model": ErrorResponse}} 宣言（フラット型）と食い違うため
+        # 揃えておく（matching.py と同様）。
+        # 下の except Exception より前に置くことで、そちらに握りつぶされるのを防ぐ。
+        raise
 
     except BedrockError:
         # ここで HTTPException に変換せず、そのまま re-raise する。

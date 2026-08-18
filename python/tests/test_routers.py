@@ -145,7 +145,8 @@ class TestMatchingCalculate:
         )
         response = self._post_matching({"engineer_id": 999})
         assert response.status_code == 404
-        assert response.json()["detail"]["error_code"] == "ENGINEER_NOT_FOUND"
+        # error_code はトップレベルに置く（Laravel 側が $body['error_code'] を参照するため）
+        assert response.json()["error_code"] == "ENGINEER_NOT_FOUND"
 
     def test_returns_422_when_no_active_candidate(self, mocker):
         from app.services.matching_service import NoActiveCandidateError
@@ -156,7 +157,26 @@ class TestMatchingCalculate:
         )
         response = self._post_matching({"engineer_id": 1})
         assert response.status_code == 422
-        assert response.json()["detail"]["error_code"] == "NO_ACTIVE_PROJECT"
+        # error_code はトップレベルに置く（Laravel 側が $body['error_code'] を参照するため）
+        assert response.json()["error_code"] == "NO_ACTIVE_PROJECT"
+
+    def test_error_response_body_is_flat_not_nested(self, mocker):
+        """エラー応答は {"error_code", "message"} のフラット形式であること（契約テスト）。
+
+        HTTPException(detail={...}) で返すと {"detail": {"error_code": ...}} と入れ子になり、
+        error_code をトップレベルで参照する Laravel 側（HttpMatchingEngineClient::mapErrorResponse）が
+        判定に失敗して 404/422 が一律「上流障害」に落ちる。OpenAPI 宣言
+        （responses={404: {"model": ErrorResponse}}／ErrorResponse は {error_code, message} のフラット型）
+        とも食い違うため、形そのものを固定して再発を防ぐ。
+        """
+        mocker.patch(
+            "app.routers.matching.run_matching",
+            side_effect=EngineerNotFoundError(999),
+        )
+        body = self._post_matching({"engineer_id": 999}).json()
+
+        assert set(body.keys()) == {"error_code", "message"}
+        assert "detail" not in body
 
     def test_returns_500_without_leaking_internal_exception_message(self, mocker):
         """予期せぬ例外発生時、内部の例外メッセージがレスポンスに漏れないこと。"""
@@ -210,7 +230,8 @@ class TestProfileSummary:
         )
         response = self._post_profile_summary({"engineer_id": 999})
         assert response.status_code == 404
-        assert response.json()["detail"]["error_code"] == "ENGINEER_NOT_FOUND"
+        # error_code はトップレベルに置く（Laravel 側が $body['error_code'] を参照するため）
+        assert response.json()["error_code"] == "ENGINEER_NOT_FOUND"
 
     def test_returns_504_on_bedrock_timeout(self, mocker):
         mocker.patch(

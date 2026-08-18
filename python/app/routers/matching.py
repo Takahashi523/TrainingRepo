@@ -68,24 +68,26 @@ def matching_calculate(request: MatchingRequest, db: Session = Depends(get_db)):
             ],
         )
 
-    except EngineerNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error_code": "ENGINEER_NOT_FOUND",
-                "message": str(e),
-            },
-        )
+    except EngineerNotFoundError:
+        # ここで HTTPException に変換せず、そのまま re-raise する（BedrockError と同じ方式）。
+        # main.py の @app.exception_handler(EngineerNotFoundError) が捕捉し、
+        # 404 ENGINEER_NOT_FOUND として応答してくれる（設計書 §4.2 準拠）。
+        #
+        # HTTPException(detail={"error_code": ...}) に変換すると FastAPI 既定のハンドラにより
+        # {"detail": {"error_code": ...}} と入れ子で返るが、Laravel 側
+        # （HttpMatchingEngineClient::mapErrorResponse）は error_code をトップレベルで参照するため
+        # 判定に失敗し、404/422 が一律「上流障害」に落ちてしまう。app ハンドラに委ねることで
+        # {"error_code": ..., "message": ...} のフラット形式で返し、OpenAPI の
+        # responses={404: {"model": ErrorResponse}} 宣言とも一致させる。
+        #
+        # 下の except Exception より前に置くことで、そちらに握りつぶされるのを防ぐ。
+        raise
 
-    except NoActiveCandidateError as e:
-        # スコアリングロジック設計書 §4.2 準拠の 422 エラーハンドリング
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "error_code": "NO_ACTIVE_PROJECT",
-                "message": str(e),
-            },
-        )
+    except NoActiveCandidateError:
+        # スコアリングロジック設計書 §4.2 準拠の 422 エラーハンドリング。
+        # 上記 EngineerNotFoundError と同じ理由で re-raise し、main.py の
+        # @app.exception_handler(NoActiveCandidateError) に委ねる。
+        raise
 
     except BedrockError:
         # ここで HTTPException に変換せず、そのまま re-raise する。
