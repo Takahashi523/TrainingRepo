@@ -797,8 +797,16 @@ class TestGenerateProfileSummary:
         assert ai_summary == "Pythonを中心に5年の経験を持つエンジニアです。"
         assert generated_at is not None
 
-    def test_updates_db_when_summary_is_not_empty(self, mocker):
-        """要約テキストがある場合、engineers テーブルを UPDATE すること。"""
+    def test_does_not_write_to_db_when_summary_is_not_empty(self, mocker):
+        """要約テキストがあっても、Python 側は DB へ書き込まないこと（契約テスト）。
+
+        スコアリングロジック設計書 v0.6 §1.3「データ連携方針」のとおり、
+        engineers.ai_summary / ai_summary_generated_at への保存は Laravel 側
+        （EngineerService::refreshAiSummary）の責務であり、Python は返却のみを行う。
+        両側が同じカラムを書くと、Laravel がタイムアウトで打ち切った後に Python が commit し、
+        「失敗トーストが出ているのに画面には要約が表示される」食い違いが発生するため、
+        書き込みが復活していないことをテストで固定する。
+        """
         engineer = _make_engineer(appeal_note="アピールポイントあり")
         mocker.patch(
             "app.services.matching_service.fetch_engineer", return_value=engineer
@@ -809,13 +817,17 @@ class TestGenerateProfileSummary:
         )
         mock_db = MagicMock()
 
-        generate_profile_summary(mock_db, engineer_id=1)
+        ai_summary, generated_at = generate_profile_summary(mock_db, engineer_id=1)
 
-        mock_db.execute.assert_called_once()
-        mock_db.commit.assert_called_once()
+        # 生成結果は返る
+        assert ai_summary == "要約テキスト"
+        assert generated_at is not None
+        # ただし DB への書き込みは一切行わない
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_not_called()
 
     def test_skips_db_update_when_summary_is_empty(self, mocker):
-        """appeal_note が空で要約テキストが空の場合、DB を更新しないこと。"""
+        """appeal_note が空で要約テキストが空の場合も、DB を更新しないこと。"""
         engineer = _make_engineer(appeal_note="")
         mocker.patch(
             "app.services.matching_service.fetch_engineer", return_value=engineer

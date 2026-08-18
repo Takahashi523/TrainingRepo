@@ -388,20 +388,13 @@ def generate_profile_summary(
         # engineers.appeal_note（H1）のみを入力としてBedrockのプロンプト関数に渡す
         ai_summary = invoke_profile_summary(appeal_note)
 
-    # Step 8.3: 生成結果がある場合のみ DB を更新（明示的なカラム指定でSELECT *を防止）
-    if ai_summary:
-        db.execute(
-            text(
-                "UPDATE engineers"
-                " SET ai_summary = :ai_summary, ai_summary_generated_at = :generated_at"
-                " WHERE id = :engineer_id"
-            ),
-            {
-                "ai_summary": ai_summary,
-                "generated_at": generated_at,
-                "engineer_id": engineer_id,
-            },
-        )
-        db.commit()
-
+    # Step 9（2026-08-17 実装反映）: Python 側は DB への書き込みを一切行わず、生成結果を返すのみとする。
+    #
+    # スコアリングロジック設計書 v0.6 §1.3「データ連携方針」のとおり、engineers.ai_summary /
+    # ai_summary_generated_at への保存は Laravel 側（EngineerService::refreshAiSummary）の責務。
+    # 従来はここで UPDATE + commit していたが、両側が同じカラムを書く二重化状態となっており、
+    # 「Laravel 側が timeout（services.ai_summary.timeout=30s）で打ち切った後に Python が commit する」
+    # 場合に、Laravel は失敗トーストを出すのに画面には要約が表示される、という食い違いが発生していた。
+    # 加えて生 SQL は updated_at を更新しないため、更新時刻の整合も崩れていた。
+    # 保存責務を Laravel 一本に寄せることで、この不整合を構造的に解消する。
     return ai_summary, generated_at
