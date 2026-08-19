@@ -1,8 +1,8 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
 import SavedSearchManageDialog from '@/Components/Common/SavedSearchManageDialog';
+import SavedSearchMenu from '@/Components/Common/SavedSearchMenu';
 import SavedSearchSaveDialog from '@/Components/Common/SavedSearchSaveDialog';
-import SavedSearchSelect from '@/Components/Common/SavedSearchSelect';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import {
@@ -106,8 +106,10 @@ export default function ProjectFilterPanel({
         filters.interview_count.length > 0 ||
         filters.keyword.length > 0;
 
+    // 左右パディングはページヘッダ（px-10）に合わせる。カード一覧はスクロール領域の px-6 に
+    // スクロールバー幅が加わって実質同じ位置になるため、px-6 のままだとこの行だけ左右にはみ出して見える。
     return (
-        <div className="border-b border-border bg-muted/40 px-6 py-3">
+        <div className="border-b border-border bg-muted/40 px-10 py-3">
             <div className="flex flex-wrap items-center gap-2.5">
                 {/* フリーワード */}
                 <div className="relative">
@@ -207,36 +209,42 @@ export default function ProjectFilterPanel({
                     <span className="text-[11px] text-muted-foreground">（適用中の条件はありません）</span>
                 )}
 
+                {/* 「条件を保存」「すべてクリア」はどちらも左の絞り込みタグ（＝現在の条件）に作用するため、
+                    作用対象の隣にまとめる。どちらも hasAnyFilter 依存なので同時に出没し、
+                    常時表示の右クラスタ（保存済み条件の呼び出し・管理）が横にズレない。
+                    並び順は建設的な「保存」を先、破壊的な「すべてクリア」を後にする。 */}
+                {hasAnyFilter && (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="ml-1 h-7 gap-1 bg-white text-[11px] text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowSaveModal(true)}
+                    >
+                        <Star className="h-3 w-3" />
+                        条件を保存
+                    </Button>
+                )}
+
                 {hasAnyFilter && (
                     <button
                         type="button"
                         onClick={onClearAll}
-                        className="ml-1 inline-flex h-7 items-center gap-1 rounded-md border border-input bg-white px-2.5 text-[11px] text-muted-foreground hover:bg-muted/50"
+                        className="inline-flex h-7 items-center gap-1 rounded-md border border-input bg-white px-2.5 text-[11px] text-muted-foreground hover:bg-muted/50"
                     >
                         <X className="h-3 w-3" />
                         すべてクリア
                     </button>
                 )}
 
-                {/* 保存済み条件の呼び出し・保存（WF_06の配置に合わせて右端） */}
+                {/* 保存済み条件の呼び出し・管理（WF_06の配置に合わせて右端）。
+                    「保存済み条件」の見出しラベルは置かない。呼び出し・管理のどちらもボタン文言だけで
+                    対象と操作が分かるため、ラベルは情報を足さずクラスタの幅だけを占める。 */}
                 <div className="ml-auto flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground">保存済み条件</span>
-                    <SavedSearchSelect
+                    <SavedSearchMenu
                         savedSearches={savedSearches}
                         onApply={onFilterChange}
                     />
-                    {hasAnyFilter && (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 gap-1 bg-white text-[11px]"
-                            onClick={() => setShowSaveModal(true)}
-                        >
-                            <Star className="h-3 w-3" />
-                            条件を保存
-                        </Button>
-                    )}
                     <Button
                         type="button"
                         size="sm"
