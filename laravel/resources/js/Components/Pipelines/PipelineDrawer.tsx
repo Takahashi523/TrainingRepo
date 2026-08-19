@@ -1,4 +1,5 @@
 import ConfirmDialog from '@/Components/Common/ConfirmDialog';
+import DateInput from '@/Components/Common/DateInput';
 import RankBadge, { RANK_BAR_FALLBACK_STYLE, RANK_BAR_STYLES } from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import PipelineStatusBadge from '@/Components/Pipelines/PipelineStatusBadge';
@@ -10,7 +11,6 @@ import {
     AccordionTrigger,
 } from '@/Components/ui/accordion';
 import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
 import { Textarea } from '@/Components/ui/textarea';
 import { PageProps } from '@/types';
 import { PipelineDetail, PipelineStatus, StatusOption } from '@/types/pipeline';
@@ -286,10 +286,9 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             <label className="text-[10px] font-bold text-muted-foreground">
                                 次回アクション予定日
                             </label>
-                            <Input
-                                type="date"
+                            <DateInput
                                 value={data.next_action_date}
-                                onChange={(e) => setData('next_action_date', e.target.value)}
+                                onChange={(v) => setData('next_action_date', v)}
                                 className="h-8 w-[180px] bg-white px-2.5 text-xs md:text-xs"
                             />
                             {errors.next_action_date && (

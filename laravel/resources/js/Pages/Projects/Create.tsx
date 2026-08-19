@@ -87,13 +87,14 @@ export default function Create({
             billing_range: data.billing_range || null,
             remarks: data.remarks || null,
             sub_user_id: data.sub_user_id || null,
-            headcount: data.headcount !== "" ? Number(data.headcount) : null,
-            rate_min: data.rate_min !== "" ? Number(data.rate_min) : null,
-            rate_max: data.rate_max !== "" ? Number(data.rate_max) : null,
+            // 数値欄は Number() で変換しない。Number("あ")=NaN が JSON 化で null になり、
+            // nullable 項目をサイレントに NULL 保存してしまう（silent rejection の再発）。
+            // 生文字列のまま送り、サーバの integer ルールで "あ"/"1.5" を 422 として弾く（#67）。
+            headcount: data.headcount !== "" ? data.headcount : null,
+            rate_min: data.rate_min !== "" ? data.rate_min : null,
+            rate_max: data.rate_max !== "" ? data.rate_max : null,
             interview_count:
-                data.interview_count !== ""
-                    ? Number(data.interview_count)
-                    : null,
+                data.interview_count !== "" ? data.interview_count : null,
 
             required_skills: data.required_skills
                 .filter((s) => s.label !== "" || s.detail !== "")

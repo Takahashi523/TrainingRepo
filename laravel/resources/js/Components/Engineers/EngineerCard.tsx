@@ -1,9 +1,9 @@
-import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import StatusBadge, { STATUS_STYLES } from '@/Components/Common/StatusBadge';
 import SkillTag from '@/Components/Common/SkillTag';
 import { Button } from '@/Components/ui/button';
 import { cn } from '@/lib/utils';
-import { EngineerListItem, Phase } from '@/types/engineer';
+import { EngineerListItem } from '@/types/engineer';
 import { router } from '@inertiajs/react';
 import { ArrowLeftRight, Clock } from 'lucide-react';
 
@@ -25,8 +25,8 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
     const visibleSkills = engineer.skills.slice(0, MAX_SKILLS_VISIBLE);
     const hiddenSkillsCount = Math.max(0, engineer.skills.length - MAX_SKILLS_VISIBLE);
 
-    const phaseList: Phase[] = engineer.phases.map(({ key, name }) => ({ key, name }));
-    const phaseValues = Object.fromEntries(engineer.phases.map((p) => [p.key, p.has_experience]));
+    // 工程経験は他画面（人材詳細・マッチング）と同じ共通アダプタで変換する（人材は has_experience）。
+    const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
     const updatedAt = new Date(engineer.updated_at).toLocaleDateString('ja-JP', {
         year: 'numeric',
@@ -89,10 +89,17 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                     </Section>
 
                     {/* 工程経験。フルサイズ（16px）ではカードのタイポに対して大きいため、縮小ラッパーで
-                        やや小さめ（15px / ラベル12px）に調整する。マッチングカード（14px）より一段大きい。 */}
+                        やや小さめ（15px / ラベル12px）に調整する。マッチングカード（14px）より一段大きい。
+                        一覧では本カードが人材ごとに複数枚描画されるため、id はカードごとに一意化（idPrefix）して
+                        重複を防ぐ（マッチング結果カードと同じ扱い）。 */}
                     <Section label="工程経験">
                         <div className="[&_button]:h-[15px] [&_button]:w-[15px] [&_label]:text-xs [&_svg]:h-3 [&_svg]:w-3">
-                            <ProcessCheckboxGroup phases={phaseList} values={phaseValues} readOnly />
+                            <ProcessCheckboxGroup
+                                phases={phaseList}
+                                values={phaseValues}
+                                readOnly
+                                idPrefix={`engineer-${engineer.id}-`}
+                            />
                         </div>
                     </Section>
 

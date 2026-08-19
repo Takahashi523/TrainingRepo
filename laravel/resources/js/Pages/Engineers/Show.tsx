@@ -2,7 +2,7 @@ import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import ConfirmDialog from '@/Components/Common/ConfirmDialog';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
-import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Engineers/ProcessCheckboxGroup';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';

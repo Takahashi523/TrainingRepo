@@ -17,6 +17,7 @@ import {
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { CompletedFilters, PipelineCompletedPageProps } from '@/types/pipeline';
+import { isValidYmd } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -24,6 +25,26 @@ import { useEffect, useRef, useState } from 'react';
 type Props = PageProps<PipelineCompletedPageProps>;
 
 const KEYWORD_DEBOUNCE_MS = 300;
+/** 終了日欄も打鍵ごとに発火するため、キーワードと同じ間隔でまとめてから問い合わせる。 */
+const DATE_DEBOUNCE_MS = 300;
+
+/**
+ * 日付入力欄の生値を絞り込み条件へ変換する。
+ * - `''`（空）→ `null`：条件なし
+ * - 実在する 'YYYY-MM-DD' → その値：適用する
+ * - 入力途中の不完全な値（'2' / '2026-08-0'）→ `undefined`：**まだサーバーへ送らない**
+ *
+ * `DateInput` はテキスト欄で1打鍵ごとに途中の値を返すため、素通しでリクエストすると
+ * `PipelineCompletedRequest` の `date` ルールに毎回引っかかり、1文字目でエラーが出て
+ * 手入力できなくなる（旧 `type="date"` は完成値しか返さなかったため表面化していなかった）。
+ *
+ * 判定は開始・終了それぞれで独立して行う（`>=` と `<=` は独立した条件のため、
+ * 片方が入力途中でももう片方は絞り込みに反映する）。
+ */
+function toFilterDate(input: string): string | null | undefined {
+    if (input === '') return null;
+    return isValidYmd(input) ? input : undefined;
+}
 
 type QueryPayload = {
     keyword?: string;
@@ -79,6 +100,51 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [keywordInput]);
 
+    // 終了日範囲もキーワードと同じ「ローカル state で受けてからデバウンス」方式にする。
+    // 加えて、日付は入力途中の値が意味を持たないため toFilterDate で完成値・空のみに絞る。
+    const [endedFromInput, setEndedFromInput] = useState(filters.ended_from ?? '');
+    const [endedToInput, setEndedToInput] = useState(filters.ended_to ?? '');
+
+    // タグの ✕ や「すべてクリア」でサーバー側の条件が変わったら入力欄も追従させる。
+    useEffect(() => {
+        setEndedFromInput(filters.ended_from ?? '');
+    }, [filters.ended_from]);
+    useEffect(() => {
+        setEndedToInput(filters.ended_to ?? '');
+    }, [filters.ended_to]);
+
+    const isInitialDateSync = useRef(true);
+    useEffect(() => {
+        if (isInitialDateSync.current) {
+            isInitialDateSync.current = false;
+            return;
+        }
+        const from = toFilterDate(endedFromInput);
+        const to = toFilterDate(endedToInput);
+        // 両方とも入力途中なら送るものが無い（422 も出さない）。
+        if (from === undefined && to === undefined) return;
+        const timer = setTimeout(() => {
+            // 判定は発火時点の filtersRef で行う（条件タグの ✕ や「すべてクリア」が先に
+            // visit を済ませている場合の重複リクエスト防止）。
+            const applied = filtersRef.current;
+            // 打ち終わっていて、かつ適用済みと違う欄だけを patch に載せる。
+            // 開始・終了は「>=」「<=」の独立した条件なので、片方が入力途中でも
+            // もう片方は絞り込みに反映する（片方だけ適用される状態は順に打てば元々起きる）。
+            // 入力途中の欄は patch から外す＝その欄の適用済み条件をそのまま維持する。
+            const patch: Partial<CompletedFilters> = {};
+            if (from !== undefined && from !== (applied.ended_from ?? null)) {
+                patch.ended_from = from;
+            }
+            if (to !== undefined && to !== (applied.ended_to ?? null)) {
+                patch.ended_to = to;
+            }
+            if (Object.keys(patch).length === 0) return;
+            visit(patch, 1);
+        }, DATE_DEBOUNCE_MS);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [endedFromInput, endedToInput]);
+
     // 常に最新の filters を指す ref（Index.tsx と同じ stale closure 対策）。
     // キーワードのデバウンス visit が古い filters を再適用し「すべてクリア」で条件が復活する競合を防ぐ。
     const filtersRef = useRef(filters);
@@ -95,6 +161,9 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
 
     const handleClearAll = () => {
         setKeywordInput('');
+        // 入力途中の値が残っていると props 追従では消えないため、明示的にクリアする。
+        setEndedFromInput('');
+        setEndedToInput('');
         visit({ keyword: '', status: [], user_id: null, ended_from: null, ended_to: null }, 1);
     };
 
@@ -148,6 +217,10 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                         statuses={statuses}
                         keywordInput={keywordInput}
                         onKeywordInput={setKeywordInput}
+                        endedFromInput={endedFromInput}
+                        onEndedFromInput={setEndedFromInput}
+                        endedToInput={endedToInput}
+                        onEndedToInput={setEndedToInput}
                         onFilterChange={(patch) => visit(patch, 1)}
                         onClearAll={handleClearAll}
                     />
