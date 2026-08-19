@@ -28,7 +28,9 @@ const DropdownMenuContent = React.forwardRef<
       className={cn(
         // 見た目は popover.tsx に揃える（同じ「一覧の上に出るパネル」で印象を割らないため）。
         // Select と違い内部スクロールを自前で持たないため、件数が増えても画面外へ伸びないよう max-h を既定にする。
-        "z-50 max-h-[60vh] overflow-y-auto rounded-md border border-input bg-white p-1.5 text-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        // 高さは Radix が衝突検出で算出した「その向きの実際の空き」を使う。vh 固定だと、
+        // 低いウィンドウやトリガーが縦中央にある場合に上下どちらにも収まらず画面外へはみ出す。
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto rounded-md border border-input bg-white p-1.5 text-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className
       )}
       {...props}

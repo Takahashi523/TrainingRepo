@@ -54,9 +54,14 @@ export default function SavedSearchMenu<
                 右クラスタに置かれるトリガーのため align="end" とし、幅が広がる方向を画面内側（左）にする。 */}
             <DropdownMenuContent align="end" className="min-w-[200px]">
                 {savedSearches.length === 0 ? (
-                    // 素のテキストではなく disabled 項目にする。メニューの一員として支援技術に伝わり、
-                    // かつキーボード移動・選択の対象にならないので誤って適用されることがない。
-                    <DropdownMenuItem disabled>
+                    // 素のテキストではなく項目として置く（メニューの一員として支援技術に伝わる）。
+                    // disabled にするとロービングフォーカスの対象外になり、キーボードでは案内文に
+                    // 到達できず「空のメニューが開いただけ」になるため、フォーカスは受けられるようにし、
+                    // onSelect を握りつぶして「押しても何も起きない」状態にする。
+                    <DropdownMenuItem
+                        onSelect={(e) => e.preventDefault()}
+                        className="cursor-default text-muted-foreground"
+                    >
                         保存された検索条件はありません
                     </DropdownMenuItem>
                 ) : (

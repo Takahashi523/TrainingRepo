@@ -75,6 +75,23 @@ export default function EngineerFilterPanel({
             ? currentSortOption.label
             : undefined;
 
+    // 保存済み条件の適用。conditions はサーバに生 JSON で保存されているため、
+    // 保存後にフィルタ項目を増減させると古いレコードにはキーが欠けうる。
+    // patch をそのままマージすると欠けた次元に現在の絞り込みが残り、
+    // 「保存したものと違う条件が適用された」状態（部分適用）になるため、
+    // 先に全次元を既定値へ戻してから保存値を上書きする。
+    const applySavedConditions = (conditions: Partial<EngineerSearchConditions>) => {
+        onFilterChange({
+            status: [],
+            work_styles: [],
+            phases: [],
+            keyword: '',
+            sort: sortOptions[0].sort as EngineerFilters['sort'],
+            order: sortOptions[0].order as EngineerFilters['order'],
+            ...conditions,
+        });
+    };
+
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [showManageModal, setShowManageModal] = useState(false);
 
@@ -172,23 +189,25 @@ export default function EngineerFilterPanel({
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="ml-1 h-7 gap-1 bg-white text-[11px] text-muted-foreground hover:text-foreground"
+                        className="ml-1 h-7 gap-1 bg-white text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground [&_svg]:size-3.5"
                         onClick={() => setShowSaveModal(true)}
                     >
-                        <Star className="h-3 w-3" />
+                        <Star />
                         条件を保存
                     </Button>
                 )}
 
                 {hasAnyFilter && (
-                    <button
+                    <Button
                         type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 bg-white text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground [&_svg]:size-3.5"
                         onClick={onClearAll}
-                        className="inline-flex h-7 items-center gap-1 rounded-md border border-input bg-white px-2.5 text-[11px] text-muted-foreground hover:bg-muted/50"
                     >
-                        <X className="h-3 w-3" />
+                        <X />
                         すべてクリア
-                    </button>
+                    </Button>
                 )}
 
                 {/* 保存済み条件の呼び出し・管理（WF_03の配置に合わせて右端）。
@@ -197,16 +216,16 @@ export default function EngineerFilterPanel({
                 <div className="ml-auto flex items-center gap-2">
                     <SavedSearchMenu
                         savedSearches={savedSearches}
-                        onApply={onFilterChange}
+                        onApply={applySavedConditions}
                     />
                     <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-8 gap-1 bg-white text-[11px]"
+                        className="h-8 gap-1 bg-white text-[11px] [&_svg]:size-3.5"
                         onClick={() => setShowManageModal(true)}
                     >
-                        <List className="h-3 w-3" />
+                        <List />
                         条件管理
                     </Button>
                 </div>
