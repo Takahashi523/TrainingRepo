@@ -290,41 +290,75 @@ class MatchingControllerTest extends TestCase
         $closing = Project::factory()->create(['main_user_id' => $user->id]);
         $deleting = Project::factory()->create(['main_user_id' => $user->id]);
         $adding = Project::factory()->create(['main_user_id' => $user->id]);
+        $filling = Project::factory()->create(['main_user_id' => $user->id]);
 
         $matches = [
             $this->match($closing->id, 92, 'A'),
             $this->match($deleting->id, 80, 'B'),
             $this->match($adding->id, 70, 'B'),
+            $this->match($filling->id, 60, 'C'),
         ];
         Http::fakeSequence('*/api/v1/matching/calculate')
             ->push($this->engineBody($matches), 200)
             ->push($this->engineBody($matches), 200);
 
         $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
-            ->assertInertia(fn ($page) => $page->has('results', 3)
+            ->assertInertia(fn ($page) => $page->has('results', 4)
                 ->where('results.0.is_available', true)
-                ->where('results.2.is_in_pipeline', false));
+                ->where('results.2.is_in_pipeline', false)
+                ->where('results.3.is_project_full', false));
 
         // 表示中に別ユーザーが行った操作を再現する。
         $closing->update(['status' => 'closed']);
         $deleting->delete();
         Pipeline::factory()->create(['engineer_id' => $engineer->id, 'project_id' => $adding->id]);
+        // 別人材で $filling を上限（5件）まで埋める（上限到達も再実行で反映されること）。
+        Pipeline::factory()->count(Pipeline::MAX_PER_PROJECT)->create(['project_id' => $filling->id]);
 
         $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
-            ->assertInertia(fn ($page) => $page->has('results', 2)
+            ->assertInertia(fn ($page) => $page->has('results', 3)
                 // 掲載停止は一覧に残したまま無効表示にする（黙って消さない）。
                 ->where('results.0.project.id', $closing->id)
                 ->where('results.0.is_available', false)
                 // ハード削除された案件は表示できないため一覧から落ちる。
                 ->where('results.1.project.id', $adding->id)
-                ->where('results.1.is_in_pipeline', true));
+                ->where('results.1.is_in_pipeline', true)
+                // 上限到達は「上限到達」表示＋追加無効化（サーバー enforce の先出し）。
+                ->where('results.2.project.id', $filling->id)
+                ->where('results.2.is_project_full', true));
     }
 
-    public function test_rerun_engine_failure_returns_null_results_to_preserve_existing_list(): void
+    public function test_rerun_after_add_back_runs_engine_again(): void
+    {
+        // 追加直後の back ではエンジンをスキップする（#4）が、その状態から再マッチングを押せば
+        // 今度は実行される。「自動再実行はしない」と「ボタンで最新化できる」が両立することを固定する。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $project = Project::factory()->create(['main_user_id' => $user->id]);
+        $this->fakeEngine([$this->match($project->id, 90, 'A')]);
+
+        // 追加直後の back：フラグありでエンジンを呼ばない。
+        $this->actingAs($user)
+            ->withSession(['preserve_matching_results' => true])
+            ->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->where('results', null));
+        Http::assertNothingSent();
+
+        // 続けて再マッチング：フラグは pull 済みで残らないため、今度はエンジンが実行される。
+        $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->has('results', 1)
+                ->where('results.0.project.id', $project->id));
+        Http::assertSentCount(1);
+    }
+
+    public function test_rerun_engine_failure_returns_null_results_instead_of_empty_array(): void
     {
         // 再マッチングでエンジンが落ちていたとき、results=[] を返すと「更新を押したら一覧が消えた」に
         // なってしまう。null（＝置き換える中身が無い）を返してフロントに据え置きを指示し、失敗自体は
         // flash.error で伝える（Silent Rejection にはしない）。
+        // ※ サーバーは前回の一覧を保持しない（ステートレス）。据え置きの実体はフロントの state であり、
+        //   ここで固定できるのは「据え置きを指示する応答を返すこと」まで。1回目の GET は、その指示が
+        //   意味を持つ前提（手元に一覧がある状態）を再現するために置いている。
         $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
         $project = Project::factory()->create(['main_user_id' => $user->id]);

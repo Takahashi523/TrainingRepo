@@ -60,6 +60,15 @@ export default function Show({
         if (resultsProp !== null) {
             setResults(resultsProp);
             setEmptyReason(emptyReasonProp);
+            return;
+        }
+
+        // 据え置き指示（results=null）でも理由が来ているとき（＝エンジン通信失敗・#52）は理由だけ更新する。
+        // 一覧が0件のまま再マッチングに失敗すると、据え置くべき中身が無いのに前回の理由（例：no_match＝
+        // 「条件に合う募集中の案件が見つかりませんでした」）が残り、確認できていない事実を断定してしまう。
+        // 追加直後の back は emptyReason=null で来るため、この分岐に入らず従来の空状態を壊さない。
+        if (emptyReasonProp !== null) {
+            setEmptyReason(emptyReasonProp);
         }
     }, [resultsProp, emptyReasonProp]);
 
@@ -118,10 +127,27 @@ export default function Show({
     // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する（人材詳細と同方式）。
     const rerunCancel = useRef<(() => void) | null>(null);
 
+    // キャンセル時に開いていたドロワーへ戻すための退避先（キャンセル＝何も起きなかったことにする）。
+    const selectedBeforeRerun = useRef<number | null>(null);
+
     const handleRerun = () => {
         // 再取得で並びが変わると、index で選択しているドロワーが別案件の内容に化ける。
-        // 実行前に必ず閉じ、ユーザーが見ている対象と中身がズレた状態を作らない。
+        // 実行前に必ず閉じ、ユーザーが見ている対象と中身がズレた状態を作らない
+        // （マウスでは背景幕に阻まれるが、ドロワーはフォーカストラップを持たないためキーボードで到達できる）。
+        selectedBeforeRerun.current = selected;
         setSelected(null);
+
+        // Inertia の onError は「サーバーが検証エラー（props.errors）を返した」ときだけ発火する。
+        // この GET は検証エラーを返さないため、サーバーに到達できない通信断は onError にも flash にも
+        // 乗らず、何も表示されないまま終わる。再実行中だけ exception を購読してトーストを出す
+        // （到達済みのエンジン失敗はサーバーが flash.error で通知するので、そちらは重複しない）。
+        // リスナーは値を返さない（false を返すと Inertia の既定動作＝例外の再スローまで抑止してしまう）。
+        const offException = router.on('exception', () => {
+            toast({
+                description: '再マッチングに失敗しました。通信環境をご確認のうえ、再度お試しください。',
+                variant: 'destructive',
+            });
+        });
 
         // 現在 URL への素の GET。preserve_matching_results フラグが無いためサーバーがエンジンを再実行する。
         // reload() は preserveState を強制するため、通信失敗時にサーバーが返す results=null（＝既存表示の
@@ -133,18 +159,23 @@ export default function Show({
             // 全画面オーバーレイは「何が起きているか」を、進捗バーは「リクエストが飛んでいること」を伝える。
             showProgress: true,
             onStart: () => setIsRerunning(true),
-            onFinish: () => setIsRerunning(false),
+            // onFinish は成功・失敗・キャンセルすべてで発火するため、後片付けはここに集約する。
+            onFinish: () => {
+                setIsRerunning(false);
+                rerunCancel.current = null;
+                offException();
+            },
             onCancelToken: (token) => {
                 rerunCancel.current = token.cancel;
             },
-            // サーバー到達前のエラー（通信断・リクエスト中断）は成功レスポンスの flash.error では拾えないため、
-            // ここでトースト表示して Silent Rejection を防ぐ（到達済みのエンジン失敗はサーバーが flash.error で通知）。
-            onError: () =>
-                toast({
-                    description: '再マッチングに失敗しました。時間をおいて再度お試しください。',
-                    variant: 'destructive',
-                }),
         });
+    };
+
+    // オーバーレイのキャンセル（ボタン / ESC）。一覧は一切変わらないので、開いていたドロワーも戻して
+    // 「何も起きなかった」状態にする（実行前に閉じるのは並び替わり対策であり、キャンセルには不要なため）。
+    const handleRerunCancel = () => {
+        rerunCancel.current?.();
+        setSelected(selectedBeforeRerun.current);
     };
 
     return (
@@ -157,7 +188,7 @@ export default function Show({
             <AiLoadingOverlay
                 show={isRerunning}
                 message="AIがマッチングを計算しています…"
-                onCancel={() => rerunCancel.current?.()}
+                onCancel={handleRerunCancel}
             />
 
             {/* WF_09：ヘッダ・対象人材サマリーは上部固定、下の結果一覧のみスクロール。

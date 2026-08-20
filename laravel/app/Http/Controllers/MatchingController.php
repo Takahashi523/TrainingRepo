@@ -58,9 +58,10 @@ class MatchingController extends Controller
             // 再マッチング（#52）は同じ URL への GET のため、back() の戻り先がこの画面自身になり得る。
             // その場合は同じガードで再び弾かれ、リダイレクトが自分自身へ往復し続けてしまう。
             // 戻り先が現在 URL と同じときだけ人材詳細へ振り替え、ループを断つ（他画面からの流入は従来どおり back）。
-            // クエリ付きで戻ってくる場合もあるため、現在 URL で始まるかで自己判定する。
+            // 判定はパスだけで行う。Referer とリクエストではスキーム・ホストが食い違うことがあり
+            // （プロキシ配下など）、URL 文字列の比較だとループ対策が静かに無効化されるため。
             $fallback = route('engineers.show', $engineer);
-            $redirect = str_starts_with(url()->previous(), url()->current())
+            $redirect = parse_url(url()->previous(), PHP_URL_PATH) === $request->getPathInfo()
                 ? redirect($fallback)
                 : back(fallback: $fallback);
 
