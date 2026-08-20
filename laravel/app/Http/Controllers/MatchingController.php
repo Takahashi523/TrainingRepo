@@ -46,6 +46,8 @@ class MatchingController extends Controller
     /**
      * GET /engineers/{engineer}/matching
      * ページロード時にマッチングを同期実行し、結果を表示する（TBD #4：自動実行を採用）。
+     * 画面の「再マッチング」ボタン（#52）も同じ GET を叩く。専用のフラグ・エンドポイントは設けず、
+     * 「フラグ無しの GET＝エンジンを実行して最新化する」という既存の意味づけをそのまま使う。
      */
     public function show(Request $request, Engineer $engineer): Response|RedirectResponse
     {
@@ -53,8 +55,16 @@ class MatchingController extends Controller
         // からの実行もサーバー側で弾き、無駄な Python 呼び出し・提案不可人材のパイプライン化を防ぐ。
         // フロントのマッチングボタンも同条件で無効化しているが、ここが最終防波堤となる。
         if (! in_array($engineer->status, self::MATCHABLE_ENGINEER_STATUSES, true)) {
-            return back(fallback: route('engineers.index'))
-                ->with('error', '提案不可の人材はマッチングを実行できません。');
+            // 再マッチング（#52）は同じ URL への GET のため、back() の戻り先がこの画面自身になり得る。
+            // その場合は同じガードで再び弾かれ、リダイレクトが自分自身へ往復し続けてしまう。
+            // 戻り先が現在 URL と同じときだけ人材詳細へ振り替え、ループを断つ（他画面からの流入は従来どおり back）。
+            // クエリ付きで戻ってくる場合もあるため、現在 URL で始まるかで自己判定する。
+            $fallback = route('engineers.show', $engineer);
+            $redirect = str_starts_with(url()->previous(), url()->current())
+                ? redirect($fallback)
+                : back(fallback: $fallback);
+
+            return $redirect->with('error', '提案不可の人材はマッチングを実行できません。');
         }
 
         // 対象人材サマリー（ヘッダー表示）は既存 EngineerResource を再利用する
@@ -80,8 +90,10 @@ class MatchingController extends Controller
 
         return Inertia::render('Matching/Show', [
             'engineer' => EngineerResource::make($engineer),
+            // items=null（エンジン通信失敗）はそのまま results=null として渡し、フロントに既存表示の
+            // 据え置きを指示する（#52）。空配列は「本当に0件」なので配列のまま渡し、空状態を表示させる。
             // data ラップを避けるため toArray で素の配列にする（既存 PipelineController と同方式）。
-            'results' => MatchingResource::collection($results)->toArray($request),
+            'results' => $results === null ? null : MatchingResource::collection($results)->toArray($request),
             // 結果0件のとき、その理由（no_match / engine_error / unavailable）をフロントへ渡し
             // 空状態の文言・アイコンを出し分ける。結果ありのときは null。
             'emptyReason' => $emptyReason,
@@ -96,11 +108,15 @@ class MatchingController extends Controller
      *  - NotFound（404 / 非掲出）：404 応答
      *  - NoCandidate（候補0件）：結果0件（reason=no_match）として正常表示
      *  - スコア0件：同上（reason=no_match）
-     *  - Upstream（400/500/504・接続不可）：flash.error を出しつつ結果0件（reason=engine_error）で描画（Silent Rejection 回避）
+     *  - Upstream（400/500/504・接続不可）：flash.error を出しつつ items=null（reason=engine_error）を返す（Silent Rejection 回避）
      *  - 突合後全滅：マッチはあったが案件が全てハード削除で1件も残らない（reason=unavailable）
      *    ※掲載停止（closed/pending）は残して is_available=false で無効表示するため、ここには該当しない
      *
-     * @return array{items: list<array{result: MatchResult, project: Project, is_in_pipeline: bool, is_available: bool, is_project_full: bool}>, reason: ?string}
+     * items は「0件」と「スコアを取得できていない」を区別する：
+     *  - []   ：スコアリングは成立したが表示できる案件が0件（no_match / unavailable）→ フロントは空状態を表示する
+     *  - null ：スコアを取得できていない＝一覧を置き換える中身が無い（engine_error）→ フロントは既存表示を据え置く（#52）
+     *
+     * @return array{items: ?list<array{result: MatchResult, project: Project, is_in_pipeline: bool, is_available: bool, is_project_full: bool}>, reason: ?string}
      */
     private function resolveMatches(Engineer $engineer): array
     {
@@ -117,7 +133,11 @@ class MatchingController extends Controller
 
             session()->flash('error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。');
 
-            return ['items' => [], 'reason' => self::EMPTY_ENGINE_ERROR];
+            // 通信失敗ではスコアを1件も得られていない＝一覧を置き換える中身が無い。空配列（＝0件確定）ではなく
+            // null を返し、フロントには既存表示の据え置きを指示する（#52）。これにより、再マッチングを押した結果
+            // として手元の有効な一覧が消える事故を防ぐ。初回ロードで失敗したときは据え置く一覧が無いため、
+            // フロントは reason=engine_error の空状態を従来どおり表示する。
+            return ['items' => null, 'reason' => self::EMPTY_ENGINE_ERROR];
         }
 
         if (count($matches) === 0) {

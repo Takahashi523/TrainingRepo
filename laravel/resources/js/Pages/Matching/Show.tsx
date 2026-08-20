@@ -1,3 +1,4 @@
+import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import SkillTag from '@/Components/Common/SkillTag';
@@ -5,12 +6,14 @@ import StatusBadge from '@/Components/Common/StatusBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import MatchCard from '@/Components/Matching/MatchCard';
 import MatchDrawer from '@/Components/Matching/MatchDrawer';
+import { Button } from '@/Components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { MatchingEmptyReason, MatchingShowPageProps } from '@/types/matching';
-import { Head } from '@inertiajs/react';
-import { AlertTriangle, PackageX, SearchX } from 'lucide-react';
-import { ComponentType, useEffect, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, PackageX, RefreshCw, SearchX } from 'lucide-react';
+import { ComponentType, useEffect, useRef, useState } from 'react';
 
 type Props = PageProps<MatchingShowPageProps>;
 
@@ -105,17 +108,78 @@ export default function Show({
     // 工程経験を人材登録・一覧と同じ ProcessCheckboxGroup で表示する（readOnly）。人材は has_experience。
     const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
+    // 再マッチング（#52）：AI を再実行して一覧を最新化する明示的オプトイン導線。
+    // 自動再実行は行わない（コスト・並び替わり・成功直後の空状態化を避けるため）方針は維持し、
+    // ユーザーが押したときだけ回す。リロード/ブラウザバックしか最新化手段が無い状態を解消する。
+    const [isRerunning, setIsRerunning] = useState(false);
+    const { toast } = useToast();
+
+    // マッチングは読み取り専用（DB保存なし）のため、途中キャンセルは安全（副作用が残らない）。
+    // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する（人材詳細と同方式）。
+    const rerunCancel = useRef<(() => void) | null>(null);
+
+    const handleRerun = () => {
+        // 再取得で並びが変わると、index で選択しているドロワーが別案件の内容に化ける。
+        // 実行前に必ず閉じ、ユーザーが見ている対象と中身がズレた状態を作らない。
+        setSelected(null);
+
+        // 現在 URL への素の GET。preserve_matching_results フラグが無いためサーバーがエンジンを再実行する。
+        // reload() は preserveState を強制するため、通信失敗時にサーバーが返す results=null（＝既存表示の
+        // 据え置き指示）がそのまま効く（コンポーネントが再マウントされると据え置きが成立しない）。
+        // 併せて async 実行のため、二重実行はボタンの disabled とモーダルオーバーレイで防ぐ。
+        router.reload({
+            // reload() は async 実行のため Inertia の既定（showProgress = !async）では進捗バーが出ない。
+            // 人材詳細からの初回マッチング（router.get）では出るので、明示的に有効化して体裁を揃える。
+            // 全画面オーバーレイは「何が起きているか」を、進捗バーは「リクエストが飛んでいること」を伝える。
+            showProgress: true,
+            onStart: () => setIsRerunning(true),
+            onFinish: () => setIsRerunning(false),
+            onCancelToken: (token) => {
+                rerunCancel.current = token.cancel;
+            },
+            // サーバー到達前のエラー（通信断・リクエスト中断）は成功レスポンスの flash.error では拾えないため、
+            // ここでトースト表示して Silent Rejection を防ぐ（到達済みのエンジン失敗はサーバーが flash.error で通知）。
+            onError: () =>
+                toast({
+                    description: '再マッチングに失敗しました。時間をおいて再度お試しください。',
+                    variant: 'destructive',
+                }),
+        });
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="マッチング結果" />
 
+            {/* AI 再実行中（Python 同期計算・数秒）に全画面で計算中を表示する。文言・見た目は遷移元
+                （人材詳細のマッチング実行）と同一にし、初回ロードと再実行で体験を割らない。
+                マッチングは読み取り専用でキャンセルが安全なため onCancel を渡す（visit を中断）。 */}
+            <AiLoadingOverlay
+                show={isRerunning}
+                message="AIがマッチングを計算しています…"
+                onCancel={() => rerunCancel.current?.()}
+            />
+
             {/* WF_09：ヘッダ・対象人材サマリーは上部固定、下の結果一覧のみスクロール。
                 進捗管理・人材一覧と同じく p-6 を -m-6 で打ち消し、画面全高（h-screen）の flex カラムにする。 */}
             <div className="relative -m-6 flex h-screen flex-col overflow-hidden">
-                {/* ページヘッダー（WF_09：タイトル＋サブタイトルのみ。アクションボタンは持たない） */}
-                <div className="shrink-0 border-b border-border bg-white px-10 py-4">
-                    <h1 className="text-lg font-bold text-foreground">マッチング結果</h1>
-                    <p className="mt-0.5 text-xs text-muted-foreground">対象人材にマッチする案件をAIスコアの高い順に表示します</p>
+                {/* ページヘッダー（WF_09：タイトル＋サブタイトル。#52 で右側に再マッチングを追加） */}
+                <div className="flex shrink-0 items-center justify-between border-b border-border bg-white px-10 py-4">
+                    <div>
+                        <h1 className="text-lg font-bold text-foreground">マッチング結果</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">対象人材にマッチする案件をAIスコアの高い順に表示します</p>
+                    </div>
+                    {/* 実行中は disabled にして二重実行を防ぐ（オーバーレイでも背後の操作は遮断される）。 */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 shrink-0 gap-1.5 text-xs"
+                        onClick={handleRerun}
+                        disabled={isRerunning}
+                    >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        再マッチング
+                    </Button>
                 </div>
 
                 {/* 対象人材サマリー（WF_09：薄グレーの帯・下境界のみ */}
