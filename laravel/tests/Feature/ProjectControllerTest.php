@@ -1857,6 +1857,101 @@ class ProjectControllerTest extends TestCase
     }
 
     // -------------------------------------------------------
+    // store: POST /projects — description / work_env / remarks の文字数上限
+    // （PostTooLargeException対策として ProjectRules に追加した max ルールの境界値）
+    // -------------------------------------------------------
+
+    public function test_description_exceeding_max_length_fails(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'description' => str_repeat('あ', 4001),
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('description');
+    }
+
+    public function test_description_is_accepted_at_max_length_4000(): void
+    {
+        $this->seedFormFieldSettings();
+        $user        = User::factory()->create();
+        $description = str_repeat('あ', 4000);
+        $payload     = array_merge($this->validPayload($user->id), [
+            'description' => $description,
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('projects', [
+            'description' => $description,
+        ]);
+    }
+
+    public function test_work_env_exceeding_max_length_fails(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'work_env' => str_repeat('あ', 1001),
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('work_env');
+    }
+
+    public function test_work_env_is_accepted_at_max_length_1000(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $workEnv = str_repeat('あ', 1000);
+        $payload = array_merge($this->validPayload($user->id), [
+            'work_env' => $workEnv,
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('projects', [
+            'work_env' => $workEnv,
+        ]);
+    }
+
+    public function test_remarks_exceeding_max_length_fails(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'remarks' => str_repeat('あ', 1001),
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionHasErrors('remarks');
+    }
+
+    public function test_remarks_is_accepted_at_max_length_1000(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $remarks = str_repeat('あ', 1000);
+        $payload = array_merge($this->validPayload($user->id), [
+            'remarks' => $remarks,
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('projects', [
+            'remarks' => $remarks,
+        ]);
+    }
+
+    // -------------------------------------------------------
     // edit: GET /projects/{project}/edit
     // -------------------------------------------------------
 
@@ -2357,6 +2452,105 @@ class ProjectControllerTest extends TestCase
         $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
 
         $response->assertSessionHasErrors('name');
+    }
+
+    public function test_description_exceeding_max_length_fails_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+        $payload = array_merge($this->validPayload($user->id), [
+            'description' => str_repeat('あ', 4001),
+        ]);
+
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertSessionHasErrors('description');
+    }
+
+    public function test_description_is_accepted_at_max_length_4000_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user        = User::factory()->create();
+        $project     = $this->createProject(['main_user_id' => $user->id]);
+        $description = str_repeat('あ', 4000);
+        $payload     = array_merge($this->validPayload($user->id), [
+            'description' => $description,
+        ]);
+
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('projects', [
+            'id'          => $project->id,
+            'description' => $description,
+        ]);
+    }
+
+    public function test_work_env_exceeding_max_length_fails_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+        $payload = array_merge($this->validPayload($user->id), [
+            'work_env' => str_repeat('あ', 1001),
+        ]);
+
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertSessionHasErrors('work_env');
+    }
+
+    public function test_work_env_is_accepted_at_max_length_1000_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+        $workEnv = str_repeat('あ', 1000);
+        $payload = array_merge($this->validPayload($user->id), [
+            'work_env' => $workEnv,
+        ]);
+
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('projects', [
+            'id'       => $project->id,
+            'work_env' => $workEnv,
+        ]);
+    }
+
+    public function test_remarks_exceeding_max_length_fails_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+        $payload = array_merge($this->validPayload($user->id), [
+            'remarks' => str_repeat('あ', 1001),
+        ]);
+
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertSessionHasErrors('remarks');
+    }
+
+    public function test_remarks_is_accepted_at_max_length_1000_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+        $remarks = str_repeat('あ', 1000);
+        $payload = array_merge($this->validPayload($user->id), [
+            'remarks' => $remarks,
+        ]);
+
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('projects', [
+            'id'      => $project->id,
+            'remarks' => $remarks,
+        ]);
     }
 
     public function test_status_is_required_on_update(): void
