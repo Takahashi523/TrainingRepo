@@ -132,7 +132,9 @@ export default function Show({
                 進捗管理・人材一覧と同じく p-6 を -m-6 で打ち消し、画面全高（h-screen）の flex カラムにする。 */}
             <div
                 ref={setDrawerContainer}
-                className="relative -m-6 flex h-screen flex-col overflow-hidden"
+                // ドロワーを閉じたときの復帰先（起点のカードが消えている場合）。マウスでは焦点化しない
+                tabIndex={-1}
+                className="relative -m-6 flex h-screen flex-col overflow-hidden outline-none"
             >
                 {/* ページヘッダー（WF_09：タイトル＋サブタイトルのみ。アクションボタンは持たない） */}
                 <div className="shrink-0 border-b border-border bg-white px-10 py-4">
@@ -255,7 +257,8 @@ export default function Show({
                   暗くして「今は操作できない」ことを見た目でも示す（明るいまま押せない状態にしない）
                 ・閉じるは onOpenChange 一本に集約する（ESC・幕クリック・ヘッダーの ✕ すべてここを通る） */}
             <Sheet
-                open={!!current}
+                // container が確定するまで開かない（body へ Portal されてサイドバーに被る一瞬を作らない）
+                open={!!current && drawerContainer !== null}
                 onOpenChange={(open) => {
                     if (!open) setSelected(null);
                 }}
@@ -265,14 +268,21 @@ export default function Show({
                     overlayClassName="z-20 bg-black/25"
                     className="absolute inset-y-0 right-0 z-30 h-full w-full max-w-md gap-0 border-l border-border bg-white p-0 shadow-xl sm:max-w-md"
                     showCloseButton={false}
-                    // ドロワーに説明文は持たせないため、Radix の Description 未指定警告を抑止する
+                    // ドロワーは説明文を持たないため、存在しない id を指す aria-describedby を出さない
                     aria-describedby={undefined}
-                    onCloseAutoFocus={(event) => {
-                        const opener = openerRef.current;
-                        // 起点が画面から消えている場合（再検索等）は Radix の既定処理に任せる
-                        if (!opener?.isConnected) return;
+                    tabIndex={-1}
+                    onOpenAutoFocus={(event) => {
+                        // 既定では最初の tabbable（ヘッダーの ✕）に乗る。パネル自身に当てて
+                        // SheetTitle（案件名）から読ませ、進捗管理側と挙動を揃える。
                         event.preventDefault();
-                        opener.focus();
+                        (event.currentTarget as HTMLElement).focus();
+                    }}
+                    onCloseAutoFocus={(event) => {
+                        // Radix は SheetTrigger 経由で開いていないと復帰先を知らず、既定のまま抜けると
+                        // フォーカスが body に落ちる。起点が残っていればそこへ、消えていれば一覧コンテナへ戻す。
+                        event.preventDefault();
+                        const opener = openerRef.current;
+                        (opener?.isConnected ? opener : drawerContainer)?.focus();
                     }}
                 >
                     {/* 別カードを選び直したときにフォーム状態を持ち越さないため、案件IDで再マウントする */}

@@ -136,7 +136,9 @@ export default function Index({
              */}
             <div
                 ref={setDrawerContainer}
-                className="relative -m-6 flex h-screen flex-col overflow-hidden"
+                // ドロワーを閉じたときの復帰先（起点のカードが消えている場合）。マウスでは焦点化しない
+                tabIndex={-1}
+                className="relative -m-6 flex h-screen flex-col overflow-hidden outline-none"
             >
                 {/* ヘッダ・タブ・フィルタ（常時固定） */}
                 <div className="z-10 shrink-0 bg-white">
@@ -206,7 +208,10 @@ export default function Index({
                       暗くして「今は操作できない」ことを見た目でも示す
                     ・開閉はサーバー往復（selectedPipeline の有無）が正。閉じる操作は closeDrawer に集約する */}
                 <Sheet
-                    open={!!detail}
+                    // container が確定するまで開かない。/pipelines/{id} を直接開くと初回描画から
+                    // detail が入っており、この条件が無いと一瞬 body へ Portal されてサイドバーに被る
+                    // （その後 ref 確定で Portal 先が変わり unmount→remount する）。
+                    open={!!detail && drawerContainer !== null}
                     onOpenChange={(open) => {
                         if (!open) closeDrawer();
                     }}
@@ -216,14 +221,21 @@ export default function Index({
                         overlayClassName="z-20 bg-black/25"
                         className="absolute inset-y-0 right-0 z-30 h-full w-[480px] max-w-full gap-0 border-l border-border bg-white p-0 shadow-[-4px_0_16px_rgba(0,0,0,0.12)] sm:max-w-full"
                         showCloseButton={false}
-                        // ドロワーに説明文は持たせないため、Radix の Description 未指定警告を抑止する
+                        // ドロワーは説明文を持たないため、存在しない id を指す aria-describedby を出さない
                         aria-describedby={undefined}
-                        onCloseAutoFocus={(event) => {
-                            const opener = openerRef.current;
-                            // 起点が画面から消えている場合（削除・絞り込み変更等）は Radix の既定処理に任せる
-                            if (!opener?.isConnected) return;
+                        tabIndex={-1}
+                        onOpenAutoFocus={(event) => {
+                            // 既定では最初の tabbable（ヘッダーのステータス変更 Select）にフォーカスが乗る。
+                            // 不可逆操作に関わるコントロールから始めず、パネル自身に当てて SheetTitle から読ませる。
                             event.preventDefault();
-                            opener.focus();
+                            (event.currentTarget as HTMLElement).focus();
+                        }}
+                        onCloseAutoFocus={(event) => {
+                            // Radix は SheetTrigger 経由で開いていないと復帰先を知らず、既定のまま抜けると
+                            // フォーカスが body に落ちる。起点が残っていればそこへ、消えていれば一覧コンテナへ戻す。
+                            event.preventDefault();
+                            const opener = openerRef.current;
+                            (opener?.isConnected ? opener : drawerContainer)?.focus();
                         }}
                     >
                         {/* 開くたびに key={detail.id} で再マウントし、パイプライン切り替え時にフォームを初期化する */}
