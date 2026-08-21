@@ -4,6 +4,7 @@ import PipelineFilterPanel from '@/Components/Pipelines/PipelineFilterPanel';
 import PipelineFilterSummary from '@/Components/Pipelines/PipelineFilterSummary';
 import PipelineTabHeader from '@/Components/Pipelines/PipelineTabHeader';
 import { Button } from '@/Components/ui/button';
+import { Sheet, SheetContent } from '@/Components/ui/sheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { ActiveFilters, PipelineIndexPageProps } from '@/types/pipeline';
@@ -90,8 +91,14 @@ export default function Index({
         visit({ keyword: '', user_id: null, rank: [], status: [] });
     };
 
+    // ドロワーを開いた起点の要素。閉じたときにここへフォーカスを戻す。
+    // Sheet は SheetTrigger 経由で開いていないため、Radix は復帰先を知らない（放置するとフォーカスが body に落ち、
+    // キーボード操作ではカンバンの先頭から辿り直しになる）。開いた瞬間の activeElement を自前で覚えておく。
+    const openerRef = useRef<HTMLElement | null>(null);
+
     // カードクリック：現在のフィルタを載せて詳細のみ部分リロード
     const openCard = (id: number) => {
+        openerRef.current = document.activeElement as HTMLElement | null;
         router.get(route('pipelines.show', id), buildQuery(filters), {
             preserveState: true,
             preserveScroll: true,
@@ -111,6 +118,12 @@ export default function Index({
     const detail = selectedPipeline ?? null;
     const drawerStatusOptions = statusOptions ?? [];
 
+    // ドロワー（Sheet）の Portal 先。WF_10 どおりドロワー本体をコンテンツ領域内に収め、
+    // サイドバーの上に乗せないため、body ではなくこのページのコンテナへ描画する。
+    // ref ではなく state で保持するのは、ref 代入では再レンダリングが起きず、
+    // 初回描画時に container が null（＝ body へフォールバック）のままになるため。
+    const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
+
     return (
         <AuthenticatedLayout>
             <Head title="進捗管理" />
@@ -119,9 +132,12 @@ export default function Index({
              * ページ全体を p-6 打ち消し（-m-6）＋ 画面全高（h-screen）の relative コンテナにする。
              * - ヘッダ・タブ・フィルタは shrink-0 で常時固定（フレックスにより上部に固定）
              * - カンバンは flex-1 で残り高さを占有し内部スクロール
-             * - ドロワーはこのコンテナ直下に置き、ヘッダーを含む画面トップから全高でオーバーレイする
+             * - ドロワー（Sheet）はこのコンテナへ Portal し、ヘッダーを含む画面トップから全高でオーバーレイする
              */}
-            <div className="relative -m-6 flex h-screen flex-col overflow-hidden">
+            <div
+                ref={setDrawerContainer}
+                className="relative -m-6 flex h-screen flex-col overflow-hidden"
+            >
                 {/* ヘッダ・タブ・フィルタ（常時固定） */}
                 <div className="z-10 shrink-0 bg-white">
                     {/* ページヘッダ */}
@@ -184,15 +200,43 @@ export default function Index({
                     </div>
                 </div>
 
-                {/* ドロワー：コンテナ直下に置きヘッダーを含む画面トップから全高でオーバーレイ */}
-                {detail && (
-                    <PipelineDrawer
-                        key={detail.id}
-                        pipeline={detail}
-                        statusOptions={drawerStatusOptions}
-                        onClose={closeDrawer}
-                    />
-                )}
+                {/* ドロワー（shadcn Sheet＝Radix Dialog。ESC・フォーカストラップ・スクロールロックを標準で得る）。
+                    ・パネルは container 指定＋absolute でコンテンツ領域内に収め、サイドバーの上に乗せない（WF_10 の .drawer）
+                    ・幕は fixed のまま画面全体に敷く。modal によりサイドバーは操作できなくなるため、
+                      暗くして「今は操作できない」ことを見た目でも示す
+                    ・開閉はサーバー往復（selectedPipeline の有無）が正。閉じる操作は closeDrawer に集約する */}
+                <Sheet
+                    open={!!detail}
+                    onOpenChange={(open) => {
+                        if (!open) closeDrawer();
+                    }}
+                >
+                    <SheetContent
+                        container={drawerContainer}
+                        overlayClassName="z-20 bg-black/25"
+                        className="absolute inset-y-0 right-0 z-30 h-full w-[480px] max-w-full gap-0 border-l border-border bg-white p-0 shadow-[-4px_0_16px_rgba(0,0,0,0.12)] sm:max-w-full"
+                        showCloseButton={false}
+                        // ドロワーに説明文は持たせないため、Radix の Description 未指定警告を抑止する
+                        aria-describedby={undefined}
+                        onCloseAutoFocus={(event) => {
+                            const opener = openerRef.current;
+                            // 起点が画面から消えている場合（削除・絞り込み変更等）は Radix の既定処理に任せる
+                            if (!opener?.isConnected) return;
+                            event.preventDefault();
+                            opener.focus();
+                        }}
+                    >
+                        {/* 開くたびに key={detail.id} で再マウントし、パイプライン切り替え時にフォームを初期化する */}
+                        {detail && (
+                            <PipelineDrawer
+                                key={detail.id}
+                                pipeline={detail}
+                                statusOptions={drawerStatusOptions}
+                                onClose={closeDrawer}
+                            />
+                        )}
+                    </SheetContent>
+                </Sheet>
             </div>
         </AuthenticatedLayout>
     );

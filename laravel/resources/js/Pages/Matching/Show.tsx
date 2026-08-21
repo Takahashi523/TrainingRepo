@@ -6,13 +6,14 @@ import StatusBadge from '@/Components/Common/StatusBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import MatchCard from '@/Components/Matching/MatchCard';
 import MatchDrawer from '@/Components/Matching/MatchDrawer';
+import { Sheet, SheetContent } from '@/Components/ui/sheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { emptyText } from '@/lib/emptyValue';
 import { PageProps } from '@/types';
 import { MatchingEmptyReason, MatchingShowPageProps } from '@/types/matching';
 import { Head } from '@inertiajs/react';
 import { AlertTriangle, PackageX, SearchX } from 'lucide-react';
-import { ComponentType, useEffect, useState } from 'react';
+import { ComponentType, useEffect, useRef, useState } from 'react';
 
 type Props = PageProps<MatchingShowPageProps>;
 
@@ -107,13 +108,32 @@ export default function Show({
     // 工程経験を人材登録・一覧と同じ ProcessCheckboxGroup で表示する（readOnly）。人材は has_experience。
     const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
+    // ドロワー（Sheet）の Portal 先。WF_09 どおりドロワー本体をコンテンツ領域内に収め、
+    // サイドバーの上に乗せないため、body ではなくこのページのコンテナへ描画する。
+    // ref ではなく state で保持するのは、ref 代入では再レンダリングが起きず、
+    // 初回描画時に container が null（＝ body へフォールバック）のままになるため。
+    const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
+
+    // ドロワーを開いた起点の要素。閉じたときにここへフォーカスを戻す。
+    // Sheet は SheetTrigger 経由で開いていないため、Radix は復帰先を知らない（放置するとフォーカスが body に落ち、
+    // キーボード操作では一覧の先頭から辿り直しになる）。開いた瞬間の activeElement を自前で覚えておく。
+    const openerRef = useRef<HTMLElement | null>(null);
+
+    const openDrawer = (index: number) => {
+        openerRef.current = document.activeElement as HTMLElement | null;
+        setSelected(index);
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="マッチング結果" />
 
             {/* WF_09：ヘッダ・対象人材サマリーは上部固定、下の結果一覧のみスクロール。
                 進捗管理・人材一覧と同じく p-6 を -m-6 で打ち消し、画面全高（h-screen）の flex カラムにする。 */}
-            <div className="relative -m-6 flex h-screen flex-col overflow-hidden">
+            <div
+                ref={setDrawerContainer}
+                className="relative -m-6 flex h-screen flex-col overflow-hidden"
+            >
                 {/* ページヘッダー（WF_09：タイトル＋サブタイトルのみ。アクションボタンは持たない） */}
                 <div className="shrink-0 border-b border-border bg-white px-10 py-4">
                     <h1 className="text-lg font-bold text-foreground">マッチング結果</h1>
@@ -220,7 +240,7 @@ export default function Show({
                                         key={result.project.id}
                                         result={result}
                                         selected={selected === i}
-                                        onSelect={() => setSelected(i)}
+                                        onSelect={() => openDrawer(i)}
                                     />
                                 ))}
                             </div>
@@ -229,15 +249,34 @@ export default function Show({
                 </div>
             </div>
 
-            {/* 右ドロワー */}
-            {current && (
-                <>
-                    <div
-                        className="fixed inset-0 z-40 bg-black/30"
-                        onClick={() => setSelected(null)}
-                        aria-hidden="true"
-                    />
-                    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-border bg-white shadow-xl">
+            {/* 右ドロワー（shadcn Sheet＝Radix Dialog。ESC・フォーカストラップ・スクロールロックを標準で得る）。
+                ・パネルは container 指定＋absolute でコンテンツ領域内に収め、サイドバーの上に乗せない（WF_09 の .drawer）
+                ・幕は fixed のまま画面全体に敷く。modal によりサイドバーは操作できなくなるため、
+                  暗くして「今は操作できない」ことを見た目でも示す（明るいまま押せない状態にしない）
+                ・閉じるは onOpenChange 一本に集約する（ESC・幕クリック・ヘッダーの ✕ すべてここを通る） */}
+            <Sheet
+                open={!!current}
+                onOpenChange={(open) => {
+                    if (!open) setSelected(null);
+                }}
+            >
+                <SheetContent
+                    container={drawerContainer}
+                    overlayClassName="z-20 bg-black/25"
+                    className="absolute inset-y-0 right-0 z-30 h-full w-full max-w-md gap-0 border-l border-border bg-white p-0 shadow-xl sm:max-w-md"
+                    showCloseButton={false}
+                    // ドロワーに説明文は持たせないため、Radix の Description 未指定警告を抑止する
+                    aria-describedby={undefined}
+                    onCloseAutoFocus={(event) => {
+                        const opener = openerRef.current;
+                        // 起点が画面から消えている場合（再検索等）は Radix の既定処理に任せる
+                        if (!opener?.isConnected) return;
+                        event.preventDefault();
+                        opener.focus();
+                    }}
+                >
+                    {/* 別カードを選び直したときにフォーム状態を持ち越さないため、案件IDで再マウントする */}
+                    {current && (
                         <MatchDrawer
                             key={current.project.id}
                             result={current}
@@ -245,9 +284,9 @@ export default function Show({
                             onAdded={() => handleAdded(current.project.id)}
                             onClose={() => setSelected(null)}
                         />
-                    </div>
-                </>
-            )}
+                    )}
+                </SheetContent>
+            </Sheet>
         </AuthenticatedLayout>
     );
 }
