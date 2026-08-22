@@ -745,7 +745,7 @@
       <div>
         <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>勤務地：フリーテキスト確定。フルリモート・未選択時は行を非表示。入力値クリアはフロントではなく保存時にバックエンド（ProjectService）が行う（QA #59）</li>
+          <li>勤務地：フリーテキスト確定。フルリモート・未選択時は行を非表示。画面上（稼働形態の切替時）は値をクリアせず、送信時にフロントで一次null化・保存時にバックエンド（ProjectService）が再度null化して最終保証する二段構え（QA #59 / Issue #50レビュー対応で記述訂正）</li>
           <li>[Issue #50] 勤務地は「勤務地（最寄駅）」「勤務地（路線名）」の別行・別バッジ表示。最寄駅は常時必須（業務ルール固定）、路線名はマスタ設定（form_field_settings.work_location）に連動</li>
           <li>単価：スキル見合いチェックボックスあり。ON時に数値欄→テキスト入力へ切替（QA #14）</li>
           <li>稼働環境：フリーテキストでスキル要件セクション末尾に追加（QA #67）</li>
@@ -766,8 +766,8 @@
 
 <!--
   WF_07_案件登録_編集.html
-  バージョン: v1.2
-  更新日: 2026-08-15
+  バージョン: v1.3
+  更新日: 2026-08-22
   変更履歴:
     v1.2 (2026-08-15)
       - [Issue #50] 勤務地を「勤務地（最寄駅）」「勤務地（路線名）」の2行に分割。
@@ -776,9 +776,13 @@
         （旧: 1行に統合し路線名側のバッジのみを表示していたため、
         マスタで路線名を任意にすると最寄駅の実際の必須条件と表示が矛盾していた）
       - [Issue #50] onWorkStyleChange() を2行対応に変更。入力値クリアの記述を削除
-        （実装はフロントで値をクリアせず、保存時にバックエンドがnull化する）
+        （画面上はクリアせず、送信時にフロントが一次null化・保存時にバックエンドが最終null化する）
       - [Issue #50] 2行のヒント文を実装（ProjectForm.tsx）と一致させ、人材登録WF_04と同じ
         「用途＋自由入力＋例」の文体に統一（旧版は実装反映前の暫定文言のまま残っていた）
+    v1.3 (2026-08-22)
+      - [Issue #50 レビュー対応] 「入力値クリアはフロントでは行わない」という記述を訂正。
+        実装（Create.tsx / Edit.tsx のtransform）では送信時にフロント側でも一次null化しており、
+        バックエンド（ProjectService）はそれを最終保証として再度null化する二段構えが正しい挙動
     v1.1 (2026-04-30)
       - [QA #77] システム名を「Nexus（ネクサス）」に統一
       - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
@@ -804,8 +808,9 @@ function toggleSkillMerit(chk) {
 
 function onWorkStyleChange(sel) {
   // [Issue #50] 最寄駅・路線名の2行を同じ条件で出し分ける。
-  // 入力値のクリアはフロントでは行わない（保存時にバックエンド ProjectService が
-  // work_style=remote の場合に work_location_line / work_location_station を null 化する）。
+  // 画面上（この切替時）は値をクリアしない。実装では送信時にフロント（Create/Edit.tsx）が
+  // work_style=remote の場合に一次null化し、保存時にバックエンド ProjectService が
+  // 同条件で再度null化して最終保証する（二段構え。[Issue #50 レビュー対応]で記述訂正）。
   var rowStation = document.getElementById('location-row-station');
   var rowLine    = document.getElementById('location-row-line');
   var val        = sel.value;

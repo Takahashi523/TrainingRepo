@@ -171,7 +171,9 @@
     // [Issue #50] work_location_line / work_location_station は「勤務地（路線名）」「勤務地（最寄駅）」の
     // 別行・別バッジとしてフロントに表示する（旧: 1行に統合しwork_locationのバッジのみ表示していたため、
     // 最寄駅の実際の必須条件と表示が矛盾していた）。
-    // work_style が remote の場合は行を非表示にする（値のクリアはフロントではなく保存時にバックエンドが行う）。
+    // work_style が remote の場合は行を非表示にする（画面上はクリアせず、送信時にフロントで一次null化、
+    // 保存時にバックエンドが再度null化して最終保証する二段構え。両者とも work_style === 'remote' の
+    // 一致判定のみのため、work_style が空（未選択）のまま保存された場合は対象外）。
     "interview_count":      { "is_required": "bool" },
     "required_skills":      { "is_required": "bool" },
     "preferred_skills":     { "is_required": "bool" },
@@ -293,7 +295,7 @@
 > **単価の扱い**：`rate_is_negotiable`（スキル見合いフラグ）が `true` の場合は `rate_min` / `rate_max` を null として扱い、`rate_note` に "スキル見合い" 等のテキストを保存する（QA #14確定）。  
 > **単価の表示ルール（一覧・詳細共通）**：① rate_min/rate_max があれば範囲表示、② 無くても rate_note があればそれを表示、③ どちらも無ければ「—」と表示する。rate_min/rate_maxは片方のみの登録ができないため、③は「未入力」または「rate_is_negotiableかつrate_note未入力」の場合のみ発生する。  
 > ※ 単価を意図的に非公開にする専用フラグは採用しておらず（WF_06確定事項）、③は常に「単なる未入力」を意味するため、表示文言も「非公開」ではなく「—」に統一する。  
-> **勤務地の扱い**：`work_style` が `remote`（フルリモート）の場合は `work_location_line` / `work_location_station` を null として扱う。値のクリアはフロントでは行わず、保存時にバックエンド（`ProjectService`）が null 化する（WF_07確定・Issue #50でフロント実装と整合するよう記述を修正）。  
+> **勤務地の扱い**：`work_style` が `remote`（フルリモート）の場合は `work_location_line` / `work_location_station` を null として扱う。画面上（稼働形態の切替時）は値をクリアしない。送信時に `Create.tsx` / `Edit.tsx` のtransformがフロント側で一次的にnull化し、保存時にバックエンド（`ProjectService`）が同条件で再度null化して最終的な保証とする二段構え（WF_07確定・Issue #50レビュー対応でフロント実装と整合するよう記述を修正）。いずれも `work_style === 'remote'` の一致判定のみのため、`work_style` が空（未選択）のまま保存されたケースはこの経路の対象外となる点に注意（通常のUI操作では稼働形態を未選択に戻せないため到達しない）。  
 > **スキルの更新処理**：PUT時に `required_skills[]` / `preferred_skills[]` を送信した場合、既存レコードを全件削除後に再挿入する（人材スキルと同方針）。空配列または省略の場合は全件削除として扱う。  
 
 | フィールド名 | 型 | 必須 | 備考 |
