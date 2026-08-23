@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Http\Middleware\TrustHosts;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
 use Tests\TestCase;
 
@@ -90,6 +91,19 @@ class TrustHostsTest extends TestCase
         $this->assertFalse($this->hostIsAccepted('http://localhost/up'));
     }
 
+    /**
+     * APP_URL にスキームが無いと parse_url(..., PHP_URL_HOST) は NULL を返す。
+     * 「ホスト名に更新する」という手順書の文言を素直に読むと起こりうる誤設定のため、
+     * 素通し（フェイルオープン）ではなく拒否側に倒れることを固定する。
+     */
+    public function test_application_url_without_scheme_fails_closed(): void
+    {
+        config(['app.url' => 'app.example.com']);
+        $this->applyTrustedHosts();
+
+        $this->assertFalse($this->hostIsAccepted('https://app.example.com/login'));
+    }
+
     public function test_unrelated_host_is_rejected(): void
     {
         config(['app.url' => 'https://app.example.com']);
@@ -121,5 +135,29 @@ class TrustHostsTest extends TestCase
         $this->applyTrustedHosts();
 
         $this->assertFalse($this->hostIsAccepted('https://sub.app.example.com/login'));
+    }
+
+    /**
+     * 許可外の Host が 400 で拒否され、かつ warning が1件記録されることを固定する。
+     *
+     * ⚠️ Handler::render() は renderViaCallbacks() の前に prepareException() を通し、
+     *    SuspiciousOperationException を BadRequestHttpException へ差し替える
+     *    （Handler.php:651-653 / :710）。bootstrap/app.php のハンドラを元例外の型で
+     *    宣言すると一度も呼ばれないデッドコードになるため、ログ出力まで検証する。
+     */
+    public function test_untrusted_host_returns_400_and_writes_a_warning_log(): void
+    {
+        Request::setTrustedHosts(['^app\\.example\\.com$']);
+
+        Log::spy();
+
+        // 相対パスを渡すと prepareUrlForRequest() 内の url() が先に getHost() を呼んで
+        // 例外になるため（UrlGenerator::formatRoot 経由）、絶対 URL を渡して回避する。
+        // Host が localhost（許可外）になるため、ルーティング前に弾かれる。
+        $this->get('http://localhost/__untrusted-host-probe')->assertStatus(400);
+
+        Log::shouldHaveReceived('warning')
+            ->once()
+            ->withArgs(fn (string $message, array $context) => $context['host'] === 'localhost');
     }
 }

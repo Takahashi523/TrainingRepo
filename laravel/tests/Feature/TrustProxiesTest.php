@@ -133,7 +133,7 @@ class TrustProxiesTest extends TestCase
      */
     public function test_session_cookie_gets_secure_flag_over_https_when_not_configured(): void
     {
-        config(['session.secure' => null, 'session.driver' => 'file']);
+        config(['session.secure' => null]);
 
         Route::middleware('web')->get('/__session-probe', fn () => response('ok'));
 

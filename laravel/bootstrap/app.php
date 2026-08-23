@@ -9,8 +9,10 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -59,7 +61,8 @@ return Application::configure(basePath: dirname(__DIR__))
         //    ^...$ で囲み preg_quote でエスケープすること。
         //
         // なお TrustHosts は local 環境とテスト実行時は自動的に無効になる（shouldSpecifyTrustedHosts）。
-        // 許可外の Host は 400 Bad Request になり、例外は $dontReport 対象のためログは汚れない。
+        // 許可外の Host は 400 Bad Request になる。この例外は $dontReport 対象で既定では
+        // 何も記録されないため、切り分け用の warning を withExceptions 側で別途出している。
         $middleware->trustHosts(
             at: function () {
                 $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
@@ -98,20 +101,42 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(StaleResourceRedirector::class)->handle($e, $request);
         });
 
-        // 許可外の Host ヘッダー（trustHosts の拒否）を1行だけ記録する。
+        // 許可外の Host ヘッダー（trustHosts の拒否）を記録する。
         //
-        // この例外は Handler の internalDontReport 対象で、既定では**ログに何も残らない**。
+        // この例外は Handler の internalDontReport 対象で、既定ではログに何も残らない。
         // 一方これは APP_URL が実ホストとずれた瞬間に全リクエストが 400 になる経路でもあり、
         // 無言で落ちると原因の切り分け手段が無くなる（Silent Rejection）。
         // 応答は既定の 400 のままとし（null を返す）、運用者向けの手掛かりだけを残す。
         //
-        // Host は攻撃者が任意長を送れるため Str::limit で切り詰める。
-        $exceptions->render(function (SuspiciousOperationException $e, Request $request) {
-            Log::warning('許可されていない Host ヘッダーを拒否しました', [
-                'host' => Str::limit((string) $request->headers->get('HOST'), 100),
-                'path' => Str::limit($request->path(), 100),
-                'ip' => $request->ip(),
-            ]);
+        // ⚠️ 型は SuspiciousOperationException ではなく BadRequestHttpException にすること。
+        //    Handler::render() は renderViaCallbacks() の**前**に prepareException() を通し
+        //    （Handler.php:651-653）、RequestExceptionInterface を BadRequestHttpException に
+        //    差し替える（同 :710）。元例外で型宣言するとコールバックは一度も呼ばれない。
+        //    元の例外は getPrevious() に保持されるため、そちらで判別する。
+        $exceptions->render(function (BadRequestHttpException $e, Request $request) {
+            if (! $e->getPrevious() instanceof SuspiciousOperationException) {
+                return null;
+            }
+
+            try {
+                // 未認証・レート制限前の経路であり、不正な Host を投げ続けるだけで
+                // ログを無制限に肥大させられる。1分あたりの件数を上限で抑える。
+                RateLimiter::attempt('untrusted-host-log', 10, function () use ($request) {
+                    Log::warning('許可されていない Host ヘッダーを拒否しました', [
+                        // Host は攻撃者が任意長を送れるため切り詰める
+                        'host' => Str::limit((string) $request->headers->get('HOST'), 100),
+                        'path' => Str::limit($request->path(), 100),
+                        // ⚠️ $request->ip() は使わない。例外は TrustProxies の内部から送出され、
+                        //    その時点で信頼プロキシが空にリセットされているため、常に直前の
+                        //    接続元（＝前段 Nginx の固定 IP）しか返らず調査の役に立たない。
+                        'remote_addr' => $request->server->get('REMOTE_ADDR'),
+                        'x_forwarded_for' => Str::limit((string) $request->headers->get('X-Forwarded-For'), 100),
+                    ]);
+                }, 60);
+            } catch (Throwable) {
+                // ログ出力の失敗で 400 応答を 500 に化けさせない。
+                // ここでの握りつぶしは意図的（応答の正しさを優先する）。
+            }
 
             return null;
         });
