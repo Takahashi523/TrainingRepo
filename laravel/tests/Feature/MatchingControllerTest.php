@@ -313,6 +313,49 @@ class MatchingControllerTest extends TestCase
             ->where('emptyReason', 'no_match'));
     }
 
+    public function test_422_with_other_error_code_is_treated_as_upstream_not_no_match(): void
+    {
+        // LP-ERR-01：422 のうち「候補0件」を意味するのは NO_ACTIVE_PROJECT だけ（#12 §4.2）。
+        // それ以外の error_code を持つ 422（エンジン側の想定外・将来追加されたコード等）を
+        // 「候補なし」に丸めると、上流の異常がユーザーにも運用にも見えないまま
+        // 「マッチする案件がありません」と表示される（Silent Rejection）。
+        // ステータスだけでなく error_code まで一致した場合のみ no_match に落ちることを固定する。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        Http::fake(['*/api/v1/matching/calculate' => Http::response(['error_code' => 'INVALID_PARAMETER'], 422)]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        $response->assertSessionHas('error');
+        $response->assertInertia(fn ($page) => $page->component('Matching/Show')
+            ->has('results', 0)
+            ->where('emptyReason', 'engine_error')
+            ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
+    }
+
+    public function test_422_with_nested_error_code_is_treated_as_upstream_not_no_match(): void
+    {
+        // LP-ERR-01：error_code は「トップレベル」で返る契約（#12 §4.2 / Python 側 ErrorResponse）。
+        // FastAPI の HTTPException(detail=[...]) 経由だと {"detail": {"error_code": ...}} と入れ子で
+        // 返るが、その形は契約違反なので no_match には落とさず上流障害として扱う。
+        // 入れ子も救済する実装にすると、エンジン側の契約違反が Laravel 側で吸収されて
+        // 恒久的に発見できなくなるため、ここで「救済しないこと」を明示的に固定する。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        Http::fake(['*/api/v1/matching/calculate' => Http::response([
+            'detail' => ['error_code' => 'NO_ACTIVE_PROJECT', 'message' => '候補が0件です'],
+        ], 422)]);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        $response->assertSessionHas('error');
+        $response->assertInertia(fn ($page) => $page->has('results', 0)
+            ->where('emptyReason', 'engine_error')
+            ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
+    }
+
     public function test_engine_returns_empty_matches_shows_no_match(): void
     {
         // #2：エンジンは 200 で成功したが matches が空配列（候補0件と同じ扱い）。
