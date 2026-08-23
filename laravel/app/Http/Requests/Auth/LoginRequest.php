@@ -75,6 +75,21 @@ class LoginRequest extends FormRequest
     }
 
     /**
+     * 送信元 IP ごとの試行上限（1分あたり）。Breeze 既定。
+     */
+    private const MAX_ATTEMPTS_PER_IP = 5;
+
+    /**
+     * アカウント単位の試行上限（1時間あたり）。送信元 IP を分散されても効く第2段。
+     */
+    private const MAX_ATTEMPTS_PER_EMAIL = 30;
+
+    /**
+     * アカウント単位のカウンタの保持時間（秒）。
+     */
+    private const EMAIL_DECAY_SECONDS = 3600;
+
+    /**
      * Attempt to authenticate the request's credentials.
      *
      * @throws ValidationException
@@ -85,6 +100,7 @@ class LoginRequest extends FormRequest
 
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->emailThrottleKey(), self::EMAIL_DECAY_SECONDS);
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
@@ -92,29 +108,51 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+        RateLimiter::clear($this->emailThrottleKey());
     }
 
     /**
      * Ensure the login request is not rate limited.
      *
+     * 2段構えにしている理由：
+     *
+     * リバースプロキシ配下で X-Forwarded-For を信頼するようになった結果（bootstrap/app.php）、
+     * throttleKey() の IP は「前段 Nginx の固定 IP」から「実クライアント IP」に変わった。
+     * これは「攻撃者が他人のアカウントを意図的にロックアウトできる」問題を解消した一方で、
+     * 送信元を分散されると `5 × 送信元数` 回/分まで試行できることを意味し、
+     * 総当たりに対しては**弱くなる**。IP 単独の上限では塞げないため、
+     * アカウント単位の上限を第2段として重ねる。
+     *
+     * ⚠️ トレードオフ：アカウント単位の上限は、原理上「攻撃者が特定ユーザーを
+     *    ロックアウトできる」経路を作り直すことになる。社内ツールで正規ユーザーが
+     *    1時間に30回も失敗しないことを踏まえ、しきい値を高めに置いて
+     *    「通常利用では踏まないが、総当たりは止まる」水準に寄せている。
+     *
      * @throws ValidationException
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
-            return;
+        $limits = [
+            [$this->throttleKey(), self::MAX_ATTEMPTS_PER_IP],
+            [$this->emailThrottleKey(), self::MAX_ATTEMPTS_PER_EMAIL],
+        ];
+
+        foreach ($limits as [$key, $maxAttempts]) {
+            if (! RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+                continue;
+            }
+
+            event(new Lockout($this));
+
+            $seconds = RateLimiter::availableIn($key);
+
+            throw ValidationException::withMessages([
+                'email' => trans('auth.throttle', [
+                    'seconds' => $seconds,
+                    'minutes' => ceil($seconds / 60),
+                ]),
+            ]);
         }
-
-        event(new Lockout($this));
-
-        $seconds = RateLimiter::availableIn($this->throttleKey());
-
-        throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
-        ]);
     }
 
     /**
@@ -123,5 +161,16 @@ class LoginRequest extends FormRequest
     public function throttleKey(): string
     {
         return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+    }
+
+    /**
+     * 送信元 IP を含まない、アカウント単位のレート制限キー。
+     *
+     * throttleKey() と衝突しないよう接頭辞を付ける（IP 部分が無いだけの文字列だと、
+     * 「メールアドレスに `|` を含む入力」で別キーと重なりうる）。
+     */
+    public function emailThrottleKey(): string
+    {
+        return 'login-email|'.Str::transliterate(Str::lower($this->string('email')));
     }
 }

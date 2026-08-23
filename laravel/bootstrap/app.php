@@ -63,9 +63,34 @@ return Application::configure(basePath: dirname(__DIR__))
         // なお TrustHosts は local 環境とテスト実行時は自動的に無効になる（shouldSpecifyTrustedHosts）。
         // 許可外の Host は 400 Bad Request になる。この例外は $dontReport 対象で既定では
         // 何も記録されないため、切り分け用の warning を withExceptions 側で別途出している。
+        // 許可するのは「APP_URL のホスト」＋「TRUSTED_HOSTS（カンマ区切り・任意）」。
+        //
+        // APP_URL 単独導出だと、許可ホストを一時的に増やす操作がすべてコード変更＋再デプロイになる。
+        // 実際にそれが必要になるのは次の2ケースで、いずれも .env だけで完結させたい：
+        //   - ホスト名の移行中に新旧2ホストを同時に通したいとき（無停止で切り替えるため）
+        //   - ロードバランサ / 監視が APP_URL 以外の名前（IP 直打ち等）で /up を叩くとき
+        // TRUSTED_HOSTS は「追加」であって置き換えではないため、
+        // 未設定時の挙動（APP_URL のホストのみ許可）は従来どおり。
         $middleware->trustHosts(
             at: function () {
-                $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+                $hosts = array_merge(
+                    [parse_url((string) config('app.url'), PHP_URL_HOST)],
+                    explode(',', (string) config('app.trusted_hosts')),
+                );
+
+                $patterns = [];
+
+                foreach ($hosts as $host) {
+                    $host = trim((string) $host);
+
+                    if ($host === '') {
+                        continue;
+                    }
+
+                    // ⚠️ 渡す値は正規表現パターンで、Symfony は preg_match で**部分一致**を取る。
+                    //    アンカーとエスケープはここで必ず付ける（TrustHostsTest で固定）。
+                    $patterns[] = '^'.preg_quote($host).'$';
+                }
 
                 // ⚠️ 許可リストが空だと Symfony は「パターンが無い＝検証しない」と判断し、
                 //    全ホストを素通しする（フェイルオープン）。APP_URL が空・不正のときは
@@ -73,8 +98,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 //
                 // ⚠️ ホスト名を変更したら .env の APP_URL も必ず更新すること。
                 //    更新を忘れると全リクエストが 400 になる
-                //    （docs/環境構築手順書.md のリリース前チェック参照）。
-                return [$appHost ? '^'.preg_quote($appHost).'$' : '^(?!)$'];
+                //    （docs/環境構築手順書.md「リリース前チェックリスト」参照）。
+                return $patterns ?: ['^(?!)$'];
             },
             subdomains: false,
         );
@@ -101,7 +126,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(StaleResourceRedirector::class)->handle($e, $request);
         });
 
-        // 許可外の Host ヘッダー（trustHosts の拒否）を記録する。
+        // 許可外の Host ヘッダー（trustHosts の拒否）など、Symfony が不正と判定したリクエストを記録する。
         //
         // この例外は Handler の internalDontReport 対象で、既定ではログに何も残らない。
         // 一方これは APP_URL が実ホストとずれた瞬間に全リクエストが 400 になる経路でもあり、
@@ -114,15 +139,30 @@ return Application::configure(basePath: dirname(__DIR__))
         //    差し替える（同 :710）。元例外で型宣言するとコールバックは一度も呼ばれない。
         //    元の例外は getPrevious() に保持されるため、そちらで判別する。
         $exceptions->render(function (BadRequestHttpException $e, Request $request) {
-            if (! $e->getPrevious() instanceof SuspiciousOperationException) {
+            // ⚠️ prepareException() は RequestExceptionInterface 以外も BadRequestHttpException にするため、
+            //    元例外を必ず確認する。このガードを外すと、アプリが投げたあらゆる 400 が
+            //    「Host 拒否」として記録され、ログの意味が壊れる（TrustHostsTest で固定）。
+            $previous = $e->getPrevious();
+
+            if (! $previous instanceof SuspiciousOperationException) {
                 return null;
             }
 
             try {
                 // 未認証・レート制限前の経路であり、不正な Host を投げ続けるだけで
                 // ログを無制限に肥大させられる。1分あたりの件数を上限で抑える。
-                RateLimiter::attempt('untrusted-host-log', 10, function () use ($request) {
-                    Log::warning('許可されていない Host ヘッダーを拒否しました', [
+                //
+                // ⚠️ キーは固定文字列＝全ホストで予算を共有する。公開 IP への無差別スキャンは
+                //    常時発生するため、上限を絞りすぎると「運用者が本当に見たい1件が
+                //    ノイズに押し出されて記録されない」＝障害調査のときに限ってログが空、
+                //    という壊れ方をする。1リクエストにつき1件しか出ない経路なので、
+                //    ログ量よりも取りこぼさないことを優先して余裕を持たせる。
+                RateLimiter::attempt('untrusted-host-log', 60, function () use ($request, $previous) {
+                    Log::warning('不正なリクエストを拒否しました（Host ヘッダー等）', [
+                        // SuspiciousOperationException は Invalid Host / Untrusted Host /
+                        // Invalid HTTP method override の3経路で送出される。どれなのかは
+                        // 元例外のメッセージにしか出ないため、切り分け用に残す。
+                        'reason' => Str::limit($previous->getMessage(), 200),
                         // Host は攻撃者が任意長を送れるため切り詰める
                         'host' => Str::limit((string) $request->headers->get('HOST'), 100),
                         'path' => Str::limit($request->path(), 100),
