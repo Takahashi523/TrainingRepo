@@ -73,6 +73,21 @@ class TrustProxiesTest extends TestCase
         $this->assertSame('203.0.113.10', $response->json('ip'));
     }
 
+    /**
+     * 本番の Nginx は $proxy_add_x_forwarded_for を使っており、
+     * クライアントが偽装値を送ると「偽装値, 実IP」の連鎖になって届く。
+     * 単一値のテストではこの形状を再現できないため、連鎖でも実 IP が採られることを固定する。
+     */
+    public function test_client_ip_ignores_spoofed_value_in_forwarded_for_chain(): void
+    {
+        $response = $this->get('/__trust-proxies-probe', [
+            'X-Forwarded-For' => '1.2.3.4, 203.0.113.99',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('203.0.113.99', $response->json('ip'), '偽装値が採用されている');
+    }
+
     public function test_x_forwarded_prefix_is_not_trusted(): void
     {
         $baseline = $this->baselineAssetUrl();
@@ -101,5 +116,32 @@ class TrustProxiesTest extends TestCase
 
         $this->assertStringNotContainsString(':1234', $asset);
         $this->assertSame($baseline, $asset);
+    }
+
+    /**
+     * セッションクッキーの Secure 属性は config/session.php の 'secure' が null のとき、
+     * Symfony Response::prepare() が isSecure() を見て自動付与する
+     * （Cookie::isSecure() は `secure ?? secureDefault`）。
+     *
+     * つまり .env で SESSION_SECURE_COOKIE=false を明示すると、この自動判定が打ち消され、
+     * HTTPS でも Secure が付かなくなる。.env.example がその値を配ってしまう事故を防ぐため、
+     * 「未設定なら HTTPS で Secure が付く」という前提そのものを固定する。
+     */
+    public function test_session_cookie_gets_secure_flag_over_https_when_not_configured(): void
+    {
+        config(['session.secure' => null, 'session.driver' => 'file']);
+
+        Route::middleware('web')->get('/__session-probe', fn () => response('ok'));
+
+        $response = $this->get('/__session-probe', ['X-Forwarded-Proto' => 'https']);
+
+        $response->assertOk();
+
+        // Symfony の Cookie はプロパティが private のため、getName() で突き合わせる
+        $cookie = collect($response->headers->getCookies())
+            ->first(fn ($cookie) => $cookie->getName() === config('session.cookie'));
+
+        $this->assertNotNull($cookie, 'セッションクッキーが発行されていない');
+        $this->assertTrue($cookie->isSecure(), 'HTTPS 経由なのに Secure 属性が付いていない');
     }
 }

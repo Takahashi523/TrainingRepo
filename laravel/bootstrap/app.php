@@ -43,6 +43,34 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PROTO,
         );
 
+        // Host ヘッダーによる絶対 URL の乗っ取りを防ぐ。
+        //
+        // trustProxies は X-Forwarded-* しか扱わないため、Host ヘッダー自体はクライアント制御下に残る。
+        // Nginx の proxy_set_header Host $host; の $host も「クライアントが送った Host」由来であり、
+        // 443 の server ブロックが1つ＝既定サーバのため、どんな Host を送っても素通りする。
+        // 実際 Host: evil.example.com を送ると asset() が https://evil.example.com/... を生成していた。
+        //
+        // ⚠️ 渡す値は「正規表現パターン」であり、Symfony が preg_match で**部分一致**を取る
+        //    （Request::setTrustedHosts が {%s}i で包むだけでアンカーを足さない）。
+        //    'localhost' とそのまま書くと evil-localhost.attacker.com にも一致してしまうため、
+        //    ^...$ で囲み preg_quote でエスケープすること。
+        //
+        // なお TrustHosts は local 環境とテスト実行時は自動的に無効になる（shouldSpecifyTrustedHosts）。
+        // 許可外の Host は 400 Bad Request になり、例外は $dontReport 対象のためログは汚れない。
+        $middleware->trustHosts(
+            at: fn () => array_filter([
+                // APP_URL のホスト。⚠️ ホスト名を変更したら .env の APP_URL も必ず更新すること。
+                // 更新を忘れると全リクエストが 400 になる（docs/環境構築手順書.md のリリース前チェック参照）。
+                ($appHost = parse_url((string) config('app.url'), PHP_URL_HOST))
+                    ? '^'.preg_quote($appHost).'$'
+                    : null,
+                // コンテナ内からのヘルスチェック用。localhost を名乗られても生成される URL は
+                // localhost 宛＝攻撃者の支配下ではないため、許可しても攻撃には使えない。
+                '^localhost$',
+            ]),
+            subdomains: false,
+        );
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
