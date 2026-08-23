@@ -89,6 +89,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
                     // ⚠️ 渡す値は正規表現パターンで、Symfony は preg_match で**部分一致**を取る。
                     //    アンカーとエスケープはここで必ず付ける（TrustHostsTest で固定）。
+                    //
+                    // ⚠️ preg_quote の代償として、受け付けるのは「ホスト名そのもの」だけになる。
+                    //    `*.example.com` / `example.com:8443` / `https://example.com` は
+                    //    エスケープされて決して一致せず、「許可したのに 400 が返り続ける」形で
+                    //    無言で失敗する（安全側ではあるが気づきにくい）。
+                    //    書式は .env.example と docs/インフラ構成図.md に明記し、
+                    //    一致しないことを TrustHostsTest で固定している。
                     $patterns[] = '^'.preg_quote($host).'$';
                 }
 
@@ -98,7 +105,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 //
                 // ⚠️ ホスト名を変更したら .env の APP_URL も必ず更新すること。
                 //    更新を忘れると全リクエストが 400 になる
-                //    （docs/環境構築手順書.md「リリース前チェックリスト」参照）。
+                //    （docs/インフラ構成図.md「リリース前チェックリスト（本番）」参照）。
                 return $patterns ?: ['^(?!)$'];
             },
             subdomains: false,
@@ -176,6 +183,13 @@ return Application::configure(basePath: dirname(__DIR__))
             } catch (Throwable) {
                 // ログ出力の失敗で 400 応答を 500 に化けさせない。
                 // ここでの握りつぶしは意図的（応答の正しさを優先する）。
+                //
+                // ⚠️ RateLimiter は既定ストア（本番・開発とも CACHE_STORE=database）を使うため、
+                //    この経路は DB の生存に依存する。DB 障害中＝運用者が最もログを見たい瞬間に
+                //    拒否ログだけが無言で消える、という弱点が残っている。
+                //    カウンタだけ DB 以外のストアへ逃がせば解消するが、ストアを分けると
+                //    テスト間でカウンタが持ち越されて検証が不安定になるため現状は据え置く。
+                //    「500 に化けないこと」は TrustHostsTest で固定している。
             }
 
             return null;

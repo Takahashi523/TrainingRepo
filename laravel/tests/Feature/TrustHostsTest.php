@@ -110,6 +110,34 @@ class TrustHostsTest extends TestCase
     }
 
     /**
+     * TRUSTED_HOSTS に「ホスト名以外の書き方」を入れても一致しないことを固定する。
+     *
+     * preg_quote で全てエスケープされるため安全側（余計に通らない）に倒れるが、
+     * その代わり誤設定がエラーにならず「許可したつもりで 400 が返り続ける」形になる。
+     * 挙動を固定しておかないと、将来 preg_quote を外すリファクタで
+     * 「ワイルドカードを効かせたつもり」の穴が静かに開く。
+     * 対応する注意書きは .env.example と docs/インフラ構成図.md に置いている。
+     */
+    public function test_wildcard_port_and_scheme_forms_are_not_accepted_in_trusted_hosts(): void
+    {
+        config([
+            'app.url' => 'https://app.example.com',
+            'app.trusted_hosts' => '*.example.com,new.example.com:8443,https://other.example.com',
+        ]);
+        $this->applyTrustedHosts();
+
+        // ワイルドカードは展開されない
+        $this->assertFalse($this->hostIsAccepted('https://any.example.com/login'));
+        // ポート付きで書いた分は、照合対象（getHost()）にポートが含まれないため一致しない
+        $this->assertFalse($this->hostIsAccepted('https://new.example.com:8443/login'));
+        $this->assertFalse($this->hostIsAccepted('https://new.example.com/login'));
+        // スキーム付きで書いた分も一致しない
+        $this->assertFalse($this->hostIsAccepted('https://other.example.com/login'));
+        // APP_URL のホストは従来どおり通る（誤設定が既存の許可を壊していないこと）
+        $this->assertTrue($this->hostIsAccepted('https://app.example.com/login'));
+    }
+
+    /**
      * 許可するのは APP_URL のホストのみ。localhost も例外ではない。
      * （コンテナ内ヘルスチェック等で localhost を通す必要が出た場合は、
      *   実際に届く Host を確認したうえで明示的に追加すること）
@@ -267,5 +295,29 @@ class TrustHostsTest extends TestCase
         $this->get('/__bad-request-probe')->assertStatus(400);
 
         Log::shouldNotHaveReceived('warning');
+    }
+
+    /**
+     * ログ出力に失敗しても、400 応答が 500 に化けないこと。
+     *
+     * bootstrap/app.php の catch (Throwable) はこのためのガードだが、
+     * try ごと消しても catch だけ消しても既存ケースは両方通ってしまい、
+     * 「何のための握りつぶしか」が固定されていなかった。
+     *
+     * 机上の心配ではない：ログ抑制のカウンタ（RateLimiter）は既定ストア＝
+     * database（.env.example の CACHE_STORE）を使うため、この経路は DB が
+     * 生きていることに依存する。DB 障害中＝運用者が最もログを見たい瞬間に
+     * 例外が飛ぶが、そこで 500 を返すと「Host 拒否」という本来の応答まで失われる。
+     */
+    public function test_log_failure_does_not_turn_the_400_into_a_500(): void
+    {
+        Request::setTrustedHosts(['^app\\.example\\.com$']);
+
+        // 同上（詳細レンダラのメモリ消費を避ける）
+        config(['app.debug' => false]);
+
+        Log::spy()->shouldReceive('warning')->andThrow(new RuntimeException('log backend down'));
+
+        $this->get('http://localhost/__untrusted-host-probe')->assertStatus(400);
     }
 }
