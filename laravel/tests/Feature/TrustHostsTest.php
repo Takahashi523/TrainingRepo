@@ -43,13 +43,51 @@ class TrustHostsTest extends TestCase
         }
     }
 
-    public function test_application_host_and_localhost_are_accepted(): void
+    public function test_application_host_is_accepted(): void
     {
         config(['app.url' => 'https://app.example.com']);
         $this->applyTrustedHosts();
 
         $this->assertTrue($this->hostIsAccepted('https://app.example.com/login'));
-        $this->assertTrue($this->hostIsAccepted('http://localhost/up'));
+    }
+
+    /**
+     * 許可するのは APP_URL のホストのみ。localhost も例外ではない。
+     * （コンテナ内ヘルスチェック等で localhost を通す必要が出た場合は、
+     *   実際に届く Host を確認したうえで明示的に追加すること）
+     */
+    public function test_localhost_is_not_accepted(): void
+    {
+        config(['app.url' => 'https://app.example.com']);
+        $this->applyTrustedHosts();
+
+        $this->assertFalse($this->hostIsAccepted('http://localhost/up'));
+    }
+
+    /**
+     * Host にポートが付いていても、ポートは getHost() で除去されてから照合される。
+     * 許可パターンにポートを含めていないことが正しいと保証する。
+     */
+    public function test_host_with_port_is_accepted(): void
+    {
+        config(['app.url' => 'https://app.example.com']);
+        $this->applyTrustedHosts();
+
+        $this->assertTrue($this->hostIsAccepted('https://app.example.com:8443/login'));
+    }
+
+    /**
+     * APP_URL が空だと許可パターンが 0 件になり、Symfony は
+     * 「パターンが無い＝検証しない」と判断して全ホストを素通しする（フェイルオープン）。
+     * 決して一致しないパターンを返して閉じる側に倒していることを固定する。
+     */
+    public function test_empty_application_url_fails_closed_instead_of_allowing_everything(): void
+    {
+        config(['app.url' => '']);
+        $this->applyTrustedHosts();
+
+        $this->assertFalse($this->hostIsAccepted('https://evil.example.com/login'));
+        $this->assertFalse($this->hostIsAccepted('http://localhost/up'));
     }
 
     public function test_unrelated_host_is_rejected(): void
@@ -72,7 +110,6 @@ class TrustHostsTest extends TestCase
 
         $this->assertFalse($this->hostIsAccepted('https://app.example.com.attacker.test/login'));
         $this->assertFalse($this->hostIsAccepted('https://prefix-app.example.com/login'));
-        $this->assertFalse($this->hostIsAccepted('https://evil-localhost.attacker.test/login'));
     }
 
     /**

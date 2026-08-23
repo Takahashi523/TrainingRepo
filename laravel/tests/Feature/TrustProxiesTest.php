@@ -124,8 +124,12 @@ class TrustProxiesTest extends TestCase
      * （Cookie::isSecure() は `secure ?? secureDefault`）。
      *
      * つまり .env で SESSION_SECURE_COOKIE=false を明示すると、この自動判定が打ち消され、
-     * HTTPS でも Secure が付かなくなる。.env.example がその値を配ってしまう事故を防ぐため、
-     * 「未設定なら HTTPS で Secure が付く」という前提そのものを固定する。
+     * HTTPS でも Secure が付かなくなる。
+     *
+     * 本テストが固定するのは「session.secure が未設定なら HTTPS で Secure が付く」という
+     * フレームワーク側の前提と、その判定に必要な X-Forwarded-Proto の信頼までである。
+     * config を明示的に null へ上書きしているため、.env.example / config の既定値が
+     * false に変わった場合はこのテストでは検出できない（設定値そのものの監視は範囲外）。
      */
     public function test_session_cookie_gets_secure_flag_over_https_when_not_configured(): void
     {

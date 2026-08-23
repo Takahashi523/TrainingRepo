@@ -8,6 +8,9 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -58,16 +61,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // なお TrustHosts は local 環境とテスト実行時は自動的に無効になる（shouldSpecifyTrustedHosts）。
         // 許可外の Host は 400 Bad Request になり、例外は $dontReport 対象のためログは汚れない。
         $middleware->trustHosts(
-            at: fn () => array_filter([
-                // APP_URL のホスト。⚠️ ホスト名を変更したら .env の APP_URL も必ず更新すること。
-                // 更新を忘れると全リクエストが 400 になる（docs/環境構築手順書.md のリリース前チェック参照）。
-                ($appHost = parse_url((string) config('app.url'), PHP_URL_HOST))
-                    ? '^'.preg_quote($appHost).'$'
-                    : null,
-                // コンテナ内からのヘルスチェック用。localhost を名乗られても生成される URL は
-                // localhost 宛＝攻撃者の支配下ではないため、許可しても攻撃には使えない。
-                '^localhost$',
-            ]),
+            at: function () {
+                $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+                // ⚠️ 許可リストが空だと Symfony は「パターンが無い＝検証しない」と判断し、
+                //    全ホストを素通しする（フェイルオープン）。APP_URL が空・不正のときは
+                //    決して一致しないパターンを返し、閉じる側へ倒す。
+                //
+                // ⚠️ ホスト名を変更したら .env の APP_URL も必ず更新すること。
+                //    更新を忘れると全リクエストが 400 になる
+                //    （docs/環境構築手順書.md のリリース前チェック参照）。
+                return [$appHost ? '^'.preg_quote($appHost).'$' : '^(?!)$'];
+            },
             subdomains: false,
         );
 
@@ -91,5 +96,23 @@ return Application::configure(basePath: dirname(__DIR__))
         // このフォールバックが共通エラーページ（issue #70）の差し込み口になる。
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
             return app(StaleResourceRedirector::class)->handle($e, $request);
+        });
+
+        // 許可外の Host ヘッダー（trustHosts の拒否）を1行だけ記録する。
+        //
+        // この例外は Handler の internalDontReport 対象で、既定では**ログに何も残らない**。
+        // 一方これは APP_URL が実ホストとずれた瞬間に全リクエストが 400 になる経路でもあり、
+        // 無言で落ちると原因の切り分け手段が無くなる（Silent Rejection）。
+        // 応答は既定の 400 のままとし（null を返す）、運用者向けの手掛かりだけを残す。
+        //
+        // Host は攻撃者が任意長を送れるため Str::limit で切り詰める。
+        $exceptions->render(function (SuspiciousOperationException $e, Request $request) {
+            Log::warning('許可されていない Host ヘッダーを拒否しました', [
+                'host' => Str::limit((string) $request->headers->get('HOST'), 100),
+                'path' => Str::limit($request->path(), 100),
+                'ip' => $request->ip(),
+            ]);
+
+            return null;
         });
     })->create();
