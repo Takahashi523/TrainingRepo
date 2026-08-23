@@ -41,3 +41,15 @@ export interface SortOption {
     order: string;
     label: string;
 }
+
+/**
+ * 工程（人材＝経験工程 / 案件＝対象工程）の識別子と表示名。
+ * 人材・案件・マッチングで共通のため、各ドメインのtypes/*.tsや
+ * Components/Common/ProcessCheckboxGroup.tsxはここを参照し、個別に同じ形を再定義しないこと。
+ * 真偽フラグ（has_experience / is_target）はドメイン固有のため、
+ * 各ドメイン側で交差型（Phase & { has_experience: boolean } 等）として付与する。
+ */
+export interface Phase {
+    key: string;
+    name: string;
+}

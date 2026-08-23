@@ -1,5 +1,7 @@
-import ProcessCheckboxGroup from '@/Components/Engineers/ProcessCheckboxGroup';
-import SkillInput from '@/Components/Engineers/SkillInput';
+import DateInput from '@/Components/Common/DateInput';
+import NumberInput from '@/Components/Common/NumberInput';
+import ProcessCheckboxGroup from '@/Components/Common/ProcessCheckboxGroup';
+import SkillInput from '@/Components/Common/SkillInput';
 import WorkStyleCheckboxGroup from '@/Components/Engineers/WorkStyleCheckboxGroup';
 import { Input } from '@/Components/ui/input';
 import {
@@ -118,6 +120,14 @@ export default function EngineerForm({
         return age;
     }, [data.birth_date]);
 
+    // birth_date の上限（未来日不可）。カレンダーの選択可否とサーバ before_or_equal:today に対応。
+    const todayYmd = useMemo(() => {
+        const d = new Date();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${d.getFullYear()}-${m}-${day}`;
+    }, []);
+
     const procValues: Record<string, boolean> = {
         proc_requirements: data.proc_requirements,
         proc_basic_design: data.proc_basic_design,
@@ -157,10 +167,10 @@ export default function EngineerForm({
                 error={errors.birth_date}
             >
                 <div className="flex items-center gap-3">
-                    <Input
-                        type="date"
+                    <DateInput
                         value={data.birth_date}
-                        onChange={(e) => setData('birth_date', e.target.value)}
+                        onChange={(v) => setData('birth_date', v)}
+                        max={todayYmd}
                         className="w-40"
                     />
                     {calculatedAge !== null && (
@@ -207,10 +217,9 @@ export default function EngineerForm({
                 error={errors.available_from}
             >
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="date"
+                    <DateInput
                         value={data.available_from}
-                        onChange={(e) => setData('available_from', e.target.value)}
+                        onChange={(v) => setData('available_from', v)}
                         className="w-40"
                     />
                     <span className="text-sm text-muted-foreground">〜（以降）</span>
@@ -311,13 +320,11 @@ export default function EngineerForm({
                 error={errors.desired_rate}
             >
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="number"
+                    <NumberInput
                         value={data.desired_rate}
-                        onChange={(e) => setData('desired_rate', e.target.value)}
+                        onChange={(v) => setData('desired_rate', v)}
                         placeholder="60"
                         className="w-24"
-                        min={0}
                     />
                     <span className="text-sm text-muted-foreground">万円</span>
                 </div>

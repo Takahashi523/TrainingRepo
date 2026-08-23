@@ -1,5 +1,7 @@
-import ProcessCheckboxGroup from "@/Components/Engineers/ProcessCheckboxGroup";
-import SkillInput from "@/Components/Engineers/SkillInput";
+import DateInput from "@/Components/Common/DateInput";
+import NumberInput from "@/Components/Common/NumberInput";
+import ProcessCheckboxGroup from "@/Components/Common/ProcessCheckboxGroup";
+import SkillInput from "@/Components/Common/SkillInput";
 import { Checkbox } from "@/Components/ui/checkbox";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
@@ -149,10 +151,9 @@ export default function ProjectForm({
                 error={errors.headcount}
             >
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="number"
+                    <NumberInput
                         value={data.headcount}
-                        onChange={(e) => setData("headcount", e.target.value)}
+                        onChange={(v) => setData("headcount", v)}
                         placeholder="2"
                         className={`w-20 ${errors.headcount ? "border-destructive" : ""}`}
                     />
@@ -166,10 +167,9 @@ export default function ProjectForm({
                 error={errors.start_date}
                 hint="稼働開始時期のマッチングスコアリングに使用します"
             >
-                <Input
-                    type="date"
+                <DateInput
                     value={data.start_date}
-                    onChange={(e) => setData("start_date", e.target.value)}
+                    onChange={(v) => setData("start_date", v)}
                     className={`w-40 ${errors.start_date ? "border-destructive" : ""}`}
                 />
             </FormRow>
@@ -200,24 +200,18 @@ export default function ProjectForm({
 
                 {!data.rate_is_negotiable && (
                     <div className="flex items-center gap-2">
-                        <Input
-                            type="number"
+                        <NumberInput
                             value={data.rate_min}
-                            onChange={(e) =>
-                                setData("rate_min", e.target.value)
-                            }
+                            onChange={(v) => setData("rate_min", v)}
                             placeholder="60"
                             className={`w-28 ${errors.rate_min ? "border-destructive" : ""}`}
                         />
                         <span className="text-sm text-muted-foreground">
                             万円　〜
                         </span>
-                        <Input
-                            type="number"
+                        <NumberInput
                             value={data.rate_max}
-                            onChange={(e) =>
-                                setData("rate_max", e.target.value)
-                            }
+                            onChange={(v) => setData("rate_max", v)}
                             placeholder="80"
                             className={`w-28 ${errors.rate_max ? "border-destructive" : ""}`}
                         />
@@ -339,12 +333,9 @@ export default function ProjectForm({
                 error={errors.interview_count}
             >
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="number"
+                    <NumberInput
                         value={data.interview_count}
-                        onChange={(e) =>
-                            setData("interview_count", e.target.value)
-                        }
+                        onChange={(v) => setData("interview_count", v)}
                         placeholder="1"
                         className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
                     />
