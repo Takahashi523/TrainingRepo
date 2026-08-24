@@ -401,7 +401,8 @@
       <div class="section-card">
         <div class="section-card-header">勤務条件</div>
         <div class="detail-row">
-          <div class="detail-label">勤務地（最寄駅）</div>
+          <!-- [Issue #50] 値は最寄駅・路線名を結合表示のまま、ラベルを実際の中身に合わせて修正 -->
+          <div class="detail-label">勤務地（最寄駅 / 路線名）</div>
           <div class="detail-value">大手町駅（東京メトロ丸ノ内線）</div>
         </div>
         <div class="detail-row">
@@ -548,6 +549,7 @@
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>スキル表示：年数入りタグ → ラベルタグ（角丸・グレー背景）＋詳細テキストの縦並び構成に変更（登録画面と統一）</li>
           <li>必須スキル：実線タグ / 尚可スキル：点線タグで視覚区分を維持</li>
+          <li>[Issue #50 レビュー対応] 勤務条件の行ラベルを「勤務地（最寄駅）」→「勤務地（最寄駅 / 路線名）」に修正。値は従来どおり最寄駅と路線名を結合表示するため、登録フォームで確定させた語の意味とラベルを一致させた</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
@@ -585,9 +587,13 @@
 
 <!--
   WF_08_案件詳細.html
-  バージョン: v1.1
-  更新日: 2026-04-30
+  バージョン: v2.1
+  更新日: 2026-08-22
   変更履歴:
+    v2.1 (2026-08-22)
+      - [Issue #50 レビュー対応] 勤務条件の行ラベルを「勤務地（最寄駅）」→「勤務地（最寄駅 / 路線名）」に修正。
+        値（最寄駅＋路線名の結合表示）は変更なし。案件登録フォーム（WF_07）で「最寄駅」「路線名」の
+        語の意味を確定させたのに合わせ、両方を表示するこの行のラベルも実際の中身に一致させた
     v1.1 (2026-04-30)
       - [QA #77] システム名を「Nexus（ネクサス）」に統一
       - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示

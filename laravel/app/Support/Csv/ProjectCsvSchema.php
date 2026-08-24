@@ -27,7 +27,7 @@ class ProjectCsvSchema extends CsvSchema
             ['header' => '単価備考', 'field' => 'rate_note', 'type' => 'string'],
             ['header' => '商流', 'field' => 'commercial_flow', 'type' => 'enum'],
             ['header' => '稼働形態', 'field' => 'work_style', 'type' => 'enum'],
-            ['header' => '勤務地（路線）', 'field' => 'work_location_line', 'type' => 'string'],
+            ['header' => '勤務地（路線名）', 'field' => 'work_location_line', 'type' => 'string'],
             ['header' => '勤務地（最寄駅）', 'field' => 'work_location_station', 'type' => 'string'],
             ['header' => '面談回数', 'field' => 'interview_count', 'type' => 'integer'],
             ['header' => '顧客折衝経験要否', 'field' => 'negotiation_required', 'type' => 'flag'],
