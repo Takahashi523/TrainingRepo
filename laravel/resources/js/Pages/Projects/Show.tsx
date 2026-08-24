@@ -1,4 +1,8 @@
 import { Button } from "@/Components/ui/button";
+import ConfirmDialog from "@/Components/Common/ConfirmDialog";
+import ProcessCheckboxGroup, {
+    buildProcessPhaseProps,
+} from "@/Components/Common/ProcessCheckboxGroup";
 import SkillTagDetail from "@/Components/Common/SkillTagDetail";
 import StatusBadge from "@/Components/Common/StatusBadge";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
@@ -10,7 +14,7 @@ import {
 } from "@/types/project";
 import { PageProps } from "@/types";
 import { Head, router, usePage } from "@inertiajs/react";
-import { Check, Clock, Pencil, Trash2, Users } from "lucide-react";
+import { Clock, Pencil, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 
 type Props = PageProps<ProjectShowPageProps>;
@@ -57,6 +61,12 @@ export default function Show({ project }: Props) {
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // 対象工程は共通 ProcessCheckboxGroup で表示する（案件のフラグ名は is_target）。
+    const { phaseList, phaseValues } = buildProcessPhaseProps(
+        project.phases,
+        "is_target",
+    );
 
     const handleDelete = () => {
         router.delete(`/projects/${project.id}`, {
@@ -213,7 +223,9 @@ export default function Show({ project }: Props) {
 
                 {/* 勤務条件 */}
                 <SectionCard title="勤務条件">
-                    <DetailRow label="勤務地（最寄駅）">
+                    {/* [Issue #50 レビュー対応] 登録フォームでは「最寄駅」「路線名」の語の意味を確定させたため、
+                        値を結合表示するこの行もラベルを実際の中身に合わせる（旧: 「勤務地（最寄駅）」のまま路線名も表示していた） */}
+                    <DetailRow label="勤務地（最寄駅 / 路線名）">
                         {workLocationLabel}
                     </DetailRow>
                     <DetailRow label="稼働形態">
@@ -278,35 +290,14 @@ export default function Show({ project }: Props) {
                         )}
                     </DetailRow>
                     <DetailRow label="対象工程">
-                        <div className="flex flex-wrap gap-3">
-                            {project.phases.map((phase) => (
-                                <span
-                                    key={phase.key}
-                                    className="flex items-center gap-1 text-sm"
-                                >
-                                    <span
-                                        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border text-[9px] font-bold ${
-                                            phase.is_target
-                                                ? "border-primary bg-primary text-primary-foreground"
-                                                : "border-border bg-muted/50 text-transparent"
-                                        }`}
-                                    >
-                                        {phase.is_target && (
-                                            <Check className="h-2.5 w-2.5" />
-                                        )}
-                                    </span>
-                                    <span
-                                        className={
-                                            phase.is_target
-                                                ? "text-foreground"
-                                                : "text-muted-foreground"
-                                        }
-                                    >
-                                        {phase.name}
-                                    </span>
-                                </span>
-                            ))}
-                        </div>
+                        {/* 人材詳細（Pages/Engineers/Show.tsx）と同一の指定にそろえ、
+                            同じ「工程」が画面ごとに違う見え方になるのを防ぐ。 */}
+                        <ProcessCheckboxGroup
+                            phases={phaseList}
+                            values={phaseValues}
+                            readOnly
+                            className="flex-nowrap gap-x-4"
+                        />
                     </DetailRow>
                     <DetailRow label="顧客折衝経験">
                         {project.negotiation_required === true
@@ -357,35 +348,23 @@ export default function Show({ project }: Props) {
                 </SectionCard>
             </div>
 
-            {/* Delete confirmation dialog */}
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="w-full max-w-sm rounded-lg border border-border bg-white p-6 shadow-xl">
-                        <h2 className="mb-2 text-base font-bold text-foreground">
-                            案件情報を削除しますか？
-                        </h2>
-                        <p className="mb-5 break-words text-sm text-muted-foreground">
-                            <strong>{project.name}</strong>{" "}
-                            の情報を物理削除します。この操作は取り消せません。
-                        </p>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setShowDeleteConfirm(false)}
-                            >
-                                キャンセル
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                onClick={handleDelete}
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? "削除中..." : "削除する"}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* 削除確認は共通 ConfirmDialog（AlertDialog ベース）で行う。
+                手組みモーダルでは得られない role="alertdialog"・フォーカストラップ・
+                Esc での閉じる・フォーカス復帰・背景の不活性化を標準機能に委ねる。 */}
+            <ConfirmDialog
+                open={showDeleteConfirm}
+                title="案件情報を削除しますか？"
+                description={
+                    <>
+                        <strong>{project.name}</strong>{" "}
+                        の情報を物理削除します。この操作は取り消せません。
+                    </>
+                }
+                processing={isDeleting}
+                processingLabel="削除中..."
+                onConfirm={handleDelete}
+                onCancel={() => setShowDeleteConfirm(false)}
+            />
         </AuthenticatedLayout>
     );
 }

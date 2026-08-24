@@ -27,10 +27,13 @@ AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
 
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> & {
+    /** オーバーレイ（背景幕）へ渡す追加クラス。既定の bg-black/80 を上書きしたい場合に指定する */
+    overlayClassName?: string
+  }
+>(({ className, overlayClassName, ...props }, ref) => (
   <AlertDialogPortal>
-    <AlertDialogOverlay />
+    <AlertDialogOverlay className={overlayClassName} />
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(

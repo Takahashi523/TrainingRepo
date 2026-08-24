@@ -1,10 +1,9 @@
-import { PaginationMeta, SortOption } from "@/types";
+import { PaginationMeta, Phase, SortOption } from "@/types";
 import { SavedSearchItem } from "@/types/savedSearch";
 
-export interface Phase {
-    key: string;
-    name: string;
-}
+// 工程の形は人材・案件・マッチングで共通のため @/types に集約している（重複定義を避ける）。
+// 既存の `@/types/project` 経由の import を壊さないよう、ここから再エクスポートして後方互換を保つ。
+export type { Phase };
 
 export interface WorkStyleOption {
     value: string;

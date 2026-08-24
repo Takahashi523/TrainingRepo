@@ -1,7 +1,8 @@
 import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
+import ConfirmDialog from '@/Components/Common/ConfirmDialog';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
-import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Engineers/ProcessCheckboxGroup';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -338,34 +339,27 @@ export default function Show({ engineer }: Props) {
 
             </div>
 
-            {/* Delete confirmation dialog */}
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="w-full max-w-sm rounded-lg border border-border bg-white p-6 shadow-xl">
-                        <h2 className="mb-2 text-base font-bold text-foreground">人材情報を削除しますか？</h2>
-                        <p className="mb-5 text-sm text-muted-foreground">
-                            <strong>{engineer.name}</strong> の情報を物理削除します。この操作は取り消せません。
-                            {engineer.pipelines_count > 0 && (
-                                <span className="mt-2 block text-destructive">
-                                    この人材に紐づくパイプライン {engineer.pipelines_count} 件も同時に削除されます。
-                                </span>
-                            )}
-                        </p>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
-                                キャンセル
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                onClick={handleDelete}
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? '削除中...' : '削除する'}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* 削除確認は共通 ConfirmDialog（AlertDialog ベース）で行う。
+                手組みモーダルでは得られない role="alertdialog"・フォーカストラップ・
+                Esc での閉じる・フォーカス復帰・背景の不活性化を標準機能に委ねる。 */}
+            <ConfirmDialog
+                open={showDeleteConfirm}
+                title="人材情報を削除しますか？"
+                description={
+                    <>
+                        <strong>{engineer.name}</strong> の情報を物理削除します。この操作は取り消せません。
+                        {engineer.pipelines_count > 0 && (
+                            <span className="mt-2 block text-destructive">
+                                この人材に紐づくパイプライン {engineer.pipelines_count} 件も同時に削除されます。
+                            </span>
+                        )}
+                    </>
+                }
+                processing={isDeleting}
+                processingLabel="削除中..."
+                onConfirm={handleDelete}
+                onCancel={() => setShowDeleteConfirm(false)}
+            />
         </AuthenticatedLayout>
     );
 }

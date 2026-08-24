@@ -1,5 +1,5 @@
 import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
-import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Engineers/ProcessCheckboxGroup';
+import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import RankBadge, { RANK_BAR_STYLES, RANK_BAR_FALLBACK_STYLE } from '@/Components/Common/RankBadge';
 import SkillTag from '@/Components/Common/SkillTag';
 import TruncatedText from '@/Components/Common/TruncatedText';
