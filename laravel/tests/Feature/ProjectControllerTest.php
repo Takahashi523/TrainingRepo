@@ -681,6 +681,24 @@ class ProjectControllerTest extends TestCase
         $response->assertSessionDoesntHaveErrors('work_location_line');
     }
 
+    public function test_work_location_line_is_not_required_when_work_location_setting_is_false_and_work_style_is_onsite(): void
+    {
+        // [Issue #50 レビュー対応] バッジ＝実際の必須条件であることを保証する回帰テスト。
+        // work_location(マスタ)がfalseかつwork_styleがonsite/hybridの場合にwork_location_lineが
+        // 本当にnullableであることを確認する（station側はrequired_ifを満たすため別途入力する）。
+        $this->seedFormFieldSettings(['work_location' => false]);
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'work_style'             => 'onsite',
+            'work_location_line'     => null,
+            'work_location_station'  => '大手町',
+        ]);
+
+        $response = $this->actingAs($user)->post('/projects', $payload);
+
+        $response->assertSessionDoesntHaveErrors('work_location_line');
+    }
+
     public function test_required_skills_is_required_when_form_field_setting_is_true(): void
     {
         $this->seedFormFieldSettings(['required_skills' => true]);
@@ -2769,6 +2787,23 @@ class ProjectControllerTest extends TestCase
         $payload = array_merge($this->validPayload($user->id), [
             'work_style' => 'remote',
             'work_location_line' => null,
+        ]);
+
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertSessionDoesntHaveErrors('work_location_line');
+    }
+
+    public function test_work_location_line_is_not_required_when_work_location_setting_is_false_and_work_style_is_onsite_on_update(): void
+    {
+        // [Issue #50 レビュー対応] バッジ＝実際の必須条件であることを保証する回帰テスト（update版）。
+        $this->seedFormFieldSettings(['work_location' => false]);
+        $user    = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+        $payload = array_merge($this->validPayload($user->id), [
+            'work_style'             => 'onsite',
+            'work_location_line'     => null,
+            'work_location_station'  => '大手町',
         ]);
 
         $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);

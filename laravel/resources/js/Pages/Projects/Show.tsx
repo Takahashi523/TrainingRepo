@@ -223,7 +223,9 @@ export default function Show({ project }: Props) {
 
                 {/* 勤務条件 */}
                 <SectionCard title="勤務条件">
-                    <DetailRow label="勤務地（最寄駅）">
+                    {/* [Issue #50 レビュー対応] 登録フォームでは「最寄駅」「路線名」の語の意味を確定させたため、
+                        値を結合表示するこの行もラベルを実際の中身に合わせる（旧: 「勤務地（最寄駅）」のまま路線名も表示していた） */}
+                    <DetailRow label="勤務地（最寄駅 / 路線名）">
                         {workLocationLabel}
                     </DetailRow>
                     <DetailRow label="稼働形態">
