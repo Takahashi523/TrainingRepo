@@ -70,7 +70,7 @@ Props           → JSONツリー形式（jsonc）
 | `302 Found` | GET リクエスト後の Inertia リダイレクト |
 | `303 See Other` | POST・PUT・DELETE 後の Inertia リダイレクト。Inertiaは非GET（PUT/PATCH/DELETE）への302リダイレクトを追えない（ブラウザがメソッドを保持したまま追ってしまう）ため、非安全メソッドへの応答は302ではなく303を返す（issue #44 / #63） |
 | `401 Unauthorized` | 未ログイン状態でのアクセス。JSONを期待する非Inertiaリクエスト（APIコール等）の場合 |
-| `403 Forbidden` | ロール権限不足（例：一般営業が DELETE を呼んだ場合） |
+| `403 Forbidden` | ロール・所有権チェックで弾かれた場合（例：一般営業がマスタ管理にアクセスした場合、他ユーザーの保存済み検索条件を削除しようとした場合）。人材・案件・パイプラインの削除は権限不足時に403を素で返さず、前画面へ戻し `flash.error` を返す（issue #65） |
 | `404 Not Found` | 存在しない ID を指定 |
 | `409 Conflict` | 未ログイン状態でのInertiaリクエスト。ログイン画面への強制的なフルページ遷移を指示する `X-Inertia-Location` ヘッダーを付与する（`UnauthenticatedInertiaRedirector`、issue #63） |
 | `419 Page Expired` | CSRFトークン不一致（主にセッション切れ後の再送信）。Inertiaリクエストの場合は元の画面へ303リダイレクトし、「セッションの有効期限が切れました。もう一度お試しください。」のフラッシュメッセージを表示する（`TokenMismatchInertiaRedirector`、issue #63） |

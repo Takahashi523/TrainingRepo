@@ -226,7 +226,9 @@ class PipelineController extends Controller
         try {
             $this->authorize('delete', $pipeline);
         } catch (AuthorizationException) {
-            return back()->with('error', '削除権限がありません。');
+            // referer が無い場合（直接リクエストされた場合等）でも flash が失われないよう、
+            // ダッシュボードへのfallbackを明示する（#78 TokenMismatchInertiaRedirectorと同方針）。
+            return back(fallback: route('dashboard'))->with('error', '削除権限がありません。');
         }
 
         $this->pipelineService->delete($pipeline);

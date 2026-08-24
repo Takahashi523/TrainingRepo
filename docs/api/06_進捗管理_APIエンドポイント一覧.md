@@ -367,7 +367,7 @@
 
 | 条件 | 動作 |
 |---|---|
-| 成功時 | 302 リダイレクト。SharedPropsの `flash.success` を返す |
+| 成功時 | 303 リダイレクト（非GETへのInertia応答は302ではなく303、00_共通仕様参照）。SharedPropsの `flash.success` を返す |
 | 権限不足時 | 前画面へリダイレクトし SharedProps の `flash.error` を返す |
 | 対象データなし | 404 を返す |
 

@@ -1762,10 +1762,31 @@ class ProjectControllerTest extends TestCase
         $user = User::factory()->create(['role' => 'general']);
         $project = $this->createProject(['main_user_id' => $user->id]);
 
+        // 削除は案件詳細画面から実行されるため、referer は詳細URL自身になる。
+        $response = $this->actingAs($user)->delete(
+            "/projects/{$project->id}",
+            [],
+            ['X-Inertia' => 'true', 'referer' => "/projects/{$project->id}"]
+        );
+
+        // 設計書 04_案件管理 DELETE #7：権限不足は 403 を素で投げず、前画面（＝同じ詳細画面）へ
+        // 戻し flash.error を返す。redirect先を固定しないと一覧へ飛ばす誤実装でも通ってしまうため、
+        // referer を明示してリダイレクト先まで検証する（StaleResourceHandlingTestと同粒度）。
+        $response->assertStatus(303);
+        $response->assertRedirect("/projects/{$project->id}");
+        $response->assertSessionHas('error', '削除権限がありません。');
+        $this->assertDatabaseHas('projects', ['id' => $project->id]);
+    }
+
+    public function test_general_user_delete_project_without_referer_falls_back_to_dashboard(): void
+    {
+        // referer が無い場合（直接リクエスト等）でも flash.error を失わずダッシュボードへ戻る。
+        $user = User::factory()->create(['role' => 'general']);
+        $project = $this->createProject(['main_user_id' => $user->id]);
+
         $response = $this->actingAs($user)->delete("/projects/{$project->id}");
 
-        // 設計書 04_案件管理 DELETE #7：権限不足は 403 を素で投げず、前画面へ戻し flash.error を返す。
-        $response->assertRedirect();
+        $response->assertRedirect('/dashboard');
         $response->assertSessionHas('error', '削除権限がありません。');
         $this->assertDatabaseHas('projects', ['id' => $project->id]);
     }
