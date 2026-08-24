@@ -72,10 +72,11 @@ Props           → JSONツリー形式（jsonc）
 | `401 Unauthorized` | 未ログイン状態でのアクセス。JSONを期待する非Inertiaリクエスト（APIコール等）の場合 |
 | `403 Forbidden` | ロール権限不足（例：一般営業が DELETE を呼んだ場合） |
 | `404 Not Found` | 存在しない ID を指定 |
-| `409 Conflict` | 未ログイン状態でのInertiaリクエスト。ログイン画面への強制的なフルページ遷移を指示する `X-Inertia-Location` ヘッダーを付与する（`UnauthenticatedInertiaRedirector`、issue #63） |
-| `419 Page Expired` | CSRFトークン不一致（主にセッション切れ後の再送信）。Inertiaリクエストの場合は元の画面へ303リダイレクトし、「セッションの有効期限が切れました。もう一度お試しください。」のフラッシュメッセージを表示する（`TokenMismatchInertiaRedirector`、issue #63） |
+| `409 Conflict` | ①未ログイン状態でのInertiaリクエスト。ログイン画面への強制的なフルページ遷移を指示する `X-Inertia-Location` ヘッダーを付与する（`UnauthenticatedInertiaRedirector`、issue #63）。②Inertiaのアセットバージョン不一致時（`HandleInertiaRequests::version()`由来、フロント資材更新後の強制リロード）にも同じ形（409 + `X-Inertia-Location`）で返る。「未ログイン時のみ」ではない点に注意 |
+| `419 Page Expired` | CSRFトークン不一致。ただしLaravel 13の`PreventRequestForgery`は`Sec-Fetch-Site: same-origin`をトークン検証より先に通すため、**同一オリジンのブラウザ操作では通常発生しない**（画面操作でのセッション期限切れは`auth`ミドルウェアの302→ログイン経由）。到達するのは主にクロスサイト送信・`Sec-Fetch-Site`を送らないクライアント向け。issue #70（PR #77）の`ErrorPageResponder`が一本化して対応：ログイン済みなら元画面へ`back()` + `flash.error`、未ログインならログイン画面へ`status`を渡して復帰導線を出す |
 | `422 Unprocessable Entity` | バリデーションエラー。詳細形式はバリデーション・エラー表示設計書を参照 |
 
-> **【2026-08-17 追加】未ログイン・セッション切れ時のInertia向けエラーハンドリングを追加（issue #63）**
-> **背景：** auth ミドルウェア（`AuthenticationException`）・CSRF検証（`TokenMismatchException`）はいずれも `HandleInertiaRequests`（Inertia\Middleware）の後処理より前で例外を投げるため、Inertiaが標準で行う「非GETへの302→303書き換え」を経由しない。302のまま返すと、DELETE/PUT/PATCHのようなリクエストがメソッドを保持したままログイン画面等を再度叩いてしまい、`405 MethodNotAllowedHttpException` になる不具合があった。
-> **対応：** `bootstrap/app.php` に例外ごとの `render()` ハンドラを追加し、Inertiaリクエストかどうかで応答を出し分ける（非Inertiaは従来どおりLaravel標準の挙動）。未ログイン（401/302だったもの）は409 + `X-Inertia-Location` でフルページ遷移、CSRFトークン切れ（419）は303 + `back()` で元画面へ戻す。実装は `app/Exceptions/UnauthenticatedInertiaRedirector.php` / `app/Exceptions/TokenMismatchInertiaRedirector.php`。既存の `StaleResourceRedirector`（issue #44）と同じ「例外種別ごとに1クラスへ委譲する」構成に揃えている。
+> **【2026-08-17 追加 / 2026-08-24 更新】未ログイン時のInertia向けエラーハンドリングを追加（issue #63）**
+> **背景：** authミドルウェアが投げる`AuthenticationException`は`HandleInertiaRequests`（Inertia\Middleware）の後処理より前で発生するため、Inertiaが標準で行う「非GETへの302→303書き換え」を経由しない。302のまま返すと、DELETE/PUT/PATCHのようなリクエストがメソッドを保持したままログイン画面等を再度叩いてしまい、`405 MethodNotAllowedHttpException` になる不具合があった。
+> **対応：** `bootstrap/app.php` の `withExceptions` に `AuthenticationException` 用の `render()` ハンドラを追加し、Inertiaリクエストかどうかで応答を出し分ける（非Inertiaは従来どおりLaravel標準の挙動）。未ログイン（401/302だったもの）は409 + `X-Inertia-Location` でフルページ遷移させる。実装は `app/Exceptions/UnauthenticatedInertiaRedirector.php`。既存の `StaleResourceRedirector`（issue #44）と同じ「例外種別ごとに1クラスへ委譲する」構成に揃えている。ログイン後に元の画面へ戻せるよう、`url.intended` のセッション保存もあわせて行っている（Laravel標準の`redirect()->guest()`相当）。
+> **なお、CSRFトークン不一致（419）への対応は当初issue #63の②として本対応に含めていたが、issue #70（PR #77・共通エラーページ）と対応範囲が重複するため、419のハンドリングはPR #77に一本化した。

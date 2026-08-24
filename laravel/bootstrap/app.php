@@ -1,7 +1,6 @@
 <?php
 
 use App\Exceptions\StaleResourceRedirector;
-use App\Exceptions\TokenMismatchInertiaRedirector;
 use App\Exceptions\UnauthenticatedInertiaRedirector;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -11,7 +10,6 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
-use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -50,10 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(UnauthenticatedInertiaRedirector::class)->handle($e, $request);
         });
 
-        // CSRFトークン不一致（419、主にセッション切れ後の再送信で発生）で生の例外画面が
-        // 出る問題への対応（issue #63・②）。詳細は TokenMismatchInertiaRedirector の
-        // クラスコメントを参照。
-        $exceptions->render(function (TokenMismatchException $e, Request $request) {
-            return app(TokenMismatchInertiaRedirector::class)->handle($e, $request);
-        });
+        // CSRFトークン不一致（419）は issue #70（共通エラーページ、PR #77）の
+        // ErrorPageResponder::respond() に一本化して対応する。ここでは扱わない
+        // （経緯は issue #63 のコメント参照）。
     })->create();

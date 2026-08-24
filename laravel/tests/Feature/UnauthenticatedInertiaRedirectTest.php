@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -50,11 +51,15 @@ class UnauthenticatedInertiaRedirectTest extends TestCase
     public function test_inertia_put_while_unauthenticated_returns_409_with_inertia_location_header(): void
     {
         $project = Project::factory()->create();
+        $originalName = $project->name;
 
-        $response = $this->put("/projects/{$project->id}", [], $this->inertiaHeaders());
+        $response = $this->put("/projects/{$project->id}", ['name' => 'unauthenticated update attempt'], $this->inertiaHeaders());
 
         $response->assertStatus(409);
         $response->assertHeader('X-Inertia-Location', route('login'));
+
+        // 更新も実行されていないこと（DELETE側のassertDatabaseHasと対称に確認する）。
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'name' => $originalName]);
     }
 
     public function test_inertia_get_while_unauthenticated_also_returns_409_with_inertia_location_header(): void
@@ -65,6 +70,28 @@ class UnauthenticatedInertiaRedirectTest extends TestCase
 
         $response->assertStatus(409);
         $response->assertHeader('X-Inertia-Location', route('login'));
+    }
+
+    public function test_inertia_get_while_unauthenticated_redirects_to_originally_intended_url_after_login(): void
+    {
+        // Inertia::location()はredirect()->guest()を経由しないため、intended URLの保存を
+        // 自前で行っている（UnauthenticatedInertiaRedirector::rememberIntendedUrl）。
+        // ここが抜けると、再ログイン後に必ずダッシュボードへ飛んでしまう（回帰確認）。
+        $user = User::factory()->create();
+
+        $response = $this->get('/engineers', $this->inertiaHeaders());
+
+        $response->assertStatus(409);
+        $response->assertHeader('X-Inertia-Location', route('login'));
+        $this->assertSame(route('engineers.index'), session('url.intended'));
+
+        $loginResponse = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        // ダッシュボードではなく、セッション切れ前に開いていた元の画面へ戻ること。
+        $loginResponse->assertRedirect(route('engineers.index'));
     }
 
     public function test_non_inertia_delete_while_unauthenticated_still_returns_plain_302_redirect(): void
