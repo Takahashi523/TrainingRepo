@@ -51,6 +51,14 @@ final class ErrorPageResponder
     private const REASON_MISSING_RESOURCE = 'missing_resource';
 
     /**
+     * 案内ページの描画に失敗したことを、同一リクエスト内で共有するための属性キー。
+     *
+     * [B] が描画に失敗して例外を投げ直すと、その例外は [A] に流れて **同じ描画をもう一度**試すことになる。
+     * 一度失敗した描画は同じリクエスト内で成功しないため、再試行しても失敗ログが二重に出るだけになる。
+     */
+    private const RENDER_FAILED = 'error_page.render_failed';
+
+    /**
      * [A] 例外ハンドラの最終段。差し替え対象でなければ元の応答をそのまま返す。
      */
     public function respond(Response $response, Request $request): Response
@@ -84,11 +92,21 @@ final class ErrorPageResponder
         // ここに来る 404 は「URL は正しいがレコードが無い」（ルートモデルバインディング失敗・
         // MatchingController の意図的な abort(404)）。未定義 URL は [B] が先に処理する。
         //
+        // [B] で描画に失敗した直後の再入。同じ描画は同じリクエスト内で成功しないため、
+        // 再試行せずフレームワーク既定の応答に委ねる（失敗ログの二重出力も避ける）。
+        if ($request->attributes->get(self::RENDER_FAILED) === true) {
+            return $response;
+        }
+
         // 案内ページの描画自体が失敗した場合（Vite マニフェスト欠落など）は元の応答へ退避する。
         // 「エラーページが出せない」ことを二次障害（空の 500）に育てないためのフェイルセーフ。
         try {
             return $this->page($request, $status, $status === 404 ? self::REASON_MISSING_RESOURCE : null);
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            // 握りつぶすと「エラーページが出せない」という不具合そのものが無言で隠れる
+            // （利用者には既定のエラー画面が出るだけで、こちらには何も残らない）。必ず報告する。
+            report($e);
+
             return $response;
         }
     }
@@ -103,7 +121,22 @@ final class ErrorPageResponder
             throw new NotFoundHttpException;
         }
 
-        return $this->page($request, 404, self::REASON_MISSING_PAGE);
+        // [A] と同じフェイルセーフ。こちらは「元の応答」が存在しない（例外ではなく通常のルート実行の
+        // ため、退避先の応答を自分で決める必要がある）ので、フレームワーク既定の 404 に落とす。
+        //
+        // ここを保護しないと、描画失敗の例外がそのまま外に出て例外ハンドラが 500 として扱い、
+        // **404 のはずのアクセスが素の 500 になる**。未定義 URL は本クラスが受ける経路の中で最も
+        // 頻度が高く（打ち間違い・古いブックマーク・クローラ）、見た目の劣化で済むはずの障害を
+        // 意味の違う応答（＝監視上も本物のサーバー障害）へ格上げしてしまう。
+        try {
+            return $this->page($request, 404, self::REASON_MISSING_PAGE);
+        } catch (Throwable $e) {
+            report($e);
+
+            $request->attributes->set(self::RENDER_FAILED, true);
+
+            throw new NotFoundHttpException;
+        }
     }
 
     /**
@@ -137,6 +170,12 @@ final class ErrorPageResponder
     {
         // セッションが開始されていない経路（メンテナンス 503 など、web グループより前で
         // 発生する例外）では認証状態を解決できないため、共有を試みない。
+        //
+        // 【既知の制限】405（未定義 URL への POST など）もこの経路に入る。メソッド不一致は
+        // ルート確定より前に検出される（RouteCollection::getRouteForMethods）ため web グループが
+        // 一度も走らず、ログイン中でも未認証向けの表示（サイドバー無し・「ログイン画面へ」）になる。
+        // 405 のためだけに、セッションを自前で開始する経路を増やす価値は無いと判断した
+        // （表示の不整合にとどまり、到達頻度も低い。詳細は バリデーション・エラー表示設計書）。
         if (! $request->hasSession() || Inertia::getShared('auth') !== null) {
             return;
         }

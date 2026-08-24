@@ -6,8 +6,11 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia as Assert;
+use InvalidArgumentException;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -41,6 +44,18 @@ class ErrorPageTest extends TestCase
             'X-Inertia' => 'true',
             'X-Inertia-Version' => (string) (new HandleInertiaRequests)->version(request()),
         ];
+    }
+
+    /**
+     * ルートビューが存在しない HandleInertiaRequests をミドルウェアとして使わせる。
+     * 案内ページの描画自体が失敗する状況（Vite マニフェスト欠落など）の代替再現。
+     */
+    private function useBrokenRootView(): void
+    {
+        $this->app->bind(HandleInertiaRequests::class, fn () => new class extends HandleInertiaRequests
+        {
+            protected $rootView = 'no-such-root-view';
+        });
     }
 
     // -------------------------------------------------------
@@ -119,7 +134,55 @@ class ErrorPageTest extends TestCase
             fn (Assert $page) => $page
                 ->component('Error')
                 ->where('status', 405)
+                // 【既知の制限を固定する】メソッド不一致はルート確定より前に検出されるため
+                // web グループ（StartSession / HandleInertiaRequests）が一度も走らず、
+                // 共有 Props が **null ですらなく存在しない**（＝ログイン済みでも未認証向けの表示）。
+                // 405 のためにセッション開始経路を増やす判断はしていないので、
+                // 「直っていないこと」ではなく「現状こうであること」をここで固定しておく
+                // （将来対応する場合、このアサーションが落ちて意図的な変更だと分かる）。
+                ->missing('auth')
         );
+    }
+
+    // -------------------------------------------------------
+    // 案内ページ自体が描画できないとき（フェイルセーフ）
+    // -------------------------------------------------------
+
+    public function test_render_failure_on_undefined_url_falls_back_to_plain_404(): void
+    {
+        // 案内ページの描画そのものが失敗する状況（Vite マニフェスト欠落・ビュー欠落など）を、
+        // ルートビューが存在しない HandleInertiaRequests を差し込んで再現する。
+        // Inertia::setRootView() を直接呼んでも、fallback ルートは web グループを通るため
+        // ミドルウェアが既定値に戻してしまい、失敗を再現できない。
+        $this->useBrokenRootView();
+        Exceptions::fake();
+
+        $response = $this->get('/no-such-page');
+
+        // 描画に失敗しても、404 のアクセスは 404 のまま返す。ここで例外が外へ出ると
+        // 例外ハンドラが 500 として扱い、単なる URL 誤りが素の 500（監視上はサーバー障害）に
+        // 格上げされる。見た目は既定の 404 に劣化するが、意味は保つ。
+        $response->assertNotFound();
+        $this->assertStringNotContainsString('data-page', $response->getContent());
+
+        // 失敗を無言で握りつぶさない（案内ページが出せないこと自体が検知したい不具合）。
+        Exceptions::assertReported(InvalidArgumentException::class);
+    }
+
+    public function test_render_failure_on_missing_record_falls_back_to_original_response(): void
+    {
+        // 例外ハンドラ経由（[A]）でも同様に、元の応答へ退避する。
+        // こちらは SubstituteBindings の 404 が HandleInertiaRequests より先に起きるため、
+        // テストで設定したルートビューがそのまま描画時まで残る。
+        $user = User::factory()->create();
+        Inertia::setRootView('no-such-root-view');
+        Exceptions::fake();
+
+        $response = $this->actingAs($user)->get('/projects/99999');
+
+        $response->assertNotFound();
+        $this->assertStringNotContainsString('data-page', $response->getContent());
+        Exceptions::assertReported(InvalidArgumentException::class);
     }
 
     public function test_error_page_exposes_no_technical_information(): void
