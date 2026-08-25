@@ -94,6 +94,38 @@ class UnauthenticatedInertiaRedirectTest extends TestCase
         $loginResponse->assertRedirect(route('engineers.index'));
     }
 
+    public function test_inertia_delete_while_unauthenticated_with_external_referer_does_not_remember_it(): void
+    {
+        // Refererは送信側が自由に書き換えられるため、外部ドメインをそのままurl.intendedへ
+        // 保存すると、ログイン後にredirect()->intended()が外部URLへ遷移させてしまう
+        // （オープンリダイレクト、issue #63 再レビュー指摘）。
+        // UnauthenticatedInertiaRedirector::rememberIntendedUrl が自ホスト以外のRefererを
+        // 弾いていることを確認する。
+        $user = User::factory()->create();
+        $project = Project::factory()->create();
+
+        $headers = array_merge($this->inertiaHeaders(), [
+            'Referer' => 'https://evil.example.com/phishing',
+        ]);
+
+        $response = $this->delete("/projects/{$project->id}", [], $headers);
+
+        $response->assertStatus(409);
+        $response->assertHeader('X-Inertia-Location', route('login'));
+
+        // 外部ドメインのRefererはurl.intendedに保存されないこと。
+        $this->assertNull(session('url.intended'));
+
+        $loginResponse = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        // url.intendedが保存されていないため、ログイン後は既定のダッシュボードへ戻ること
+        // （攻撃者が指定した外部URLへは飛ばない）。
+        $loginResponse->assertRedirect(route('dashboard', absolute: false));
+    }
+
     public function test_non_inertia_delete_while_unauthenticated_still_returns_plain_302_redirect(): void
     {
         // X-Inertiaヘッダーなし（通常のブラウザ直叩き・非Inertiaクライアント）は

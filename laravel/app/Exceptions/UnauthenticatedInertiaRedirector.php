@@ -76,7 +76,14 @@ final class UnauthenticatedInertiaRedirector
             ? $request->fullUrl()
             : url()->previous();
 
-        if ($intended) {
+        // 非GET時の $intended は Referer ヘッダー由来（url()->previous()）であり、送信側が
+        // 自由に書き換えられる。外部ドメインをそのまま保存すると、ログイン後に
+        // redirect()->intended() が外部URLへ遷移させてしまう（オープンリダイレクト）。
+        // ErrorPageResponder::previousUrlWithinApp() と同じ考え方で、自ホスト以外は保存しない
+        // （issue #63 再レビュー指摘）。
+        $host = parse_url((string) $intended, PHP_URL_HOST);
+
+        if ($intended && ($host === null || $host === $request->getHost())) {
             $request->session()->put('url.intended', $intended);
         }
     }

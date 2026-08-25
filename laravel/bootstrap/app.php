@@ -147,6 +147,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // CSRFトークン不一致（419）は issue #70（共通エラーページ、PR #77）の
         // ErrorPageResponder::respond() に一本化して対応する。ここでは扱わない
         // （経緯は issue #63 のコメント参照）。
+
         // 許可外の Host ヘッダー（trustHosts の拒否）など、Symfony が不正と判定したリクエストを記録する。
         //
         // この例外は Handler の internalDontReport 対象で、既定ではログに何も残らない。
