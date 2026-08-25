@@ -2,8 +2,10 @@
 
 use App\Exceptions\ErrorPageResponder;
 use App\Exceptions\StaleResourceRedirector;
+use App\Exceptions\UnauthenticatedInertiaRedirector;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -134,6 +136,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
             return app(StaleResourceRedirector::class)->handle($e, $request);
         });
+
+        // セッション切れ状態でのInertia非GETリクエスト（DELETE/PUT/PATCH）が、ログイン画面への
+        // 302リダイレクトを経由して405になる問題への対応（issue #63・①）。詳細は
+        // UnauthenticatedInertiaRedirector のクラスコメントを参照。
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return app(UnauthenticatedInertiaRedirector::class)->handle($e, $request);
+        });
+
+        // CSRFトークン不一致（419）は issue #70（共通エラーページ、PR #77）の
+        // ErrorPageResponder::respond() に一本化して対応する。ここでは扱わない
+        // （経緯は issue #63 のコメント参照）。
 
         // 許可外の Host ヘッダー（trustHosts の拒否）など、Symfony が不正と判定したリクエストを記録する。
         //
