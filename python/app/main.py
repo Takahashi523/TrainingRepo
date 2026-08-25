@@ -21,6 +21,30 @@ app.include_router(matching.router)
 app.include_router(profile.router)
 
 
+# ---------------------------------------------------------------------------
+# 例外ハンドラ群
+#
+# エラー応答は必ず {"error_code": ..., "message": ...} の **フラット形式** で返す
+# （スコアリングロジック設計書 v0.7 §4.4「エラー応答の形式」）。呼び出し側の Laravel は
+# HttpMatchingEngineClient::mapErrorResponse() で `$body['error_code']` を **トップレベル**
+# で参照して 404/422 を分岐するため、`{"detail": {"error_code": ...}}` の入れ子で返すと
+# 判定に失敗し、すべて「上流障害（engine_error）」に落ちてユーザーには
+# 「マッチングエンジンとの通信に失敗しました」とだけ表示される。
+#
+# FastAPI の HTTPException(detail={...}) は既定ハンドラにより必ず detail 配下へ入れ子になる。
+# そのためルーター側では例外を捕捉せず（try/except を置かず）、すべて本ファイルのハンドラに
+# 到達させること。過去に routers/matching.py・routers/profile.py が HTTPException へ変換して
+# おり、404/422 の分岐が本番で機能しない不整合が発生した（PR #59 で発覚・PR #25 で是正）。
+#
+# なお 500 の error_code は設計書 §4.2 の表に従い INTERNAL_ERROR が正。
+# ルーター側にあった INTERNAL_SERVER_ERROR は設計書に存在しない値だった。
+#
+# ※ 500 応答の形を検証するテストでは TestClient(app, raise_server_exceptions=False) を使うこと。
+#   既定（True）だと Starlette の ServerErrorMiddleware が応答返却後に例外を再送出するため、
+#   レスポンスを受け取れず「ハンドラが効いていない」と誤読しやすい。
+# ---------------------------------------------------------------------------
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(

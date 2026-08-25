@@ -29,6 +29,13 @@ def _override_get_db():
 app.dependency_overrides[get_db] = _override_get_db
 client = TestClient(app)
 
+# 500 応答の「形」を検証するための専用クライアント。
+# 既定の raise_server_exceptions=True では、Starlette の ServerErrorMiddleware が
+# @app.exception_handler(Exception) の応答を返した *後* に例外を再送出するため、
+# TestClient 側でレスポンスを受け取れない（「ハンドラが効いていない」と誤読しやすい）。
+# False にすると応答をそのまま受け取れる。
+error_client = TestClient(app, raise_server_exceptions=False)
+
 # ---------------------------------------------------------------------------
 # ヘルパー
 # ---------------------------------------------------------------------------
@@ -184,11 +191,33 @@ class TestMatchingCalculate:
             "app.routers.matching.run_matching",
             side_effect=ValueError("DB接続文字列が不正です: user=root password=secret"),
         )
-        response = self._post_matching({"engineer_id": 1})
+        response = error_client.post("/api/v1/matching/calculate", json={"engineer_id": 1})
         assert response.status_code == 500
         body = response.json()
-        assert body["detail"]["error_code"] == "INTERNAL_SERVER_ERROR"
-        assert "password" not in body["detail"]["message"]
+        # 設計書 §4.2 の表に従い INTERNAL_ERROR（旧 INTERNAL_SERVER_ERROR は設計書に無い値）。
+        # 形も 404/422/504 と同じフラット形式に揃える（§4.4）。
+        assert body == {"error_code": "INTERNAL_ERROR", "message": "内部エラーが発生しました"}
+        assert "password" not in body["message"]
+        assert "DB接続文字列" not in body["message"]
+
+    def test_500_response_body_is_flat_and_uses_design_error_code(self, mocker):
+        """500 応答も {"error_code", "message"} のフラット形式であること（契約テスト）。
+
+        404/422 は PR #25 で是正済みだったが、500 だけ routers 側の
+        except Exception が HTTPException(detail={...}) を投げており入れ子のまま残っていた。
+        あわせて error_code も設計書 §4.2 に存在しない INTERNAL_SERVER_ERROR を返していた。
+        ルーターの try/except を撤去して main.py の app レベルハンドラに委ねることで、
+        値と形の両方が設計書どおりになる。
+        """
+        mocker.patch(
+            "app.routers.matching.run_matching",
+            side_effect=RuntimeError("想定外の内部エラー"),
+        )
+        body = error_client.post("/api/v1/matching/calculate", json={"engineer_id": 1}).json()
+
+        assert set(body.keys()) == {"error_code", "message"}
+        assert "detail" not in body
+        assert body["error_code"] == "INTERNAL_ERROR"
 
 
 # ---------------------------------------------------------------------------
@@ -248,12 +277,13 @@ class TestProfileSummary:
             "app.routers.profile.generate_profile_summary",
             side_effect=ValueError("DB接続文字列が不正です: user=root password=secret"),
         )
-        response = self._post_profile_summary({"engineer_id": 1})
+        response = error_client.post("/api/v1/ai/profile-summary", json={"engineer_id": 1})
         assert response.status_code == 500
         body = response.json()
-        assert body["detail"]["error_code"] == "INTERNAL_SERVER_ERROR"
-        assert "password" not in body["detail"]["message"]
-        assert "DB接続文字列" not in body["detail"]["message"]
+        # E2 も E1 と同じくフラット形式・INTERNAL_ERROR に揃える（設計書 v0.7 §4.3 / §4.4）。
+        assert body == {"error_code": "INTERNAL_ERROR", "message": "内部エラーが発生しました"}
+        assert "password" not in body["message"]
+        assert "DB接続文字列" not in body["message"]
 
     def test_returns_400_for_missing_engineer_id(self):
         """engineer_id が欠けている場合 400 になること（E2の必須項目はengineer_idのみ）。"""
