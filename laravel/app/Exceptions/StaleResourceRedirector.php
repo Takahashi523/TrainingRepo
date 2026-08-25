@@ -89,7 +89,12 @@ final class StaleResourceRedirector
 
         // 表示は既存の flash → トースト基盤（HandleInertiaRequests の flash.error →
         // AuthenticatedLayout の useToast）に相乗りする。通知経路を増やさない。
-        $redirect->with('error', "対象の{$resource['label']}は既に削除されています。");
+        //
+        // 「削除された」と断定しない。この経路は stale ページからの操作だけでなく、最初から存在しない
+        // ID（打ち間違い・古い共有 URL）でも通る。ハード削除のため「かつて存在したか」はサーバーからも
+        // 判別できない。事実（見つからない）を述べ、原因は可能性として添える
+        // （共通エラーページ #70 の「対象が見つかりません」と同じ語彙）。
+        $redirect->with('error', "対象の{$resource['label']}が見つかりません。既に削除された可能性があります。");
 
         // Inertia は PUT / PATCH / DELETE への 302 を追えないため 303 See Other で返す
         // （302 だとリダイレクト先へ元のメソッドが引き継がれる）。

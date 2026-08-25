@@ -456,6 +456,26 @@ class CsvImportTest extends CsvTestCase
         );
     }
 
+    /**
+     * EngineerRules::formatRules() の appeal_note(max:4000)/remarks(max:1000) が
+     * EngineerCsvSchema::sharedFormatRules() 経由でCSVインポートにも波及していることの確認。
+     */
+    public function test_engineer_appeal_note_and_remarks_boundaries(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '文字数境界', 'name_kana' => 'モジスウキョウカイ', 'status' => 'proposable', 'main_user_id' => $user->id,
+            'appeal_note' => str_repeat('あ', 4001), // max:4000
+            'remarks' => str_repeat('あ', 1001),     // max:1000
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, 'appeal_note'));
+        $this->assertNotNull($this->findError($errors, 2, 'remarks'));
+    }
+
     public function test_one_cell_collects_multiple_messages(): void
     {
         $user = $this->makeUser('admin');
@@ -598,6 +618,28 @@ class CsvImportTest extends CsvTestCase
         $errors = $this->importErrors($response);
         $this->assertNotNull($this->findError($errors, 2, 'headcount'));
         $this->assertNotNull($this->findError($errors, 2, 'interview_count'));
+    }
+
+    /**
+     * ProjectRules::formatRules() に追加した description/work_env/remarks の max ルールが
+     * ProjectCsvSchema::sharedFormatRules() 経由でCSVインポートにも波及していることの確認。
+     */
+    public function test_project_description_work_env_remarks_boundaries(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '文字数境界案件', 'status' => 'open', 'main_user_id' => $user->id,
+            'description' => str_repeat('あ', 4001), // max:4000
+            'work_env' => str_repeat('あ', 1001),    // max:1000
+            'remarks' => str_repeat('あ', 1001),     // max:1000
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, 'description'));
+        $this->assertNotNull($this->findError($errors, 2, 'work_env'));
+        $this->assertNotNull($this->findError($errors, 2, 'remarks'));
     }
 
     // ------------------------------------------------------------------
