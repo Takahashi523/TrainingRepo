@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesSort;
 use App\Http\Requests\EngineerIndexRequest;
 use App\Http\Requests\EngineerRequest;
 use App\Http\Resources\EngineerListResource;
@@ -22,6 +23,8 @@ use Inertia\Response;
 
 class EngineerController extends Controller
 {
+    use ResolvesSort;
+
     public function __construct(private readonly EngineerService $engineerService) {}
 
     private const ALLOWED_WORK_STYLES = ['onsite', 'hybrid', 'remote'];
@@ -46,7 +49,7 @@ class EngineerController extends Controller
         $keyword = trim((string) $request->input('keyword', ''));
 
         // ソートは sort×order のペア単位で検証する（仕様外の組み合わせはデフォルトへフォールバック）
-        [$sort, $order] = $this->resolveSort($request);
+        [$sort, $order] = $this->resolveSort($request, Engineer::SORT_OPTIONS);
 
         $perPage = (int) $request->input('per_page', self::PER_PAGE_DEFAULT);
         $perPage = max(1, min(self::PER_PAGE_MAX, $perPage));
@@ -138,28 +141,6 @@ class EngineerController extends Controller
             'phaseOptions' => Engineer::PHASES,
             'sortOptions' => Engineer::SORT_OPTIONS,
         ]);
-    }
-
-    /**
-     * ソートを sort×order のペア単位で検証する。
-     * Engineer::SORT_OPTIONS（許可組の配列。SSOT）に一致するペアだけ採用し、
-     * 無ければ先頭（デフォルト）へフォールバックする。
-     * これにより仕様外の sort×order の組み合わせを弾き、UI の選択肢と完全に一致させる。
-     *
-     * @return array{0: string, 1: string} [$sort, $order]
-     */
-    private function resolveSort(Request $request): array
-    {
-        $sortInput = (string) $request->input('sort', '');
-        $orderInput = strtolower((string) $request->input('order', ''));
-
-        foreach (Engineer::SORT_OPTIONS as $opt) {
-            if ($opt['sort'] === $sortInput && $opt['order'] === $orderInput) {
-                return [$opt['sort'], $opt['order']];
-            }
-        }
-
-        return [Engineer::SORT_OPTIONS[0]['sort'], Engineer::SORT_OPTIONS[0]['order']];
     }
 
     public function create(): Response
