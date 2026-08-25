@@ -62,16 +62,6 @@ export default function Show({ project }: Props) {
         });
     };
 
-    // 欠損は EmptyValue（淡色）で描くため、ここでは値がある場合のみ文字列を組み立てる。
-    const workLocationLabel =
-        project.work_location_station || project.work_location_line
-            ? `${project.work_location_station ?? ""}${
-                  project.work_location_line
-                      ? `（${project.work_location_line}）`
-                      : ""
-              }`
-            : null;
-
     return (
         <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="案件詳細" />
@@ -209,11 +199,33 @@ export default function Show({ project }: Props) {
 
                 {/* 勤務条件 */}
                 <SectionCard title="勤務条件">
-                    {/* [Issue #50 レビュー対応] 登録フォームでは「最寄駅」「路線名」の語の意味を確定させたため、
-                        値を結合表示するこの行もラベルを実際の中身に合わせる（旧: 「勤務地（最寄駅）」のまま路線名も表示していた） */}
-                    <FieldRow density="detail" label="勤務地（最寄駅 / 路線名）">
-                        {workLocationLabel ?? <EmptyValue field="workLocation" />}
-                    </FieldRow>
+                    {/* フルリモートは勤務地を持たない項目なので行ごと出さない。
+                        登録フォーム（ProjectForm）も work_style === 'remote' では入力欄自体を描かず、
+                        保存時に ProjectService が最寄駅・路線名を null 化する。ここで「未設定」を出すと、
+                        埋めるべき項目が空いているように読めてしまう（欠損語彙の意味と食い違う）。
+                        稼働形態は直下の行に出るため、行が無いこと自体は文脈から読み取れる。
+
+                        ただし値が入っている場合は remote でも行を出す。CSV 取込は ProjectService を
+                        通さず直接 upsert するため、work_style=remote かつ勤務地ありの行が保存され得る。
+                        稼働形態だけで隠すと、DB にある値が画面のどこにも出ない状態になってしまう。 */}
+                    {(project.work_style !== "remote" ||
+                        project.work_location_station ||
+                        project.work_location_line) && (
+                        /* [Issue #50 レビュー対応] 登録フォームでは「最寄駅」「路線名」の語の意味を確定させたため、
+                           ラベルを実際の中身に合わせる（旧: 「勤務地（最寄駅）」のまま路線名も表示していた）。
+                           値は最寄駅・路線名を1本の文字列に結合せず、項目ごとに欠損トークンを描く（人材詳細と同じ原子）。
+                           結合していた頃は、路線名だけが入った行が「（山手線）」と駅名の抜けた括弧になり、
+                           駅だけの行では路線名が空であることが画面から読み取れなかった。 */
+                        <FieldRow density="detail" label="勤務地（最寄駅 / 路線名）">
+                            {project.work_location_station || (
+                                <EmptyValue field="nearestStation" />
+                            )}
+                            {"　／　"}
+                            {project.work_location_line || (
+                                <EmptyValue field="nearestLine" />
+                            )}
+                        </FieldRow>
+                    )}
                     <FieldRow density="detail" label="稼働形態">
                         {project.work_style
                             ? (WORK_STYLE_LABELS[project.work_style] ??
