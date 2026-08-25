@@ -404,9 +404,25 @@ def invoke_matching(
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
             raise BedrockError(f"JSON パースリトライ後も失敗しました（フォーマット不正）: {exc}") from exc
 
-    # アプリ層クランプ処理（TINYINT UNSIGNEDの下限保証）
-    raw_score = int(data.get("match_score", 0))
-    final_score = max(0, raw_score)
+    # アプリ層クランプ処理（スコアリングロジック設計書 v0.7 §3.3.1）。
+    # 下限：必須スキル全不足ペナルティ(-30点)により負値になり得るが、pipelines.match_score は
+    #       TINYINT UNSIGNED のため格納できない。
+    # 上限：観点別配点の合計を AI に出力させる方式のため 100 超も起こり得る。§3.2 / §4.2 / §3.3 は
+    #       いずれも 0〜100 を前提としており、上限を担保しないと宣言と実値が食い違う。100 超が
+    #       Laravel 側へ渡ると、画面には表示されるのにパイプライン追加で between:0,100 に弾かれ、
+    #       ユーザーに回避手段のない行き止まりになる（スナップショット項目のため修正できない）。
+    #
+    # int() は AI がフォーマットを崩した場合に ValueError を送出するため try で捕捉し、
+    # BedrockError（504 UPSTREAM_TIMEOUT）に変換する。従来は素の ValueError が 500 として
+    # 表に出ていた。
+    try:
+        raw_score = int(data.get("match_score", 0))
+    except (TypeError, ValueError) as exc:
+        raise BedrockError(
+            f"match_score が数値ではありません: {data.get('match_score')!r}"
+        ) from exc
+
+    final_score = min(100, max(0, raw_score))
 
     logger.info(
         "マッチング判定完了 model_id=%s raw_score=%d final_score=%d",

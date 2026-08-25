@@ -204,6 +204,40 @@ class TestInvokeMatching:
         assert result.match_score == 0
         assert result.match_rank == "D"
 
+    def test_clamps_score_above_100(self, mocker):
+        """観点別配点の合計が 100 を超えた場合でも 100 にクランプされること（設計書 v0.7 §3.3.1）。
+
+        スコアは各観点の点数の合計を AI に出力させる方式のため、上振れは仕様上ありうる失敗モード。
+        100 超がそのまま Laravel 側へ渡ると、マッチング結果画面には表示されるのに
+        パイプライン追加で between:0,100 に弾かれ、ユーザーに回避手段のない行き止まりになる
+        （match_score はスナップショット項目のため画面上で修正できない）。
+        """
+        mock_client = MagicMock()
+        mocker.patch.object(svc, "_get_client", return_value=mock_client)
+        ai_resp = _valid_ai_response(0)
+        ai_resp["match_score"] = 105  # AI が上限超えを返した場合
+        mock_client.invoke_model.return_value = _bedrock_response(ai_resp)
+
+        result = invoke_matching(_make_engineer(), _make_project(), commute_time_minutes=20)
+
+        assert result.match_score == 100
+        assert result.match_rank == "A"
+
+    def test_non_numeric_score_raises_bedrock_error(self, mocker):
+        """match_score が非数値の場合、BedrockError（504）として扱われること。
+
+        int() は従来 try の外にあり、素の ValueError が 500 として表に出ていた。
+        AI のフォーマット崩れは上流障害（504 UPSTREAM_TIMEOUT）に寄せる。
+        """
+        mock_client = MagicMock()
+        mocker.patch.object(svc, "_get_client", return_value=mock_client)
+        ai_resp = _valid_ai_response(0)
+        ai_resp["match_score"] = "高い"  # AI が数値以外を返した場合
+        mock_client.invoke_model.return_value = _bedrock_response(ai_resp)
+
+        with pytest.raises(BedrockError):
+            invoke_matching(_make_engineer(), _make_project(), commute_time_minutes=20)
+
     def test_app_layer_corrects_wrong_rank_from_ai(self, mocker):
         """AI が match_rank を間違えた場合、アプリ層の検算値で上書きされること。"""
         mock_client = MagicMock()

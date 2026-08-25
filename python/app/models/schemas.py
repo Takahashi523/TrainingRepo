@@ -20,7 +20,9 @@ class MatchingRequest(BaseModel):
 
 class MatchResult(BaseModel):
     project_id: int
-    match_score: int        # 0〜100（クランプ済み）
+    # 0〜100（bedrock_service 側で min(100, max(0, raw_score)) にクランプ済み・設計書 v0.7 §3.3.1）。
+    # スキーマ側でも範囲を宣言し、クランプが外れた場合にレスポンス生成時点で検出できるようにする。
+    match_score: int = Field(ge=0, le=100)
     match_rank: str         # A / B / C / D
     ai_score_reason: str    # 200字以上300字以下
     ai_comment: str         # 150字以上250字以下
