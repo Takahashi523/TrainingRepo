@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ErrorPageResponder;
 use App\Exceptions\StaleResourceRedirector;
 use App\Exceptions\UnauthenticatedInertiaRedirector;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -130,7 +132,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // 判定と戻り先の対応表は StaleResourceRedirector に集約し、ここは委譲だけに留める。
         // null が返った場合は Laravel 既定の 404 応答にフォールバックする
         // （未定義 URL・意図的な abort(404)・非 Inertia リクエストはこちら）。
-        // このフォールバックが共通エラーページ（issue #70）の差し込み口になる。
+        // そのフォールバックを下の respond() が受け取り、共通エラーページに差し替える（issue #70）。
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
             return app(StaleResourceRedirector::class)->handle($e, $request);
         });
@@ -205,5 +207,19 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return null;
+        });
+
+        // 上の render() で差し替えられなかったエラー応答（403 / 404 / 419 / 500 / 503）を、
+        // アプリの体裁を保った案内ページ・再ログイン導線に差し替える（issue #70）。
+        //
+        // respond() は Handler::finalizeRenderedResponse として **すべての例外応答の最終段** で呼ばれる。
+        // 例外クラス単位の render() を複数積むより取りこぼしが起きにくい一方、上の render() が返した
+        // リダイレクトやバリデーションの 422 もここを通るため、対象は ErrorPageResponder 側の
+        // 許可リストで厳密に絞る。ここは委譲だけに留める。
+        //
+        // なお Host 拒否の 400 は ErrorPageResponder の許可リストに無く、素の 400 のまま返る
+        // （web ミドルウェア到達前の経路であり、Inertia の共有 Props が無い状態で描画しないため）。
+        $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
+            return app(ErrorPageResponder::class)->respond($response, $request);
         });
     })->create();

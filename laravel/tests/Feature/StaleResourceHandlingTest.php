@@ -50,7 +50,7 @@ class StaleResourceHandlingTest extends TestCase
         // Inertia は PUT/PATCH/DELETE への 302 を追えないため 303 であること
         $response->assertStatus(303);
         $response->assertRedirect('/projects');
-        $response->assertSessionHas('error', '対象の案件は既に削除されています。');
+        $response->assertSessionHas('error', '対象の案件が見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_get_edit_on_deleted_project_redirects_to_index_with_flash(): void
@@ -62,7 +62,7 @@ class StaleResourceHandlingTest extends TestCase
 
         $response->assertStatus(302);
         $response->assertRedirect('/projects');
-        $response->assertSessionHas('error', '対象の案件は既に削除されています。');
+        $response->assertSessionHas('error', '対象の案件が見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_put_on_deleted_project_redirects_to_index_with_flash(): void
@@ -75,7 +75,7 @@ class StaleResourceHandlingTest extends TestCase
 
         $response->assertStatus(303);
         $response->assertRedirect('/projects');
-        $response->assertSessionHas('error', '対象の案件は既に削除されています。');
+        $response->assertSessionHas('error', '対象の案件が見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_get_show_on_deleted_project_redirects_to_index(): void
@@ -86,7 +86,7 @@ class StaleResourceHandlingTest extends TestCase
             ->get('/projects/99999', $this->inertiaHeaders());
 
         $response->assertRedirect('/projects');
-        $response->assertSessionHas('error', '対象の案件は既に削除されています。');
+        $response->assertSessionHas('error', '対象の案件が見つかりません。既に削除された可能性があります。');
     }
 
     // -------------------------------------------------------
@@ -102,7 +102,7 @@ class StaleResourceHandlingTest extends TestCase
 
         $response->assertStatus(303);
         $response->assertRedirect('/engineers');
-        $response->assertSessionHas('error', '対象の人材は既に削除されています。');
+        $response->assertSessionHas('error', '対象の人材が見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_get_edit_on_deleted_engineer_redirects_to_engineer_index(): void
@@ -113,7 +113,7 @@ class StaleResourceHandlingTest extends TestCase
             ->get('/engineers/99999/edit', $this->inertiaHeaders());
 
         $response->assertRedirect('/engineers');
-        $response->assertSessionHas('error', '対象の人材は既に削除されています。');
+        $response->assertSessionHas('error', '対象の人材が見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_put_on_deleted_engineer_redirects_to_engineer_index(): void
@@ -125,7 +125,7 @@ class StaleResourceHandlingTest extends TestCase
 
         $response->assertStatus(303);
         $response->assertRedirect('/engineers');
-        $response->assertSessionHas('error', '対象の人材は既に削除されています。');
+        $response->assertSessionHas('error', '対象の人材が見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_get_matching_on_deleted_engineer_redirects_to_engineer_index(): void
@@ -138,7 +138,7 @@ class StaleResourceHandlingTest extends TestCase
             ->get('/engineers/99999/matching', $this->inertiaHeaders());
 
         $response->assertRedirect('/engineers');
-        $response->assertSessionHas('error', '対象の人材は既に削除されています。');
+        $response->assertSessionHas('error', '対象の人材が見つかりません。既に削除された可能性があります。');
     }
 
     // -------------------------------------------------------
@@ -154,7 +154,7 @@ class StaleResourceHandlingTest extends TestCase
 
         $response->assertStatus(303);
         $response->assertRedirect('/pipelines');
-        $response->assertSessionHas('error', '対象のパイプラインは既に削除されています。');
+        $response->assertSessionHas('error', '対象のパイプラインが見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_delete_on_deleted_pipeline_redirects_to_pipeline_index(): void
@@ -166,7 +166,7 @@ class StaleResourceHandlingTest extends TestCase
 
         $response->assertStatus(303);
         $response->assertRedirect('/pipelines');
-        $response->assertSessionHas('error', '対象のパイプラインは既に削除されています。');
+        $response->assertSessionHas('error', '対象のパイプラインが見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_delete_on_deleted_master_user_redirects_to_master_index(): void
@@ -178,7 +178,7 @@ class StaleResourceHandlingTest extends TestCase
 
         $response->assertStatus(303);
         $response->assertRedirect('/master');
-        $response->assertSessionHas('error', '対象のユーザーは既に削除されています。');
+        $response->assertSessionHas('error', '対象のユーザーが見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_delete_on_deleted_saved_search_redirects_back(): void
@@ -191,7 +191,7 @@ class StaleResourceHandlingTest extends TestCase
 
         $response->assertStatus(303);
         $response->assertRedirect('/engineers');
-        $response->assertSessionHas('error', '対象の検索条件は既に削除されています。');
+        $response->assertSessionHas('error', '対象の検索条件が見つかりません。既に削除された可能性があります。');
     }
 
     public function test_inertia_delete_on_deleted_saved_search_falls_back_to_dashboard(): void
