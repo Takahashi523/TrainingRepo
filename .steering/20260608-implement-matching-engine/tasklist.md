@@ -143,35 +143,61 @@
 
 Laravelチームより「PythonがUPDATEを行っていないか」という確認を受け、`スコアリングロジック設計書.md` §1.3「データ連携方針」を再確認した結果、Python側は本来DBへの書き込みを一切行わない方針（書込責務はLaravel側に集約）であることが判明。E2実装がこの方針に反していたため修正。
 
-> **⚠️ 訂正（2026-08-17）**：下記のうちコード・テストに関する2項目は、2026-07-14 に「完了」と記録されていたが**実際には実装されていなかった**。`matching_service.py`を最後に変更したコミットは`b161703`（2026-07-12＝Step 8）であり、Step 9 の対応を記録したコミット`60d02db`が変更したファイルは本 `tasklist.md` 1件のみだった。テストも`test_updates_db_when_summary_is_not_empty`が残り「UPDATEすること」をアサートし続けていたため、緑のまま気づけない状態になっていた。2026-08-17 のLaravelチームからの再指摘を受け、当初の方針どおりコードへ反映した（経緯は `reason.md` の Step 9 を参照）。
+> **⚠️ 訂正（2026-08-18）**：下記のうちコード・テストに関する2項目は、2026-07-14 に「完了」と記録されていたが**実際には実装されていなかった**。`matching_service.py`を最後に変更したコミットは`b161703`（2026-07-12＝Step 8）であり、Step 9 の対応を記録したコミット`60d02db`が変更したファイルは本 `tasklist.md` 1件のみだった。テストも`test_updates_db_when_summary_is_not_empty`が残り「UPDATEすること」をアサートし続けていたため、緑のまま気づけない状態になっていた。2026-08-18 のLaravelチームからの再指摘を受け、当初の方針どおりコードへ反映した（経緯は `reason.md` の Step 9 を参照）。
 
-- [x] ✅ ~~2026-07-14~~ → **2026-08-17 実装反映** `generate_profile_summary`からDB書込（`UPDATE engineers ...`・`db.commit()`）を削除
-- [x] ✅ ~~2026-07-14~~ → **2026-08-17 実装反映** テストを「PythonはDBに一切書き込まないこと」を検証する内容に置き換え（`test_does_not_write_to_db_when_summary_is_not_empty`）
-- [x] ✅ 2026-08-17 `routers/profile.py` の description（「DBのエンジニア情報を更新します」）を実態に合わせて修正
-- [x] ✅ 2026-07-14 `design.md`・`reason.md`・`requirements.md`・`tasklist.md`（本ファイル）を今回の結果に合わせて改訂（※ 2026-08-17 に実態との差異を訂正）
+- [x] ✅ ~~2026-07-14~~ → **2026-08-18 実装反映** `generate_profile_summary`からDB書込（`UPDATE engineers ...`・`db.commit()`）を削除
+- [x] ✅ ~~2026-07-14~~ → **2026-08-18 実装反映** テストを「PythonはDBに一切書き込まないこと」を検証する内容に置き換え（`test_does_not_write_to_db_when_summary_is_not_empty`）
+- [x] ✅ 2026-08-18 `routers/profile.py` の description（「DBのエンジニア情報を更新します」）を実態に合わせて修正
+- [x] ✅ 2026-07-14 `design.md`・`reason.md`・`requirements.md`・`tasklist.md`（本ファイル）を今回の結果に合わせて改訂（※ 2026-08-18 に実態との差異を訂正）
 - [x] ✅ 2026-07-14 Laravelチームへ、`engineers.ai_summary`等への反映がLaravel側の実装責務である旨を回答
 
 ---
 
-## Step 10: Laravel↔Python 契約不整合の是正（2026-08-17・Laravelチーム指摘対応）
+## Step 10: Laravel↔Python 契約不整合の是正（2026-08-18・Laravelチーム指摘対応）
 
 結合テストシナリオ（PR #59）のレビュー過程で、Laravel側の`Http::fake`が固定している想定応答と実Python実装が食い違っている箇所が判明したため修正。
 
-- [x] ✅ 2026-08-17 `routers/matching.py`：`EngineerNotFoundError`／`NoActiveCandidateError`を`HTTPException(detail={...})`へ変換していたため応答が`{"detail": {"error_code": ...}}`と入れ子になり、`error_code`をトップレベルで読むLaravel側（`HttpMatchingEngineClient::mapErrorResponse`）が404/422を判定できず一律`upstream()`に落ちていた問題を修正。`BedrockError`と同じ re-raise パターンに揃え、`main.py`のapp-levelハンドラに委ねる形とした
-- [x] ✅ 2026-08-17 `routers/profile.py`：同様に404を re-raise へ変更（Laravel側は`error_code`を読まないため挙動影響はないが、OpenAPI宣言との整合のため）
-- [x] ✅ 2026-08-17 `tests/test_routers.py`：404/422のアサーションを`response.json()["detail"]["error_code"]`からトップレベル参照に修正
-- [x] ✅ 2026-08-17 `tests/test_routers.py`：レスポンスの形自体を固定する契約テスト`test_error_response_body_is_flat_not_nested`を追加（修正前のコードでは4件失敗することを確認済み）
+- [x] ✅ 2026-08-18 `routers/matching.py`：`EngineerNotFoundError`／`NoActiveCandidateError`を`HTTPException(detail={...})`へ変換していたため応答が`{"detail": {"error_code": ...}}`と入れ子になり、`error_code`をトップレベルで読むLaravel側（`HttpMatchingEngineClient::mapErrorResponse`）が404/422を判定できず一律`upstream()`に落ちていた問題を修正。`BedrockError`と同じ re-raise パターンに揃え、`main.py`のapp-levelハンドラに委ねる形とした
+- [x] ✅ 2026-08-18 `routers/profile.py`：同様に404を re-raise へ変更（Laravel側は`error_code`を読まないため挙動影響はないが、OpenAPI宣言との整合のため）
+- [x] ✅ 2026-08-18 `tests/test_routers.py`：404/422のアサーションを`response.json()["detail"]["error_code"]`からトップレベル参照に修正
+- [x] ✅ 2026-08-18 `tests/test_routers.py`：レスポンスの形自体を固定する契約テスト`test_error_response_body_is_flat_not_nested`を追加（修正前のコードでは4件失敗することを確認済み）
 - [ ] マージ後、結合テストシナリオ LP-CONTRACT-02（実エンジンに対する契約適合確認）を実施
 
-> **注意**：`except EngineerNotFoundError` の節を単純に削除する方式は使えない。両例外とも`Exception`のサブクラスであるため、最後の`except Exception`が捕捉して500に化ける。`BedrockError`と同じく「捕捉して`raise`で再送出」する必要がある。
+> **注意（2026-08-25 追記）**：上記の時点では「`except` 節を単純に削除すると `except Exception` が捕捉して500に化けるため、`BedrockError` と同じ re-raise パターンにする」としていたが、**Step 11 で `except Exception` ごと撤去したため、この注意事項は解消した**。現在は `try/except` 自体が存在しない。
 
-> **残課題（Laravel側・要協議）**：`PipelineStoreRequest`が`match_rank`を`in:A,B,C,D`・`match_score`を`between:0,100`で検証しているため、エンジンが範囲外の値を返すとカードは表示されるのにパイプライン追加で弾かれ、ユーザーに回避手段がない。Python側は`matching_service.py`で降順ソート・上位5件固定を保証しているため現状は顕在化しないが、表示経路と書き込み経路で許容ポリシーが不一致である点はLaravelチームと協議中。
+> **残課題（Laravel側）**：`PipelineStoreRequest`が`match_rank`を`in:A,B,C,D`・`match_score`を`between:0,100`で検証している件。**2026-08-25 のLaravelチーム回答により、`match_rank` は `bedrock_service.py:_determine_rank()` がアプリ層で再計算するため範囲外は構造的に発生しないと確定**。実在した穴は `match_score` の上限のみで、Step 11 で是正した。Laravel 側の `between:0,100` と DB の `TINYINT UNSIGNED` は最後の砦として維持する（`MatchResult::fromArray()` でのクランプは、上流の異常を隠蔽するため採用しない）。
+
+---
+
+## Step 11: 500応答の是正とスコア上限クランプ（2026-08-25・Laravelチーム指摘対応）
+
+Step 10 のレビューで、500 応答だけ是正から漏れていたこと、およびスコアの上限クランプが設計書・実装ともに欠けていたことが判明したため対応。あわせて設計書（PR #12）を v0.7 に改訂済み。
+
+**500 応答（値と形の是正）**
+
+- [x] ✅ 2026-08-25 `routers/matching.py`・`routers/profile.py`：`try/except` を**ブロックごと撤去**。`except Exception` が `HTTPException(detail={...})` を投げていたため 500 だけ入れ子形式のまま残り、かつ `error_code` が設計書に存在しない `INTERNAL_SERVER_ERROR` になっていた。撤去により `main.py` の app-level ハンドラ（`INTERNAL_ERROR`・フラット形式）が効く
+- [x] ✅ 2026-08-25 `except Exception` の撤去に伴い、`EngineerNotFoundError`／`NoActiveCandidateError`／`BedrockError` の3節（`raise` のみ）も不要になったため削除。両ファイルとも素の関数本体に戻した
+- [x] ✅ 2026-08-25 ログ出力の改善：撤去した `except Exception` はコメントに「ログにのみ詳細を残し」とあったが**実際にはログ出力を行っていなかった**（`as e` も未使用）。`main.py:33` の `logger.error(..., exc_info=exc)` が効くようになり、スタックトレース付きで記録される
+- [x] ✅ 2026-08-25 フラット形式でなければならない理由の説明コメントを `main.py` のハンドラ群冒頭へ移設（再発防止のため保持）
+- [x] ✅ 2026-08-25 `tests/test_routers.py`：500 応答用に `TestClient(app, raise_server_exceptions=False)` を用意し、既存2件のアサーションをフラット形式・`INTERNAL_ERROR` に修正。契約テスト `test_500_response_body_is_flat_and_uses_design_error_code` を追加
+
+**スコアの上限クランプ**
+
+- [x] ✅ 2026-08-25 `bedrock_service.py`：`final_score = max(0, raw_score)` → **`min(100, max(0, raw_score))`**。設計書 v0.7 §3.3.1 の改訂に対応
+- [x] ✅ 2026-08-25 `bedrock_service.py`：`int(data.get("match_score", 0))` を `try` 内へ移動し、非数値時は `BedrockError`（504）に変換。従来は素の `ValueError` が 500 として表に出ていた
+- [x] ✅ 2026-08-25 `models/schemas.py`：`MatchResult.match_score` に `Field(ge=0, le=100)` を付与。クランプが外れた場合にレスポンス生成時点で検出できる二重の防御
+- [x] ✅ 2026-08-25 `tests/test_bedrock_service.py`：`test_clamps_score_above_100`（105→100）・`test_non_numeric_score_raises_bedrock_error` を追加
+
+**検証**
+
+- [x] ✅ 2026-08-25 実装を戻すと新規・変更した5件が失敗することを確認（500系3件・クランプ系2件）
+- [ ] マージ後、結合テストシナリオ LP-CONTRACT-02（実エンジンに対する契約適合確認）を実施
 
 ---
 
 ## 完了基準
 
-- [x] ✅ ~~2026-07-14 pytest 全件通過（103件）~~ → **2026-08-17 pytest 全件通過（104件）**（Step 10 で契約テスト `test_error_response_body_is_flat_not_nested` を1件追加）
+- [x] ✅ ~~2026-07-14 pytest 全件通過（103件）~~ → ~~2026-08-18（104件）~~ → **2026-08-25 pytest 全件通過（107件）**（Step 10 で契約テスト1件、Step 11 で500契約テスト・上限クランプ・非数値の3件を追加）
 - [x] ✅ 2026-07-14 カバレッジ90%以上（96% 達成）
 - [x] ✅ 2026-07-14 `SELECT *` が存在しないこと
 - [x] ✅ 2026-07-14 Pydantic 型定義がすべてのリクエスト/レスポンスに存在すること
@@ -186,5 +212,5 @@ Laravelチームより「PythonがUPDATEを行っていないか」という確�
 - [ ] `MOCK_MODE`の無効化・削除（AWS本番アカウント整備後）
 - [ ] Laravel⇔Python間の通信経路確定（スコアリングロジック設計書 v0.6 §6 T29、インフラ担当確認待ち）
 - [ ] `スコアリングロジック設計書.md` §3.2の出力文字数表記を`AIプロンプト設計書.md`の数値に同期（文書オーナーへ確認予定、低優先度）
-- [x] ✅ 2026-08-17 Laravel側：Python API連携の実装 — `develop` にて実装済みを確認。ファイル名は当時の想定（`app/Services/AiSummaryService.php`）から変更され、`app/Services/Ai/HttpAiSummaryClient.php` として実装されている
-- [x] ✅ 2026-08-17 Laravel側：E2レスポンス（`ai_summary`・`ai_summary_generated_at`）の`engineers`テーブルへの反映 — `develop` にて `EngineerService::refreshAiSummary()` が `$engineer->update([...])` で実施していることを確認。これによりStep 9の「保存責務はLaravel側」が両側で成立する
+- [x] ✅ 2026-08-18 Laravel側：Python API連携の実装 — `develop` にて実装済みを確認。ファイル名は当時の想定（`app/Services/AiSummaryService.php`）から変更され、`app/Services/Ai/HttpAiSummaryClient.php` として実装されている
+- [x] ✅ 2026-08-18 Laravel側：E2レスポンス（`ai_summary`・`ai_summary_generated_at`）の`engineers`テーブルへの反映 — `develop` にて `EngineerService::refreshAiSummary()` が `$engineer->update([...])` で実施していることを確認。これによりStep 9の「保存責務はLaravel側」が両側で成立する

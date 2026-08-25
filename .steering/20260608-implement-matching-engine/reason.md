@@ -153,9 +153,9 @@ Laravelチームより「PythonがDBのUPDATEを行っていないか」とい�
 
 これに対し、E2（`generate_profile_summary`）の実装が`UPDATE engineers SET ai_summary = ..., ai_summary_generated_at = ... WHERE id = ...`を直接実行しており、§1.3の方針に反していた。該当のDB書込処理（`db.execute`・`db.commit`）を削除し、Pythonは`ai_summary`・`ai_summary_generated_at`を**レスポンスとして返すだけ**（DB反映はLaravel側の責務）に修正する方針とした。
 
-### ⚠️ 訂正（2026-08-17）：上記の修正は2026-07-14時点では実装されていなかった
+### ⚠️ 訂正（2026-08-18）：上記の修正は2026-07-14時点では実装されていなかった
 
-**本セクションおよび`tasklist.md`のStep 9は、2026-07-14に「対応済み」として記録されていたが、実際にはドキュメントのみが更新され、コードとテストには反映されていなかった。** 2026-08-17にLaravelチームより再度の指摘を受けて調査した結果、以下が判明した。
+**本セクションおよび`tasklist.md`のStep 9は、2026-07-14に「対応済み」として記録されていたが、実際にはドキュメントのみが更新され、コードとテストには反映されていなかった。** 2026-08-18にLaravelチームより再度の指摘を受けて調査した結果、以下が判明した。
 
 - `matching_service.py`を最後に変更したコミットは`b161703`（2026-07-12＝Step 8）であり、Step 9の日付以降このファイルは一度も変更されていなかった
 - Step 9の対応を記録したコミット`60d02db`（2026-07-21）が変更したファイルは`tasklist.md`の1件のみだった
@@ -163,7 +163,7 @@ Laravelチームより「PythonがDBのUPDATEを行っていないか」とい�
 
 この二重書き込みは、Laravel側が`services.ai_summary.timeout`（既定30秒）でタイムアウトした後にPythonが`commit`した場合、**Laravelは「AI要約の生成に失敗しました。」の失敗トーストを出すのに、人材詳細画面には要約が表示される**という食い違いを生む。加えてPythonの生SQLは`updated_at`を更新しないため、更新時刻の整合も崩れる。この事象はLaravel側の`Http::fake`では原理的に検出できない（fakeはHTTP応答を差し替えるだけで、Python側のDB副作用が発生しないため）。
 
-**2026-08-17に、当初のStep 9の方針どおりコードへ反映した。**
+**2026-08-18に、当初のStep 9の方針どおりコードへ反映した。**
 
 - `generate_profile_summary()`から`db.execute`（`UPDATE engineers ...`）・`db.commit()`を削除し、返却のみとした
 - `test_updates_db_when_summary_is_not_empty`を`test_does_not_write_to_db_when_summary_is_not_empty`に置き換え、`mock_db.execute.assert_not_called()`・`mock_db.commit.assert_not_called()`で**書き込みが復活しないことを固定**した
