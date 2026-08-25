@@ -1,6 +1,7 @@
 import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
 import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
+import Rate from '@/Components/Common/Rate';
 import SkillTag from '@/Components/Common/SkillTag';
 import StatusBadge from '@/Components/Common/StatusBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
@@ -138,11 +139,15 @@ export default function Show({
                         項目名は MetaItem が sr-only で支援技術に渡す。未指定も同じ流儀で項目名入りトークンにし
                         （入力済み属性＝未設定／柔軟に決まり得る条件＝未定）、カードと語彙を揃える。 */}
                     <MetaRow className="mt-1.5">
-                        <MetaItem field="age">
+                        <MetaItem field="age" valueHasFieldName={engineer.age == null}>
                             {engineer.age != null ? `${engineer.age}歳` : emptyText('age', true)}
                         </MetaItem>
                         {/* 最寄駅・路線名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（max-w で幅を抑える）。 */}
-                        <MetaItem field="nearestStation" className="max-w-[18rem]">
+                        <MetaItem
+                            field="nearestStation"
+                            valueHasFieldName={!engineer.nearest_station}
+                            className="max-w-[18rem]"
+                        >
                             <TruncatedText
                                 text={engineer.nearest_station || emptyText('nearestStation', true)}
                                 className="min-w-0 max-w-[8rem]"
@@ -156,15 +161,14 @@ export default function Show({
                                 className="min-w-0 max-w-[8rem]"
                             />
                         </MetaItem>
-                        <MetaItem field="availableFrom">
+                        <MetaItem field="availableFrom" valueHasFieldName={!engineer.available_from}>
                             {engineer.available_from ? engineer.available_label : emptyText('availableFrom', true)}
                         </MetaItem>
-                        <MetaItem field="desiredRate">
-                            {engineer.desired_rate != null
-                                ? `${engineer.desired_rate}万円`
-                                : emptyText('desiredRate', true)}
+                        {/* 希望単価は単一値。案件の単価（レンジ）と単位「万円」の見せ方を揃えるため Rate に載せる。 */}
+                        <MetaItem field="desiredRate" valueHasFieldName={engineer.desired_rate == null}>
+                            <Rate value={engineer.desired_rate} variant="plain" withFieldName />
                         </MetaItem>
-                        <MetaItem field="workStyle">
+                        <MetaItem field="workStyle" valueHasFieldName={engineer.work_styles.length === 0}>
                             {engineer.work_styles.length > 0
                                 ? engineer.work_styles.map((w) => w.name).join(' / ')
                                 : emptyText('workStyle', true)}

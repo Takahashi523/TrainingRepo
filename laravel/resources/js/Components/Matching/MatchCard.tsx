@@ -133,23 +133,33 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                         既知の属性（クライアント・商流）は「未設定」、後から決まり得る条件（募集人数・開始時期・
                         単価・勤務形態）は「未定」と語を使い分ける（emptyValue.ts が語彙の SSOT）。 */}
                     <MetaRow>
-                        <MetaItem field="clientName">
+                        <MetaItem field="clientName" valueHasFieldName={!project.client_name}>
                             {/* 顧客名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（max-w で幅を抑える）。 */}
                             <TruncatedText
                                 text={project.client_name || emptyText('clientName', true)}
                                 className="min-w-0 max-w-[12rem]"
                             />
                         </MetaItem>
-                        <MetaItem field="commercialFlow">
+                        <MetaItem
+                            field="commercialFlow"
+                            valueHasFieldName={project.commercial_flow_label == null}
+                        >
                             {project.commercial_flow_label ?? emptyText('commercialFlow', true)}
                         </MetaItem>
-                        <MetaItem field="headcount">
+                        <MetaItem field="headcount" valueHasFieldName={project.headcount == null}>
                             {project.headcount != null ? `${project.headcount}名` : emptyText('headcount', true)}
                         </MetaItem>
-                        <MetaItem field="startDate">
+                        <MetaItem field="startDate" valueHasFieldName={!project.start_date}>
                             {project.start_date ? project.start_label : emptyText('startDate', true)}
                         </MetaItem>
-                        <MetaItem field="rate">
+                        {/* 単価は Rate が withFieldName で項目名入りトークンを出すため、
+                            レンジ・備考がすべて空のときだけ sr-only を省く（Rate の欠損分岐と同じ条件）。 */}
+                        <MetaItem
+                            field="rate"
+                            valueHasFieldName={
+                                project.rate_min == null && project.rate_max == null && !project.rate_note
+                            }
+                        >
                             <Rate
                                 min={project.rate_min}
                                 max={project.rate_max}
@@ -158,7 +168,7 @@ export default function MatchCard({ result, selected, onSelect }: Props) {
                                 withFieldName
                             />
                         </MetaItem>
-                        <MetaItem field="workStyle">
+                        <MetaItem field="workStyle" valueHasFieldName={project.work_style_label == null}>
                             {project.work_style_label ?? emptyText('workStyle', true)}
                         </MetaItem>
                     </MetaRow>

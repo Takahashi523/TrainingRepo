@@ -99,7 +99,9 @@ export default function ImportResultModal({ open, resource, errors, onClose }: P
                                 <TableRow key={`${e.row ?? 'null'}-${e.field ?? 'null'}-${i}`}>
                                     {/* (行, 項目) は1エントリ＝1行として1回だけ表示 */}
                                     <TableCell className="whitespace-nowrap px-4 py-2 align-top font-bold text-destructive">
-                                        {e.row === null ? '—' : `${e.row}行目`}
+                                        {/* row=null は特定の行ではなくファイル単位のエラー（データ行なし・行数超過）。
+                                            値の欠損ではないため欠損語彙は使わず、何に対するエラーかを語で示す。 */}
+                                        {e.row === null ? 'ファイル全体' : `${e.row}行目`}
                                     </TableCell>
                                     <TableCell className="whitespace-nowrap px-4 py-2 align-top text-muted-foreground">
                                         {csvFieldLabel(resource, e.field)}

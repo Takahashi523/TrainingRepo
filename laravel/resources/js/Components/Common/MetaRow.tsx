@@ -1,7 +1,7 @@
 import { EmptyFieldKey, fieldName } from '@/lib/emptyValue';
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
-import { Children, isValidElement } from 'react';
+import { Children } from 'react';
 
 /**
  * 見出し直下の圧縮メタ行（表示規約の「型2」）。
@@ -20,8 +20,11 @@ interface MetaRowProps {
 
 export default function MetaRow({ children, className }: MetaRowProps) {
     // null / false を挟んだ条件描画（{cond && <MetaItem/>}）でも区切りがずれないよう、
-    // 実際に描画される要素だけを対象にする。
-    const items = Children.toArray(children).filter((child) => isValidElement(child));
+    // 実際に描画されるものだけを対象にする。
+    // Children.toArray は null / undefined / boolean を除外して平坦化するため、これだけで足りる。
+    // isValidElement で追加フィルタすると文字列・数値の子まで無言で消え、
+    // <MetaRow>担当：{name}</MetaRow> のような書き方が警告なしに空になるため使わない。
+    const items = Children.toArray(children);
 
     return (
         <div
@@ -47,6 +50,16 @@ export default function MetaRow({ children, className }: MetaRowProps) {
 interface MetaItemProps {
     /** 支援技術に読ませる項目名。視覚的には表示されない（型2 はラベル語を出さないため） */
     field: EmptyFieldKey;
+    /**
+     * 値側に項目名が含まれるか。欠損トークンを項目名入り（`emptyText(key, true)` / `withFieldName`）で
+     * 出す分岐で true を渡す。true のとき sr-only の項目名を省き、二重読みを防ぐ。
+     *
+     * 値の中身から推測しないのは意図的。`children` は `<Rate>` / `<TruncatedText>` / 配列など
+     * 文字列でないことが多く推測が効かないうえ、実データが項目名で始まる場合
+     * （顧客名「クライアントサービス株式会社」など）に必要なラベルを誤って消すため。
+     * `Rate` / `EmptyValue` の `withFieldName` と同じく、呼び出し側が明示する。
+     */
+    valueHasFieldName?: boolean;
     /** 視覚的なスキャン補助のアイコン。読み上げ対象外（項目名は sr-only が担う） */
     icon?: LucideIcon;
     children: React.ReactNode;
@@ -57,12 +70,12 @@ interface MetaItemProps {
  * メタ行の1項目。`field` の項目名を sr-only で前置する。
  * 値そのもの（`children`）は呼び出し側が組み立てる（欠損時は emptyText(key, true) を渡す）。
  */
-export function MetaItem({ field, icon: Icon, children, className }: MetaItemProps) {
+export function MetaItem({ field, valueHasFieldName = false, icon: Icon, children, className }: MetaItemProps) {
     // 欠損時の値は「クライアント未設定」のように項目名を含む（型2 の規則）。
     // その場合に sr-only を足すと「クライアント：クライアント未設定」と二重に読まれるため、
-    // 値が項目名で始まるときは sr-only を出さない（項目名は必ず1回だけ、という大原則を保つ）。
+    // 呼び出し側が valueHasFieldName を立てた項目は sr-only を出さない
+    // （項目名は必ず1回だけ、という大原則を保つ）。
     const label = fieldName(field);
-    const valueHasFieldName = typeof children === 'string' && children.startsWith(label);
 
     return (
         <span className={cn('inline-flex min-w-0 items-baseline gap-1', className)}>

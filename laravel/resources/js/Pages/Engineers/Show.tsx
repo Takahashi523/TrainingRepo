@@ -3,6 +3,7 @@ import ConfirmDialog from '@/Components/Common/ConfirmDialog';
 import EmptyValue from '@/Components/Common/EmptyValue';
 import FieldRow from '@/Components/Common/FieldRow';
 import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
+import Rate from '@/Components/Common/Rate';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
@@ -294,7 +295,9 @@ export default function Show({ engineer }: Props) {
                 {/* 希望条件 */}
                 <SectionCard title="希望条件">
                     <FieldRow density="detail" label="希望単価（月額）">
-                        {engineer.desired_rate != null ? `${engineer.desired_rate}万円` : <EmptyValue field="desiredRate" />}
+                        {/* 案件詳細の単価（Projects/Show）と同じ Rate に載せ、単位「万円」の濃度・サイズを揃える。
+                            希望単価は単一値なので range ではなく value モードを使う（範囲記号を付けない）。 */}
+                        <Rate value={engineer.desired_rate} />
                     </FieldRow>
                     <FieldRow density="detail" label="勤務形態">
                         {engineer.work_styles.length > 0 ? (

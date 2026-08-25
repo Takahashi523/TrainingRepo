@@ -65,11 +65,20 @@ export default function ProjectCard({ project }: Props) {
                             {/* 見出し直下メタ（表示規約の型2）：ラベル語は出さず、項目名は sr-only で支援技術に渡す。
                                 マッチング結果カード・マッチングサマリーと同じ表現に揃える。 */}
                             <MetaRow className="mt-0.5">
-                                <MetaItem field="clientName">
-                                    {project.client_name ??
+                                {/* 顧客名は nullable かつ空文字もあり得るため || で falsy を一括判定する
+                                    （?? だと空文字が素通りしてセグメントが空になり、区切りだけが残る）。
+                                    他画面（MatchCard / Pipelines/Completed / Projects/Show）と同じ判定に揃える。 */}
+                                <MetaItem
+                                    field="clientName"
+                                    valueHasFieldName={!project.client_name}
+                                >
+                                    {project.client_name ||
                                         emptyText("clientName", true)}
                                 </MetaItem>
-                                <MetaItem field="commercialFlow">
+                                <MetaItem
+                                    field="commercialFlow"
+                                    valueHasFieldName={!project.commercial_flow}
+                                >
                                     {project.commercial_flow
                                         ? (COMMERCIAL_FLOW_LABELS[
                                               project.commercial_flow

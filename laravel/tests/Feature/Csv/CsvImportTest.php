@@ -3,6 +3,7 @@
 namespace Tests\Feature\Csv;
 
 use App\Models\Engineer;
+use App\Models\Project;
 use App\Support\Csv\CsvInjection;
 use App\Support\Csv\EngineerCsvSchema;
 use App\Support\Csv\ProjectCsvSchema;
@@ -753,6 +754,66 @@ class CsvImportTest extends CsvTestCase
         $this->assertSame(1, (int) $engineer->work_style_onsite);
         // AI要約 は export専用列のため取り込まれず、既存値が保持される（上書きされない）
         $this->assertSame('AI生成の要約', $engineer->ai_summary);
+    }
+
+    /**
+     * 案件の「エクスポートは通るがインポートで落ちる」非対称を検出するための往復テスト。
+     *
+     * 単価に相互必須（rate_min/rate_max）と排他（rate_note）を課したため、
+     * 保存できる形の案件がエクスポート後に再インポートできなくなると運用が壊れる
+     * （インポートは1行でも失敗するとファイル全体がロールバックされるため影響が大きい）。
+     * 保存可能な2形（レンジのみ／備考のみ）を実 export 出力で通しで確認する。
+     */
+    public function test_exported_project_csv_round_trips_back_through_import(): void
+    {
+        $mainUser = $this->makeUser('admin');
+        $subUser = $this->makeUser('general');
+
+        // 形1：レンジのみ（備考なし）
+        $ranged = Project::create([
+            'name' => '往復案件レンジ',
+            'status' => 'open',
+            'main_user_id' => $mainUser->id,
+            'sub_user_id' => $subUser->id,
+            'commercial_flow' => 'prime',
+            'work_style' => 'remote',
+            'start_date' => '2026-09-01',
+            'rate_min' => 60,
+            'rate_max' => 90,
+        ]);
+
+        // 形2：備考のみ（レンジなし＝スキル見合い）
+        $noted = Project::create([
+            'name' => '往復案件備考',
+            'status' => 'open',
+            'main_user_id' => $mainUser->id,
+            'commercial_flow' => 'secondary',
+            'work_style' => 'remote',
+            'rate_note' => 'スキル見合い',
+        ]);
+
+        // 実際のエクスポート出力（BOM 付き・export専用列を含む）をそのまま取り込む。
+        $exported = $this->actingAs($mainUser)->get(route('csv.projects.export'))->streamedContent();
+
+        $this->postImport($mainUser, 'csv.projects.import', $this->makeUpload($exported), false)
+            ->assertRedirect(route('csv.index'));
+
+        $this->assertSame(
+            ['total_rows' => 2, 'created' => 0, 'updated' => 2],
+            session('importResult')['summary'],
+            'エクスポートした案件はそのまま再インポートできる（単価ルールで弾かれない）'
+        );
+
+        $ranged->refresh();
+        $this->assertSame(60, (int) $ranged->rate_min);
+        $this->assertSame(90, (int) $ranged->rate_max);
+        $this->assertNull($ranged->rate_note);
+        $this->assertSame('2026-09-01', $ranged->start_date, '日付が Y-m-d で往復する');
+
+        $noted->refresh();
+        $this->assertNull($noted->rate_min);
+        $this->assertNull($noted->rate_max);
+        $this->assertSame('スキル見合い', $noted->rate_note);
     }
 
     /**
