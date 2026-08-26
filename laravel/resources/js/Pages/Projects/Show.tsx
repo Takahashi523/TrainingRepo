@@ -1,4 +1,5 @@
 import { Button } from "@/Components/ui/button";
+import ConfirmDialog from "@/Components/Common/ConfirmDialog";
 import ProcessCheckboxGroup, {
     buildProcessPhaseProps,
 } from "@/Components/Common/ProcessCheckboxGroup";
@@ -60,16 +61,6 @@ export default function Show({ project }: Props) {
             onSuccess: () => setShowDeleteConfirm(false),
         });
     };
-
-    // 欠損は EmptyValue（淡色）で描くため、ここでは値がある場合のみ文字列を組み立てる。
-    const workLocationLabel =
-        project.work_location_station || project.work_location_line
-            ? `${project.work_location_station ?? ""}${
-                  project.work_location_line
-                      ? `（${project.work_location_line}）`
-                      : ""
-              }`
-            : null;
 
     return (
         <AuthenticatedLayout mainClassName="bg-muted/30">
@@ -177,6 +168,15 @@ export default function Show({ project }: Props) {
                             <EmptyValue field="headcount" />
                         )}
                     </FieldRow>
+                    {/* [Issue #43] 面談回数は「何名を・何回会って選び・いつ参画するか」という
+                        募集〜選考〜参画の時系列の一部なので、勤務条件ではなく基本情報に置く。 */}
+                    <FieldRow density="detail" label="面談回数">
+                        {project.interview_count != null ? (
+                            `${project.interview_count}回`
+                        ) : (
+                            <EmptyValue field="interviewCount" />
+                        )}
+                    </FieldRow>
                     <FieldRow density="detail" label="参画開始時期">
                         {/* サーバの start_label は null のとき「未定」を返すが、欠損は控えめな色で
                             見せるため値の有無で描き分ける（色はトークン側が持つ）。 */}
@@ -197,6 +197,11 @@ export default function Show({ project }: Props) {
                             note={project.rate_note}
                         />
                     </FieldRow>
+                    {/* [Issue #43] 精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件なので、
+                        単価の直後に置き、性質の異なる商流を間に挟まない。 */}
+                    <FieldRow density="detail" label="精算幅">
+                        {project.billing_range || <EmptyValue field="billingRange" />}
+                    </FieldRow>
                     <FieldRow density="detail" label="商流">
                         {project.commercial_flow
                             ? (COMMERCIAL_FLOW_LABELS[
@@ -208,29 +213,44 @@ export default function Show({ project }: Props) {
 
                 {/* 勤務条件 */}
                 <SectionCard title="勤務条件">
-                    <FieldRow density="detail" label="勤務地（最寄駅）">
-                        {workLocationLabel ?? <EmptyValue field="workLocation" />}
-                    </FieldRow>
+                    {/* [Issue #43] 「どう働くか（稼働形態）」→「どこで働くか（勤務地）」の順にする。
+                        勤務地の行はフルリモートで消えるため、常に出る稼働形態を先頭に置いた方が
+                        行の増減でセクションの読み出し位置が動かない。登録フォームとも同順。 */}
                     <FieldRow density="detail" label="稼働形態">
                         {project.work_style
                             ? (WORK_STYLE_LABELS[project.work_style] ??
                               project.work_style)
                             : <EmptyValue field="workStyle" />}
                     </FieldRow>
-                    <FieldRow density="detail" label="面談回数">
-                        {project.interview_count != null ? (
-                            `${project.interview_count}回`
-                        ) : (
-                            <EmptyValue field="interviewCount" />
-                        )}
-                    </FieldRow>
-                </SectionCard>
+                    {/* フルリモートは勤務地を持たない項目なので行ごと出さない。
+                        登録フォーム（ProjectForm）も work_style === 'remote' では入力欄自体を描かず、
+                        保存時に ProjectService が最寄駅・路線名を null 化する。ここで「未設定」を出すと、
+                        埋めるべき項目が空いているように読めてしまう（欠損語彙の意味と食い違う）。
+                        稼働形態は直下の行に出るため、行が無いこと自体は文脈から読み取れる。
 
-                {/* 就業条件 */}
-                <SectionCard title="就業条件">
-                    <FieldRow density="detail" label="精算幅">
-                        {project.billing_range || <EmptyValue field="billingRange" />}
-                    </FieldRow>
+                        ただし値が入っている場合は remote でも行を出す。CSV 取込は ProjectService を
+                        通さず直接 upsert するため、work_style=remote かつ勤務地ありの行が保存され得る。
+                        稼働形態だけで隠すと、DB にある値が画面のどこにも出ない状態になってしまう。 */}
+                    {(project.work_style !== "remote" ||
+                        project.work_location_station ||
+                        project.work_location_line) && (
+                        /* [Issue #50 レビュー対応] 登録フォームでは「最寄駅」「路線名」の語の意味を確定させたため、
+                           ラベルを実際の中身に合わせる（旧: 「勤務地（最寄駅）」のまま路線名も表示していた）。
+                           値は最寄駅・路線名を1本の文字列に結合せず、項目ごとに欠損トークンを描く（人材詳細と同じ原子）。
+                           結合していた頃は、路線名だけが入った行が「（山手線）」と駅名の抜けた括弧になり、
+                           駅だけの行では路線名が空であることが画面から読み取れなかった。 */
+                        <FieldRow density="detail" label="勤務地（最寄駅 / 路線名）">
+                            {project.work_location_station || (
+                                <EmptyValue field="nearestStation" />
+                            )}
+                            {"　／　"}
+                            {project.work_location_line || (
+                                <EmptyValue field="nearestLine" />
+                            )}
+                        </FieldRow>
+                    )}
+                    {/* [Issue #43] 特記事項は勤務の補足を書く自由記述で、これ1項目のために
+                        「就業条件」セクションを残す必然性が無いため勤務条件の末尾に置く。 */}
                     <FieldRow density="detail" label="特記事項">
                         {project.remarks ? (
                             <p className="whitespace-pre-wrap leading-relaxed">
@@ -334,35 +354,23 @@ export default function Show({ project }: Props) {
                 </SectionCard>
             </div>
 
-            {/* Delete confirmation dialog */}
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="w-full max-w-sm rounded-lg border border-border bg-white p-6 shadow-xl">
-                        <h2 className="mb-2 text-base font-bold text-foreground">
-                            案件情報を削除しますか？
-                        </h2>
-                        <p className="mb-5 break-words text-sm text-muted-foreground">
-                            <strong>{project.name}</strong>{" "}
-                            の情報を物理削除します。この操作は取り消せません。
-                        </p>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setShowDeleteConfirm(false)}
-                            >
-                                キャンセル
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                onClick={handleDelete}
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? "削除中..." : "削除する"}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* 削除確認は共通 ConfirmDialog（AlertDialog ベース）で行う。
+                手組みモーダルでは得られない role="alertdialog"・フォーカストラップ・
+                Esc での閉じる・フォーカス復帰・背景の不活性化を標準機能に委ねる。 */}
+            <ConfirmDialog
+                open={showDeleteConfirm}
+                title="案件情報を削除しますか？"
+                description={
+                    <>
+                        <strong>{project.name}</strong>{" "}
+                        の情報を物理削除します。この操作は取り消せません。
+                    </>
+                }
+                processing={isDeleting}
+                processingLabel="削除中..."
+                onConfirm={handleDelete}
+                onCancel={() => setShowDeleteConfirm(false)}
+            />
         </AuthenticatedLayout>
     );
 }

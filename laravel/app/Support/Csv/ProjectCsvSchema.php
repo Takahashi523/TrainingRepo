@@ -27,7 +27,7 @@ class ProjectCsvSchema extends CsvSchema
             ['header' => '単価備考', 'field' => 'rate_note', 'type' => 'string'],
             ['header' => '商流', 'field' => 'commercial_flow', 'type' => 'enum'],
             ['header' => '稼働形態', 'field' => 'work_style', 'type' => 'enum'],
-            ['header' => '勤務地（路線）', 'field' => 'work_location_line', 'type' => 'string'],
+            ['header' => '勤務地（路線名）', 'field' => 'work_location_line', 'type' => 'string'],
             ['header' => '勤務地（最寄駅）', 'field' => 'work_location_station', 'type' => 'string'],
             ['header' => '面談回数', 'field' => 'interview_count', 'type' => 'integer'],
             ['header' => '顧客折衝経験要否', 'field' => 'negotiation_required', 'type' => 'flag'],
@@ -70,14 +70,9 @@ class ProjectCsvSchema extends CsvSchema
     }
 
     /**
-     * 案件固有の条件付きルール：
-     *   - 最寄駅は稼働形態が onsite/hybrid の行で必須（業務ルール固定・form_field_settings 対象外）
-     *   - 単価は下限・上限を相互必須にし、両方入力されている行では lte/gte も課す（フォームと同じ挙動）
-     *   - 単価備考は「スキル見合い」を表す欄のため、レンジと同時には入力できない（フォームでは
-     *     rate_is_negotiable により排他になっており、取込でも同じ制約を課す）
+     * 案件固有のバリデーションメッセージ。
      *
-     * @param  array<string, mixed>  $row
-     * @return array<string, array<int, mixed>>
+     * @return array<string, string>
      */
     public function importMessages(): array
     {
@@ -87,6 +82,16 @@ class ProjectCsvSchema extends CsvSchema
         ]);
     }
 
+    /**
+     * 案件固有の条件付きルール：
+     *   - 最寄駅は稼働形態が onsite/hybrid の行で必須（業務ルール固定・form_field_settings 対象外）
+     *   - 単価は下限・上限を相互必須にし、両方入力されている行では lte/gte も課す（フォームと同じ挙動）
+     *   - 単価備考は「スキル見合い」を表す欄のため、レンジと同時には入力できない（フォームでは
+     *     rate_is_negotiable により排他になっており、取込でも同じ制約を課す）
+     *
+     * @param  array<string, mixed>  $row
+     * @return array<string, array<int, mixed>>
+     */
     protected function conditionalImportRules(array $row): array
     {
         $extra = [

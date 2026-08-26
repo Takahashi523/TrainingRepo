@@ -118,6 +118,13 @@ export default function ProjectForm({
 
     return (
         <div className="max-w-3xl">
+            {/* [Issue #43] このフォームのセクション・項目順は
+                FormFieldSetting::FIELD_LABELS['project'] の定義順と 1 対 1 で対応させる
+                （マスタ管理のフォーム設定一覧は同定数の順で表示されるため、ここを並べ替えると
+                「設定画面とフォームで項目の並びが違う」状態になる）。
+                並べ替えるときは同定数と
+                MasterFormSettingControllerTest::test_project_form_settings_are_ordered_by_form_section
+                の期待順も必ず合わせること。TS 側にテスト基盤が無く、この対応は CI で検知できない。 */}
             <SectionHeading>基本情報</SectionHeading>
 
             <FormRow label="案件名" required error={errors.name}>
@@ -134,7 +141,6 @@ export default function ProjectForm({
                 label="顧客名"
                 required={fieldSettings.client_name.is_required}
                 error={errors.client_name}
-                hint="顧客ごとの傾向分析が必要な場合に活用できます"
             >
                 <Input
                     type="text"
@@ -158,6 +164,24 @@ export default function ProjectForm({
                         className={`w-20 ${errors.headcount ? "border-destructive" : ""}`}
                     />
                     <span className="text-sm text-muted-foreground">名</span>
+                </div>
+            </FormRow>
+
+            {/* [Issue #43] 面談回数は「何名を・何回会って選び・いつ参画するか」という
+                募集〜選考〜参画の時系列の一部なので、勤務条件ではなく基本情報に置く。 */}
+            <FormRow
+                label="面談回数"
+                required={fieldSettings.interview_count.is_required}
+                error={errors.interview_count}
+            >
+                <div className="flex items-center gap-2">
+                    <NumberInput
+                        value={data.interview_count}
+                        onChange={(v) => setData("interview_count", v)}
+                        placeholder="1"
+                        className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
+                    />
+                    <span className="text-sm text-muted-foreground">回</span>
                 </div>
             </FormRow>
 
@@ -233,6 +257,23 @@ export default function ProjectForm({
                 )}
             </FormRow>
 
+            {/* [Issue #43] 精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件なので、
+                単価の直後に置き、性質の異なる商流を間に挟まない。 */}
+            <FormRow
+                label="精算幅"
+                required={fieldSettings.billing_range.is_required}
+                error={errors.billing_range}
+                hint="月の精算時間帯をフリーテキストで入力してください"
+            >
+                <Input
+                    type="text"
+                    value={data.billing_range}
+                    onChange={(e) => setData("billing_range", e.target.value)}
+                    placeholder="例：140〜180h"
+                    className={`w-48 ${errors.billing_range ? "border-destructive" : ""}`}
+                />
+            </FormRow>
+
             <FormRow
                 label="商流"
                 required={fieldSettings.commercial_flow.is_required}
@@ -285,82 +326,63 @@ export default function ProjectForm({
             </FormRow>
 
             {data.work_style !== "" && data.work_style !== "remote" && (
-                <FormRow
-                    label="勤務地"
-                    required={fieldSettings.work_location.is_required}
-                    hint="フリーテキスト入力。稼働形態が「常駐」または「一部リモート可」の場合は必須です"
-                    error={
-                        errors.work_location_line ??
-                        errors.work_location_station
-                    }
-                >
-                    <div className="flex gap-2">
-                        <Input
-                            type="text"
-                            value={data.work_location_line}
-                            onChange={(e) =>
-                                setData("work_location_line", e.target.value)
-                            }
-                            placeholder="路線名（例：東京メトロ丸ノ内線）"
-                            className={`w-56 ${errors.work_location_line ? "border-destructive" : ""}`}
-                        />
+                <>
+                    <FormRow
+                        label="勤務地（最寄駅）"
+                        required
+                        hint="人材の最寄駅との通勤条件マッチングに使用します。駅名を自由入力（例：大手町）"
+                        error={errors.work_location_station}
+                    >
                         <Input
                             type="text"
                             value={data.work_location_station}
                             onChange={(e) =>
-                                setData("work_location_station", e.target.value)
+                                setData(
+                                    "work_location_station",
+                                    e.target.value,
+                                )
                             }
                             placeholder="駅名（例：大手町）"
-                            className={`w-48 ${errors.work_location_station ? "border-destructive" : ""}`}
+                            className={`w-64 ${errors.work_location_station ? "border-destructive" : ""}`}
                         />
-                    </div>
-                </FormRow>
+                    </FormRow>
+                    <FormRow
+                        label="勤務地（路線名）"
+                        required={fieldSettings.work_location.is_required}
+                        hint="路線名を自由入力（例：東京メトロ丸ノ内線）"
+                        error={errors.work_location_line}
+                    >
+                        <Input
+                            type="text"
+                            value={data.work_location_line}
+                            onChange={(e) =>
+                                setData(
+                                    "work_location_line",
+                                    e.target.value,
+                                )
+                            }
+                            placeholder="路線名（例：東京メトロ丸ノ内線）"
+                            className={`w-64 ${errors.work_location_line ? "border-destructive" : ""}`}
+                        />
+                    </FormRow>
+                </>
             )}
 
-            <FormRow
-                label="面談回数"
-                required={fieldSettings.interview_count.is_required}
-                error={errors.interview_count}
-            >
-                <div className="flex items-center gap-2">
-                    <NumberInput
-                        value={data.interview_count}
-                        onChange={(v) => setData("interview_count", v)}
-                        placeholder="1"
-                        className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
-                    />
-                    <span className="text-sm text-muted-foreground">回</span>
-                </div>
-            </FormRow>
-
-            <SectionHeading>就業条件</SectionHeading>
-
-            <FormRow
-                label="精算幅"
-                required={fieldSettings.billing_range.is_required}
-                error={errors.billing_range}
-                hint="月の精算時間帯をフリーテキストで入力してください"
-            >
-                <Input
-                    type="text"
-                    value={data.billing_range}
-                    onChange={(e) => setData("billing_range", e.target.value)}
-                    placeholder="例：140〜180h"
-                    className={`w-48 ${errors.billing_range ? "border-destructive" : ""}`}
-                />
-            </FormRow>
-
+            {/* [Issue #43] 特記事項は勤務の補足を書く自由記述で、これ1項目のために
+                「就業条件」セクションを残す必然性が無いため勤務条件の末尾に置く。 */}
             <FormRow
                 label="特記事項"
                 required={fieldSettings.remarks.is_required}
                 error={errors.remarks}
                 hint="スコア計算には使用しません。営業担当者が把握しておきたい就業条件を自由記述してください"
             >
+                {/* 過大な入力によるPostTooLargeExceptionを避けるため、バックエンドのmax:1000と揃えてフロントでも制限する */}
                 <Textarea
                     value={data.remarks}
                     onChange={(e) => setData("remarks", e.target.value)}
                     placeholder="例：基本勤務時間 10:00〜19:00、シフト制なし、出張なし など"
                     className={`min-h-28 ${errors.remarks ? "border-destructive" : ""}`}
+                    maxLength={1000}
                 />
             </FormRow>
 
@@ -446,14 +468,24 @@ export default function ProjectForm({
                 label="業務内容詳細"
                 required={fieldSettings.description.is_required}
                 error={errors.description}
-                hint="AIが案件内容を理解してマッチング精度を向上させるために使用します"
             >
+                {/* 過大な入力によるPostTooLargeExceptionを避けるため、バックエンドのmax:4000と揃えてフロントでも制限する */}
                 <Textarea
                     value={data.description}
                     onChange={(e) => setData("description", e.target.value)}
                     placeholder="例：大手金融機関の勘定系システムをJava/Spring Bootでリプレースするプロジェクトです。要件定義フェーズから参画いただき、基本設計〜開発・テストまで一貫して担当していただきます。チームは5名構成、スクラム開発を採用しています。"
                     className={`min-h-40 ${errors.description ? "border-destructive" : ""}`}
+                    maxLength={4000}
                 />
+                {/* ヒントと文字数カウンタ（メール等からの貼り付けで末尾が無言で切り詰められても気付けるように）を同じ行に表示する */}
+                <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                        AIが案件内容を理解してマッチング精度を向上させるために使用します
+                    </p>
+                    <p className="shrink-0 text-[11px] text-muted-foreground">
+                        {data.description.length.toLocaleString()} / 4,000
+                    </p>
+                </div>
             </FormRow>
 
             <FormRow
@@ -462,11 +494,13 @@ export default function ProjectForm({
                 error={errors.work_env}
                 hint="OS・ツール・ミドルウェア等の技術環境をフリーテキストで記述してください"
             >
+                {/* 過大な入力によるPostTooLargeExceptionを避けるため、バックエンドのmax:1000と揃えてフロントでも制限する */}
                 <Textarea
                     value={data.work_env}
                     onChange={(e) => setData("work_env", e.target.value)}
                     placeholder="例：OS: CentOS / Windows Server　DBMS: PostgreSQL / SQL Server　開発言語: PHP / JavaScript　クラウド: AWS　その他: Docker / Git"
                     className={`min-h-28 ${errors.work_env ? "border-destructive" : ""}`}
+                    maxLength={1000}
                 />
             </FormRow>
 

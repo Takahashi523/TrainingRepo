@@ -44,7 +44,8 @@ export const EMPTY_FIELDS = {
     description: { name: '業務内容詳細', kind: 'unset' },
     workEnv: { name: '稼働環境', kind: 'unset' },
     billingRange: { name: '精算幅', kind: 'unset' },
-    workLocation: { name: '勤務地', kind: 'unset' },
+    // 案件の勤務地は「勤務地」1語ではなく nearestStation / nearestLine の2トークンで描く。
+    // 人材詳細と同じ粒度にそろえ、片方だけ入力された行でも欠けている側が読み取れるようにするため。
     // --- 後から決まり得る条件（未定） ---
     availableFrom: { name: '稼働可能時期', kind: 'undecided' },
     startDate: { name: '参画開始時期', kind: 'undecided' },

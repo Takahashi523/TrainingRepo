@@ -52,10 +52,15 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                                 値が無いときもセグメントごと消さず、項目名入りトークンで「未設定である」ことを見せる
                                 （消すと読み落としと区別できないため）。マッチングサマリーと同じ表現。 */}
                             <MetaRow className="mt-0.5">
-                                <MetaItem field="age">
+                                <MetaItem field="age" valueHasFieldName={engineer.age == null}>
                                     {engineer.age != null ? `${engineer.age}歳` : emptyText('age', true)}
                                 </MetaItem>
-                                <MetaItem field="nearestStation">
+                                {/* 最寄駅が入っていれば値が先頭に来るため sr-only の項目名は必要
+                                    （路線だけ欠けている場合も「東京駅（路線未設定）」となり二重読みにならない）。 */}
+                                <MetaItem
+                                    field="nearestStation"
+                                    valueHasFieldName={!engineer.nearest_station}
+                                >
                                     {engineer.nearest_station || emptyText('nearestStation', true)}
                                     {engineer.nearest_line
                                         ? `（${engineer.nearest_line}）`

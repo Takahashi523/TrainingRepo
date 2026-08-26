@@ -381,9 +381,9 @@
         <div class="form-label">
           <span class="badge-optional">任意</span>顧客名
         </div>
+        <!-- [2026-08-26] ヒント「顧客ごとの傾向分析が必要な場合に活用できます」を削除（下部の注釈を参照） -->
         <div class="form-field col">
           <input class="wf-input w-200" type="text" placeholder="例：○○銀行">
-          <span class="hint-text">顧客ごとの傾向分析が必要な場合に活用できます</span>
         </div>
       </div>
 
@@ -395,6 +395,17 @@
         <div class="form-field" style="align-items:center;">
           <input class="wf-input w-80" type="text" placeholder="2">
           <span class="unit-text">名</span>
+        </div>
+      </div>
+
+      <!-- 面談回数：[Issue #43] 勤務条件から移設（募集人数 → 面談回数 → 参画開始時期の時系列） -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>面談回数
+        </div>
+        <div class="form-field" style="align-items:center;">
+          <input class="wf-input w-80" type="text" placeholder="1">
+          <span class="unit-text">回</span>
         </div>
       </div>
 
@@ -435,6 +446,17 @@
             <input class="wf-input w-200" type="text" placeholder="例：スキル見合い、応相談">
           </div>
           <span class="hint-text">人材の希望単価が案件の単価レンジ内に収まるかの判定に使用します。スキル見合いの場合はチェックを入れてください</span>
+        </div>
+      </div>
+
+      <!-- 精算幅：[Issue #43] 就業条件から移設（単価とセットで読む取引条件のため単価の直後） -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>精算幅
+        </div>
+        <div class="form-field col">
+          <input class="wf-input w-200" type="text" placeholder="例：140〜180h">
+          <span class="hint-text">月の精算時間帯をフリーテキストで入力してください</span>
         </div>
       </div>
 
@@ -479,49 +501,33 @@
         </div>
       </div>
 
-      <!-- 勤務地（最寄駅）：フルリモート以外の場合のみ表示・必須 -->
-      <div class="form-row" id="location-row" style="display:none;">
+      <!-- 勤務地（最寄駅・路線名）：常駐/一部リモート可の場合のみ2行とも表示（未選択時はフルリモートと同様に非表示）。
+           [Issue #50] 最寄駅は常に必須（業務ルール固定・form_field_settings対象外、ProjectRequest参照）。
+           路線名はマスタ管理画面の設定（form_field_settings.work_location）に連動する必須/任意。
+           以前は1行に統合し路線名側のバッジのみを表示していたため、マスタで路線名を任意にすると
+           最寄駅側の固定必須と矛盾する表示になっていた。2行に分割し、それぞれ実際のロジック通りの
+           バッジを表示するよう修正（人材登録WF_04の最寄駅/路線と同じ「別行・別バッジ」構成に統一）。 -->
+      <div class="form-row" id="location-row-station" style="display:none;">
         <div class="form-label">
-          <span class="badge-required" id="location-badge">必須</span>勤務地（最寄駅）
+          <span class="badge-required">必須</span>勤務地（最寄駅）
         </div>
         <div class="form-field col">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input class="wf-input w-200" type="text" id="location-line" placeholder="路線名（例：東京メトロ丸ノ内線）">
-            <input class="wf-input w-200" type="text" id="location-sta"  placeholder="駅名（例：大手町）">
-          </div>
-          <span class="hint-text">フリーテキスト入力。稼働形態が「常駐」または「一部リモート可」の場合は必須です</span>
+          <input class="wf-input w-200" type="text" id="location-sta" placeholder="駅名（例：大手町）">
+          <span class="hint-text">人材の最寄駅との通勤条件マッチングに使用します。駅名を自由入力（例：大手町）</span>
         </div>
       </div>
 
-      <!-- 面談回数 -->
-      <div class="form-row">
+      <div class="form-row" id="location-row-line" style="display:none;">
         <div class="form-label">
-          <span class="badge-optional">任意</span>面談回数
-        </div>
-        <div class="form-field" style="align-items:center;">
-          <input class="wf-input w-80" type="text" placeholder="1">
-          <span class="unit-text">回</span>
-        </div>
-      </div>
-      
-      <!-- ==================== 就業条件 ==================== -->
-      <div class="section-heading">
-        <span class="section-heading-text">就業条件</span>
-        <div class="section-divider"></div>
-      </div>
-
-      <!-- 精算幅 -->
-      <div class="form-row">
-        <div class="form-label">
-          <span class="badge-optional">任意</span>精算幅
+          <span class="badge-required" id="location-badge-line">必須</span>勤務地（路線名）
         </div>
         <div class="form-field col">
-          <input class="wf-input w-200" type="text" placeholder="例：140〜180h">
-          <span class="hint-text">月の精算時間帯をフリーテキストで入力してください</span>
+          <input class="wf-input w-200" type="text" id="location-line" placeholder="路線名（例：東京メトロ丸ノ内線）">
+          <span class="hint-text">路線名を自由入力（例：東京メトロ丸ノ内線）</span>
         </div>
       </div>
 
-      <!-- 特記事項 -->
+      <!-- 特記事項：[Issue #43] 就業条件から移設（勤務の補足を書く自由記述のため勤務条件の末尾） -->
       <div class="form-row">
         <div class="form-label">
           <span class="badge-optional">任意</span>特記事項
@@ -733,11 +739,14 @@
       <div>
         <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;">✅ 確定済み仕様</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
-          <li>勤務地：フリーテキスト確定。フルリモート選択時は行を非表示・入力値クリア（QA #59）</li>
+          <li>勤務地：フリーテキスト確定。フルリモート・未選択時は行を非表示。画面上（稼働形態の切替時）は値をクリアせず、送信時にフロントで一次null化・保存時にバックエンド（ProjectService）が再度null化して最終保証する二段構え（QA #59 / Issue #50レビュー対応で記述訂正）</li>
+          <li>[Issue #50] 勤務地は「勤務地（最寄駅）」「勤務地（路線名）」の別行・別バッジ表示。最寄駅は常時必須（業務ルール固定）、路線名はマスタ設定（form_field_settings.work_location）に連動</li>
           <li>単価：スキル見合いチェックボックスあり。ON時に数値欄→テキスト入力へ切替（QA #14）</li>
           <li>稼働環境：フリーテキストでスキル要件セクション末尾に追加（QA #67）</li>
-          <li>精算幅：フリーテキストで就業条件セクションに独立追加（QA #66）</li>
+          <li>精算幅：フリーテキストで独立追加（QA #66）。<strong>【2026-08-26 修正】就業条件セクション → 契約条件セクション（単価の直後）へ移設</strong>　<strong>背景：</strong>「就業条件」の中身が精算幅・特記事項の2項目だけで、独立セクションとしてのまとまりが弱かった（issue #43）。<strong>理由：</strong>精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件のため、単価の直後に置き、性質の異なる商流を間に挟まない</li>
+          <li><strong>【2026-08-26 修正】セクション再編（issue #43）</strong>：面談回数を勤務条件 → 基本情報（募集人数の後）、特記事項を就業条件 → 勤務条件（末尾）へ移設し、空になった「就業条件」セクションを削除。<strong>背景：</strong>面談回数は選考プロセスの属性で、勤務地・稼働形態（働く場所・形態）とは性質が違うのに勤務条件に置かれていた。<strong>理由：</strong>基本情報を「募集人数 → 面談回数 → 参画開始時期」の時系列にそろえ、面談回数1項目のために「選考プロセス」セクションを新設するのは過剰と判断した。案件詳細（WF_08）・マスタ管理のフォーム設定一覧（WF_12）も同じ順序にそろえている。勤務地2行の必須条件（issue #50）には変更なし</li>
           <li>スキル：ラベル（最大15文字）＋詳細テキストエリア構成。ラベルは一覧・マッチング結果に表示</li>
+          <li><strong>【2026-08-26 修正】顧客名のヒント「顧客ごとの傾向分析が必要な場合に活用できます」を削除</strong>　<strong>背景：</strong>顧客ごとの傾向分析機能は実装しておらず、実施予定も無い。<strong>理由：</strong>存在しない用途を入力欄のヒントで案内すると、営業担当者に「分析されるなら正式名称で揃えて入力すべきか」という無い制約を意識させ、入力の負担と迷いを生む。用途を書けない項目はヒント自体を置かない。あわせて `docs/01_requirements/要件定義書.md` の顧客名の用途欄も「傾向分析用」→「案件の識別・検索の補助」に改めた（同ファイルの ※1 注記を参照）</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ WF_04（人材登録）との主な差分</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
@@ -753,9 +762,23 @@
 
 <!--
   WF_07_案件登録_編集.html
-  バージョン: v1.1
-  更新日: 2026-04-30
+  バージョン: v1.3
+  更新日: 2026-08-22
   変更履歴:
+    v1.2 (2026-08-15)
+      - [Issue #50] 勤務地を「勤務地（最寄駅）」「勤務地（路線名）」の2行に分割。
+        最寄駅は常駐/一部リモート可の場合は常に必須バッジ（業務ルール固定）、
+        路線名はマスタ設定に連動したバッジを個別表示するよう修正
+        （旧: 1行に統合し路線名側のバッジのみを表示していたため、
+        マスタで路線名を任意にすると最寄駅の実際の必須条件と表示が矛盾していた）
+      - [Issue #50] onWorkStyleChange() を2行対応に変更。入力値クリアの記述を削除
+        （画面上はクリアせず、送信時にフロントが一次null化・保存時にバックエンドが最終null化する）
+      - [Issue #50] 2行のヒント文を実装（ProjectForm.tsx）と一致させ、人材登録WF_04と同じ
+        「用途＋自由入力＋例」の文体に統一（旧版は実装反映前の暫定文言のまま残っていた）
+    v1.3 (2026-08-22)
+      - [Issue #50 レビュー対応] 「入力値クリアはフロントでは行わない」という記述を訂正。
+        実装（Create.tsx / Edit.tsx のtransform）では送信時にフロント側でも一次null化しており、
+        バックエンド（ProjectService）はそれを最終保証として再度null化する二段構えが正しい挙動
     v1.1 (2026-04-30)
       - [QA #77] システム名を「Nexus（ネクサス）」に統一
       - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
@@ -780,22 +803,22 @@ function toggleSkillMerit(chk) {
 }
 
 function onWorkStyleChange(sel) {
-  var row   = document.getElementById('location-row');
-  var line  = document.getElementById('location-line');
-  var sta   = document.getElementById('location-sta');
-  var val   = sel.value;
+  // [Issue #50] 最寄駅・路線名の2行を同じ条件で出し分ける。
+  // 画面上（この切替時）は値をクリアしない。実装では送信時にフロント（Create/Edit.tsx）が
+  // work_style=remote の場合に一次null化し、保存時にバックエンド ProjectService が
+  // 同条件で再度null化して最終保証する（二段構え。[Issue #50 レビュー対応]で記述訂正）。
+  var rowStation = document.getElementById('location-row-station');
+  var rowLine    = document.getElementById('location-row-line');
+  var val        = sel.value;
 
-  if (val === 'remote') {
-    // フルリモート：入力値クリア → 行を非表示
-    line.value = '';
-    sta.value  = '';
-    row.style.display = 'none';
-  } else if (val === '' ) {
-    // 未選択：非表示のまま
-    row.style.display = 'none';
+  if (val === 'onsite' || val === 'hybrid') {
+    // 常駐 or 一部リモート可：2行とも表示
+    rowStation.style.display = 'flex';
+    rowLine.style.display    = 'flex';
   } else {
-    // 常駐 or 一部リモート可：行を表示
-    row.style.display = 'flex';
+    // フルリモート、または未選択：2行とも非表示
+    rowStation.style.display = 'none';
+    rowLine.style.display    = 'none';
   }
 }
 </script>

@@ -30,6 +30,8 @@ export default function UserAvatar({ role, name, className }: Props) {
     const shortName =
         trimmed.length > MAX_CHARS ? `${trimmed.slice(0, MAX_CHARS)}…` : trimmed;
     // 未割当も語彙は SSOT（emptyValue）に合わせる。
+    // name が null になるのはサブのみ（主担当は必須項目で DB も NOT NULL のため常に値がある）。
+    // よってキーは subUser 固定でよい。
     const label = `${role}：${name ?? emptyText('subUser')}`;
     // 頭文字だけでは誰か分からないため、遅延なし（delay 0）で即座に氏名を出す。
     const { ref, anchor, triggerProps } = useHoverTooltip<HTMLSpanElement>({ delay: 0 });
@@ -38,8 +40,10 @@ export default function UserAvatar({ role, name, className }: Props) {
         <>
         <span
             ref={ref}
-            // sr-only で氏名は読めるが、キーボード操作でもツールチップ（全文）に到達できるようにする。
-            tabIndex={0}
+            // tabIndex は付けない。押せない span をフォーカス可能にすると一覧1ページで
+            // 数十個の「止まるが何も起きない」タブストップが増え、実際の操作（編集・削除・
+            // ページネーション）までの距離が伸びる。氏名は sr-only で常に読めるため
+            // 支援技術の利用者は情報を失わない。同じツールチップを使う TruncatedText も同じ扱い。
             {...triggerProps}
             className={cn(
                 // サイズ・ウェイトは同じ行に並ぶ他のバッジ（面談回数・募集人数）に合わせる。

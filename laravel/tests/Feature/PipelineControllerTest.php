@@ -779,7 +779,32 @@ class PipelineControllerTest extends TestCase
         $user = User::factory()->create(['role' => 'general']);
         $pipeline = $this->makePipeline($user, ['status' => 'proposed']);
 
-        $this->actingAs($user)->delete('/pipelines/'.$pipeline->id)->assertForbidden();
+        // 削除はドロワー表示中（referer が show URL /pipelines/{id}）から実行される。
+        $response = $this->actingAs($user)->delete(
+            '/pipelines/'.$pipeline->id,
+            [],
+            ['X-Inertia' => 'true', 'referer' => '/pipelines/'.$pipeline->id]
+        );
+
+        // 設計書 06_進捗管理 DELETE #5：権限不足は 403 を素で投げず、前画面（＝同じドロワー表示）
+        // へ戻し flash.error を返す。redirect先を固定しないと一覧へ飛ばす誤実装でも通ってしまうため、
+        // referer を明示してリダイレクト先まで検証する（StaleResourceHandlingTestと同粒度）。
+        $response->assertStatus(303);
+        $response->assertRedirect('/pipelines/'.$pipeline->id);
+        $response->assertSessionHas('error', '削除権限がありません。');
+        $this->assertDatabaseHas('pipelines', ['id' => $pipeline->id]);
+    }
+
+    public function test_general_user_delete_pipeline_without_referer_falls_back_to_dashboard(): void
+    {
+        // referer が無い場合（直接リクエスト等）でも flash.error を失わずダッシュボードへ戻る。
+        $user = User::factory()->create(['role' => 'general']);
+        $pipeline = $this->makePipeline($user, ['status' => 'proposed']);
+
+        $response = $this->actingAs($user)->delete('/pipelines/'.$pipeline->id);
+
+        $response->assertRedirect('/dashboard');
+        $response->assertSessionHas('error', '削除権限がありません。');
         $this->assertDatabaseHas('pipelines', ['id' => $pipeline->id]);
     }
 
