@@ -1,5 +1,6 @@
 import { Toaster } from '@/Components/ui/toaster';
 import AppSidebar from '@/Components/Navigation/AppSidebar';
+import { useConnectionErrorToast } from '@/hooks/use-connection-error-toast';
 import { useToast } from '@/hooks/use-toast';
 import { PageProps } from '@/types';
 import { router, usePage } from '@inertiajs/react';
@@ -20,6 +21,9 @@ export default function Authenticated({
     const page = usePage<PageProps>();
     const { toast } = useToast();
 
+    // 通信断（サーバーに到達できない失敗）の通知。GuestLayout でも同じ購読を行う（#84）。
+    useConnectionErrorToast();
+
     useEffect(() => {
         const showFlash = (flash?: PageProps['flash']) => {
             if (!flash) return;
@@ -38,9 +42,11 @@ export default function Authenticated({
         // useEffect の依存に flash 文字列を使うと、同一メッセージが連続した際に
         // 値が変わらず再表示されない（例：同じユーザーを続けて更新）ため、
         // Inertia の成功レスポンスごとに確実に表示する。
-        return router.on('success', (event) => {
+        const offSuccess = router.on('success', (event) => {
             showFlash((event.detail.page.props as unknown as PageProps).flash);
         });
+
+        return offSuccess;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
