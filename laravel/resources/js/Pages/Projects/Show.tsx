@@ -168,6 +168,15 @@ export default function Show({ project }: Props) {
                             <EmptyValue field="headcount" />
                         )}
                     </FieldRow>
+                    {/* [Issue #43] 面談回数は「何名を・何回会って選び・いつ参画するか」という
+                        募集〜選考〜参画の時系列の一部なので、勤務条件ではなく基本情報に置く。 */}
+                    <FieldRow density="detail" label="面談回数">
+                        {project.interview_count != null ? (
+                            `${project.interview_count}回`
+                        ) : (
+                            <EmptyValue field="interviewCount" />
+                        )}
+                    </FieldRow>
                     <FieldRow density="detail" label="参画開始時期">
                         {/* サーバの start_label は null のとき「未定」を返すが、欠損は控えめな色で
                             見せるため値の有無で描き分ける（色はトークン側が持つ）。 */}
@@ -188,6 +197,11 @@ export default function Show({ project }: Props) {
                             note={project.rate_note}
                         />
                     </FieldRow>
+                    {/* [Issue #43] 精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件なので、
+                        単価の直後に置き、性質の異なる商流を間に挟まない。 */}
+                    <FieldRow density="detail" label="精算幅">
+                        {project.billing_range || <EmptyValue field="billingRange" />}
+                    </FieldRow>
                     <FieldRow density="detail" label="商流">
                         {project.commercial_flow
                             ? (COMMERCIAL_FLOW_LABELS[
@@ -199,6 +213,15 @@ export default function Show({ project }: Props) {
 
                 {/* 勤務条件 */}
                 <SectionCard title="勤務条件">
+                    {/* [Issue #43] 「どう働くか（稼働形態）」→「どこで働くか（勤務地）」の順にする。
+                        勤務地の行はフルリモートで消えるため、常に出る稼働形態を先頭に置いた方が
+                        行の増減でセクションの読み出し位置が動かない。登録フォームとも同順。 */}
+                    <FieldRow density="detail" label="稼働形態">
+                        {project.work_style
+                            ? (WORK_STYLE_LABELS[project.work_style] ??
+                              project.work_style)
+                            : <EmptyValue field="workStyle" />}
+                    </FieldRow>
                     {/* フルリモートは勤務地を持たない項目なので行ごと出さない。
                         登録フォーム（ProjectForm）も work_style === 'remote' では入力欄自体を描かず、
                         保存時に ProjectService が最寄駅・路線名を null 化する。ここで「未設定」を出すと、
@@ -226,26 +249,8 @@ export default function Show({ project }: Props) {
                             )}
                         </FieldRow>
                     )}
-                    <FieldRow density="detail" label="稼働形態">
-                        {project.work_style
-                            ? (WORK_STYLE_LABELS[project.work_style] ??
-                              project.work_style)
-                            : <EmptyValue field="workStyle" />}
-                    </FieldRow>
-                    <FieldRow density="detail" label="面談回数">
-                        {project.interview_count != null ? (
-                            `${project.interview_count}回`
-                        ) : (
-                            <EmptyValue field="interviewCount" />
-                        )}
-                    </FieldRow>
-                </SectionCard>
-
-                {/* 就業条件 */}
-                <SectionCard title="就業条件">
-                    <FieldRow density="detail" label="精算幅">
-                        {project.billing_range || <EmptyValue field="billingRange" />}
-                    </FieldRow>
+                    {/* [Issue #43] 特記事項は勤務の補足を書く自由記述で、これ1項目のために
+                        「就業条件」セクションを残す必然性が無いため勤務条件の末尾に置く。 */}
                     <FieldRow density="detail" label="特記事項">
                         {project.remarks ? (
                             <p className="whitespace-pre-wrap leading-relaxed">
