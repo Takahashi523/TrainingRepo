@@ -398,6 +398,17 @@
         </div>
       </div>
 
+      <!-- 面談回数：[Issue #43] 勤務条件から移設（募集人数 → 面談回数 → 参画開始時期の時系列） -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>面談回数
+        </div>
+        <div class="form-field" style="align-items:center;">
+          <input class="wf-input w-80" type="text" placeholder="1">
+          <span class="unit-text">回</span>
+        </div>
+      </div>
+
       <!-- 参画開始時期 -->
       <div class="form-row">
         <div class="form-label">
@@ -435,6 +446,17 @@
             <input class="wf-input w-200" type="text" placeholder="例：スキル見合い、応相談">
           </div>
           <span class="hint-text">人材の希望単価が案件の単価レンジ内に収まるかの判定に使用します。スキル見合いの場合はチェックを入れてください</span>
+        </div>
+      </div>
+
+      <!-- 精算幅：[Issue #43] 就業条件から移設（単価とセットで読む取引条件のため単価の直後） -->
+      <div class="form-row">
+        <div class="form-label">
+          <span class="badge-optional">任意</span>精算幅
+        </div>
+        <div class="form-field col">
+          <input class="wf-input w-200" type="text" placeholder="例：140〜180h">
+          <span class="hint-text">月の精算時間帯をフリーテキストで入力してください</span>
         </div>
       </div>
 
@@ -505,35 +527,7 @@
         </div>
       </div>
 
-      <!-- 面談回数 -->
-      <div class="form-row">
-        <div class="form-label">
-          <span class="badge-optional">任意</span>面談回数
-        </div>
-        <div class="form-field" style="align-items:center;">
-          <input class="wf-input w-80" type="text" placeholder="1">
-          <span class="unit-text">回</span>
-        </div>
-      </div>
-      
-      <!-- ==================== 就業条件 ==================== -->
-      <div class="section-heading">
-        <span class="section-heading-text">就業条件</span>
-        <div class="section-divider"></div>
-      </div>
-
-      <!-- 精算幅 -->
-      <div class="form-row">
-        <div class="form-label">
-          <span class="badge-optional">任意</span>精算幅
-        </div>
-        <div class="form-field col">
-          <input class="wf-input w-200" type="text" placeholder="例：140〜180h">
-          <span class="hint-text">月の精算時間帯をフリーテキストで入力してください</span>
-        </div>
-      </div>
-
-      <!-- 特記事項 -->
+      <!-- 特記事項：[Issue #43] 就業条件から移設（勤務の補足を書く自由記述のため勤務条件の末尾） -->
       <div class="form-row">
         <div class="form-label">
           <span class="badge-optional">任意</span>特記事項
@@ -749,7 +743,8 @@
           <li>[Issue #50] 勤務地は「勤務地（最寄駅）」「勤務地（路線名）」の別行・別バッジ表示。最寄駅は常時必須（業務ルール固定）、路線名はマスタ設定（form_field_settings.work_location）に連動</li>
           <li>単価：スキル見合いチェックボックスあり。ON時に数値欄→テキスト入力へ切替（QA #14）</li>
           <li>稼働環境：フリーテキストでスキル要件セクション末尾に追加（QA #67）</li>
-          <li>精算幅：フリーテキストで就業条件セクションに独立追加（QA #66）</li>
+          <li>精算幅：フリーテキストで独立追加（QA #66）。<strong>【2026-08-26 修正】就業条件セクション → 契約条件セクション（単価の直後）へ移設</strong>　<strong>背景：</strong>「就業条件」の中身が精算幅・特記事項の2項目だけで、独立セクションとしてのまとまりが弱かった（issue #43）。<strong>理由：</strong>精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件のため、単価の直後に置き、性質の異なる商流を間に挟まない</li>
+          <li><strong>【2026-08-26 修正】セクション再編（issue #43）</strong>：面談回数を勤務条件 → 基本情報（募集人数の後）、特記事項を就業条件 → 勤務条件（末尾）へ移設し、空になった「就業条件」セクションを削除。<strong>背景：</strong>面談回数は選考プロセスの属性で、勤務地・稼働形態（働く場所・形態）とは性質が違うのに勤務条件に置かれていた。<strong>理由：</strong>基本情報を「募集人数 → 面談回数 → 参画開始時期」の時系列にそろえ、面談回数1項目のために「選考プロセス」セクションを新設するのは過剰と判断した。案件詳細（WF_08）・マスタ管理のフォーム設定一覧（WF_12）も同じ順序にそろえている。勤務地2行の必須条件（issue #50）には変更なし</li>
           <li>スキル：ラベル（最大15文字）＋詳細テキストエリア構成。ラベルは一覧・マッチング結果に表示</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ WF_04（人材登録）との主な差分</div>

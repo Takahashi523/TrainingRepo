@@ -161,6 +161,24 @@ export default function ProjectForm({
                 </div>
             </FormRow>
 
+            {/* [Issue #43] 面談回数は「何名を・何回会って選び・いつ参画するか」という
+                募集〜選考〜参画の時系列の一部なので、勤務条件ではなく基本情報に置く。 */}
+            <FormRow
+                label="面談回数"
+                required={fieldSettings.interview_count.is_required}
+                error={errors.interview_count}
+            >
+                <div className="flex items-center gap-2">
+                    <NumberInput
+                        value={data.interview_count}
+                        onChange={(v) => setData("interview_count", v)}
+                        placeholder="1"
+                        className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
+                    />
+                    <span className="text-sm text-muted-foreground">回</span>
+                </div>
+            </FormRow>
+
             <FormRow
                 label="参画開始時期"
                 required={fieldSettings.start_date.is_required}
@@ -231,6 +249,23 @@ export default function ProjectForm({
                         className={`w-64 ${errors.rate_note ? "border-destructive" : ""}`}
                     />
                 )}
+            </FormRow>
+
+            {/* [Issue #43] 精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件なので、
+                単価の直後に置き、性質の異なる商流を間に挟まない。 */}
+            <FormRow
+                label="精算幅"
+                required={fieldSettings.billing_range.is_required}
+                error={errors.billing_range}
+                hint="月の精算時間帯をフリーテキストで入力してください"
+            >
+                <Input
+                    type="text"
+                    value={data.billing_range}
+                    onChange={(e) => setData("billing_range", e.target.value)}
+                    placeholder="例：140〜180h"
+                    className={`w-48 ${errors.billing_range ? "border-destructive" : ""}`}
+                />
             </FormRow>
 
             <FormRow
@@ -327,39 +362,8 @@ export default function ProjectForm({
                 </>
             )}
 
-            <FormRow
-                label="面談回数"
-                required={fieldSettings.interview_count.is_required}
-                error={errors.interview_count}
-            >
-                <div className="flex items-center gap-2">
-                    <NumberInput
-                        value={data.interview_count}
-                        onChange={(v) => setData("interview_count", v)}
-                        placeholder="1"
-                        className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
-                    />
-                    <span className="text-sm text-muted-foreground">回</span>
-                </div>
-            </FormRow>
-
-            <SectionHeading>就業条件</SectionHeading>
-
-            <FormRow
-                label="精算幅"
-                required={fieldSettings.billing_range.is_required}
-                error={errors.billing_range}
-                hint="月の精算時間帯をフリーテキストで入力してください"
-            >
-                <Input
-                    type="text"
-                    value={data.billing_range}
-                    onChange={(e) => setData("billing_range", e.target.value)}
-                    placeholder="例：140〜180h"
-                    className={`w-48 ${errors.billing_range ? "border-destructive" : ""}`}
-                />
-            </FormRow>
-
+            {/* [Issue #43] 特記事項は勤務の補足を書く自由記述で、これ1項目のために
+                「就業条件」セクションを残す必然性が無いため勤務条件の末尾に置く。 */}
             <FormRow
                 label="特記事項"
                 required={fieldSettings.remarks.is_required}

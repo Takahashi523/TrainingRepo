@@ -209,6 +209,11 @@
 
 `form_field_settings` テーブルの `field_key` 値とWF_12表示名の対応。バリデーション・シードデータの参照として使用する。
 
+> **【2026-08-26 追記】この表の行順は画面の表示順ではない**（`is_system_required` のものを先頭にまとめた読みやすさ優先の並び）。  
+> **画面（マスタ管理のフォーム設定一覧）の表示順は `FormFieldSetting::FIELD_LABELS` の定義順が SSOT** で、`MasterController::orderedSettings()` が `displayOrder()` でその順に並べ替えて `form_settings.*` を返す。  
+> **背景：** 案件側の並びが登録フォームと無関係な順序で、設定したい項目をフォームと同じ順に辿れなかった（issue #43）。  
+> **理由：** 表示順を定数1箇所に集約したまま、その定数を登録フォームのセクション順（基本情報 → 契約条件 → 勤務条件 → スキル要件 → 管理情報）に並べ替えることで、この一覧表の記述形式を変えずに画面の順序整合を取れるため。順序の固定は `MasterFormSettingControllerTest` が担保する。
+
 > **キー名の統一方針**：`fieldSettings` の各キーは form_field_settings テーブルの `field_key` カラムと1対1で対応する。人材管理・案件管理の API 定義書の `fieldSettings` と完全に一致させること。
 
 ### 人材登録フォーム（form_type = engineer）
