@@ -13,7 +13,6 @@ use App\Models\SavedSearch;
 use App\Models\User;
 use App\Models\Project;
 use App\Services\ProjectService;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
