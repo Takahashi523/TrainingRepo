@@ -155,7 +155,7 @@ export default function Index({
                         <div>
                             <h1 className="text-lg font-bold text-foreground">人材一覧</h1>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                登録人材の検索・絞り込みと詳細確認
+                                登録済みの人材を検索・確認します
                             </p>
                         </div>
                         <div>

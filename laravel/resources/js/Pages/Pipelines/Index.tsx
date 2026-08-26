@@ -169,7 +169,7 @@ export default function Index({
                 </div>
 
                 {/* カンバン本体（残り高さを占有・内部スクロール） */}
-                <div className="flex-1 overflow-hidden bg-muted/60">
+                <div className="flex-1 overflow-hidden bg-muted/30">
                     <div className="flex h-full overflow-x-auto">
                         {columns.map((column) => (
                             <KanbanColumn

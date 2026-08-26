@@ -1063,6 +1063,82 @@ class EngineerControllerTest extends TestCase
     }
 
     // -------------------------------------------------------
+    // store: POST /engineers — appeal_note / remarks の文字数上限
+    // （PostTooLargeException対策として EngineerRules に定義済みの max ルールの境界値。
+    //   案件側 ProjectControllerTest の description/work_env/remarks と同方式）
+    // -------------------------------------------------------
+
+    public function test_appeal_note_exceeding_max_length_fails(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'appeal_note' => str_repeat('あ', 4001),
+        ]);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionHasErrors('appeal_note');
+    }
+
+    public function test_appeal_note_is_accepted_at_max_length_4000(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+
+        // appeal_note が非空で保存されるとAI要約生成が走るため、実HTTP呼び出しを避けるためにfakeする。
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'engineer_id' => 1,
+                'ai_summary' => 'AI生成要約テキスト',
+                'ai_summary_generated_at' => '2026-08-07T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $appealNote = str_repeat('あ', 4000);
+        $payload    = array_merge($this->validPayload($user->id), [
+            'appeal_note' => $appealNote,
+        ]);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('engineers', [
+            'appeal_note' => $appealNote,
+        ]);
+    }
+
+    public function test_remarks_exceeding_max_length_fails(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $payload = array_merge($this->validPayload($user->id), [
+            'remarks' => str_repeat('あ', 1001),
+        ]);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionHasErrors('remarks');
+    }
+
+    public function test_remarks_is_accepted_at_max_length_1000(): void
+    {
+        $this->seedFormFieldSettings();
+        $user    = User::factory()->create();
+        $remarks = str_repeat('あ', 1000);
+        $payload = array_merge($this->validPayload($user->id), [
+            'remarks' => $remarks,
+        ]);
+
+        $response = $this->actingAs($user)->post('/engineers', $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('engineers', [
+            'remarks' => $remarks,
+        ]);
+    }
+
+    // -------------------------------------------------------
     // edit: GET /engineers/{id}/edit
     // -------------------------------------------------------
 
@@ -1298,6 +1374,80 @@ class EngineerControllerTest extends TestCase
         $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
 
         $response->assertSessionHasErrors('name');
+    }
+
+    public function test_appeal_note_exceeding_max_length_fails_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $payload  = array_merge($this->validPayload($user->id), [
+            'appeal_note' => str_repeat('あ', 4001),
+        ]);
+
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response->assertSessionHasErrors('appeal_note');
+    }
+
+    public function test_appeal_note_is_accepted_at_max_length_4000_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user       = User::factory()->create();
+        $appealNote = str_repeat('あ', 4000);
+        // 更新前後で appeal_note を変更しない（AI要約再生成トリガーを踏まないため、実HTTP呼び出しが不要になる）。
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note'  => $appealNote,
+        ]);
+
+        Http::fake();
+
+        $payload = array_merge($this->validPayload($user->id), [
+            'appeal_note' => $appealNote,
+        ]);
+
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        Http::assertNothingSent();
+        $this->assertDatabaseHas('engineers', [
+            'id'          => $engineer->id,
+            'appeal_note' => $appealNote,
+        ]);
+    }
+
+    public function test_remarks_exceeding_max_length_fails_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $payload  = array_merge($this->validPayload($user->id), [
+            'remarks' => str_repeat('あ', 1001),
+        ]);
+
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response->assertSessionHasErrors('remarks');
+    }
+
+    public function test_remarks_is_accepted_at_max_length_1000_on_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user     = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $remarks  = str_repeat('あ', 1000);
+        $payload  = array_merge($this->validPayload($user->id), [
+            'remarks' => $remarks,
+        ]);
+
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('engineers', [
+            'id'      => $engineer->id,
+            'remarks' => $remarks,
+        ]);
     }
 
     public function test_update_returns_404_for_non_existent_engineer(): void

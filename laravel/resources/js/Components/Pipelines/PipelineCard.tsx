@@ -1,6 +1,7 @@
 import RankBadge from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import StatusSelect from '@/Components/Pipelines/StatusSelect';
+import { emptyText } from '@/lib/emptyValue';
 import { cn } from '@/lib/utils';
 import { PipelineCard as PipelineCardType, PipelineStatus, StatusOption } from '@/types/pipeline';
 import { router } from '@inertiajs/react';
@@ -49,7 +50,9 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
                 if (e.key === 'Enter') onOpen(card.id);
             }}
             className={cn(
-                'w-full cursor-pointer rounded border border-transparent bg-white p-2.5 text-left transition-colors hover:bg-muted/50',
+                // ホバーは「淡いプライマリの塗り＋枠線＋影」で示す。カンバン列自体がグレー地のため、
+                // グレーで塗ると列の背景と同化してホバーが分からなくなる（色相を変えて区別する）。
+                'w-full cursor-pointer rounded border border-transparent bg-white p-2.5 text-left transition hover:border-primary/50 hover:bg-primary/5 hover:shadow-md',
                 isActive ? 'border-primary shadow-[0_0_0_2px_rgba(0,0,0,0.1)]' : 'border-border',
             )}
         >
@@ -69,7 +72,7 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
             <div className="mt-1.5 flex items-center gap-1.5">
                 <RankBadge rank={card.match_rank} />
                 <span className="text-[11px] font-bold text-muted-foreground">
-                    {card.match_score != null ? `${card.match_score}点` : '—'}
+                    {card.match_score != null ? `${card.match_score}点` : emptyText('matchScore')}
                 </span>
             </div>
 
@@ -78,10 +81,10 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
              * 画面に出ていない項目でソートさせるのは UX 上不適切なため、あえてカードにも「次回」を表示している。
              */}
             <div className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
-                <TruncatedText as="div" text={`担当：${card.engineer.main_user?.name ?? '未割当'}`} />
+                <TruncatedText as="div" text={`担当：${card.engineer.main_user?.name ?? emptyText('mainUser')}`} />
                 <div className="flex items-center gap-1">
                     <span className="shrink-0">
-                        次回：{card.next_action_date ? formatDate(card.next_action_date) : '—'}
+                        次回：{card.next_action_date ? formatDate(card.next_action_date) : emptyText('nextActionDate')}
                     </span>
                     <span className="shrink-0 text-muted-foreground/50">/</span>
                     <span className="shrink-0">更新：{formatDate(card.updated_at)}</span>

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -56,7 +58,7 @@ class Project extends Model
         ['sort' => 'created_at', 'order' => 'desc', 'label' => '登録日順（新しい順）'],
         ['sort' => 'created_at', 'order' => 'asc',  'label' => '登録日順（古い順）'],
         ['sort' => 'updated_at', 'order' => 'desc', 'label' => '更新日順（新しい順）'],
-        ['sort' => 'start_date', 'order' => 'asc',  'label' => '稼働開始時期順'],
+        ['sort' => 'start_date', 'order' => 'asc',  'label' => '参画開始時期順'],
         ['sort' => 'rate_max',   'order' => 'desc', 'label' => '単価（高い順）'],
         ['sort' => 'rate_max',   'order' => 'asc',  'label' => '単価（低い順）'],
     ];
@@ -123,6 +125,23 @@ class Project extends Model
         'proc_maintenance' => 'boolean',
         'negotiation_required' => 'boolean',
     ];
+
+    /**
+     * 参画開始時期の表示ラベル（例「2026/08/01〜」）。start_date が null なら「未定」。
+     *
+     * 一覧（ProjectListResource）・詳細（ProjectResource）・マッチング（MatchingResource）の
+     * 3リソースに同一の生成ロジックがコピペされていたため、モデルのアクセサに集約する（#57）。
+     * 人材側の Engineer::availableLabel と同じ実装形・同じ契約（常に文字列を返す）に揃えている。
+     */
+    protected function startLabel(): Attribute
+    {
+        return Attribute::make(
+            // start_date は date キャストしていない文字列カラムのため Carbon::parse を通す
+            get: fn (): string => $this->start_date
+                ? Carbon::parse($this->start_date)->format('Y/m/d').'〜'
+                : '未定',
+        );
+    }
 
     public function projectSkills(): HasMany
     {

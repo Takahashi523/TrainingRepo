@@ -1,6 +1,8 @@
 import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
+import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
+import Rate from '@/Components/Common/Rate';
 import SkillTag from '@/Components/Common/SkillTag';
 import StatusBadge from '@/Components/Common/StatusBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
@@ -8,6 +10,7 @@ import MatchCard from '@/Components/Matching/MatchCard';
 import MatchDrawer from '@/Components/Matching/MatchDrawer';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { emptyText } from '@/lib/emptyValue';
 import { PageProps } from '@/types';
 import { MatchingEmptyReason, MatchingShowPageProps } from '@/types/matching';
 import { Head, router } from '@inertiajs/react';
@@ -223,31 +226,45 @@ export default function Show({
                         <StatusBadge status={engineer.status} className="shrink-0" />
                     </div>
 
-                    {/* 年齢・最寄駅・希望単価・勤務形態を、マッチングカードのメタと同じ「ラベルなし・｜区切りの横一列」で表示する。
-                        未指定も同じ流儀でフィールド名入りトークンにし（入力済み属性＝未設定／柔軟に決まり得る条件＝未定）、カードと語彙を揃える。 */}
-                    <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] text-muted-foreground">
-                        <span>{engineer.age != null ? `${engineer.age}歳` : '年齢未設定'}</span>
+                    {/* 年齢・最寄駅・希望単価・勤務形態を、マッチングカードのメタと同じ型2（ラベル語なし・｜区切りの横一列）で表示する。
+                        項目名は MetaItem が sr-only で支援技術に渡す。未指定も同じ流儀で項目名入りトークンにし
+                        （入力済み属性＝未設定／柔軟に決まり得る条件＝未定）、カードと語彙を揃える。 */}
+                    <MetaRow className="mt-1.5">
+                        <MetaItem field="age" valueHasFieldName={engineer.age == null}>
+                            {engineer.age != null ? `${engineer.age}歳` : emptyText('age', true)}
+                        </MetaItem>
                         {/* 最寄駅・路線名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（max-w で幅を抑える）。 */}
-                        <span className="inline-flex min-w-0 max-w-[18rem] items-baseline gap-1">
-                            <span className="shrink-0">｜</span>
+                        <MetaItem
+                            field="nearestStation"
+                            valueHasFieldName={!engineer.nearest_station}
+                            className="max-w-[18rem]"
+                        >
                             <TruncatedText
-                                text={engineer.nearest_station || '最寄駅未設定'}
+                                text={engineer.nearest_station || emptyText('nearestStation', true)}
                                 className="min-w-0 max-w-[8rem]"
                             />
                             <TruncatedText
-                                text={engineer.nearest_line ? `（${engineer.nearest_line}）` : '（路線未設定）'}
+                                text={
+                                    engineer.nearest_line
+                                        ? `（${engineer.nearest_line}）`
+                                        : `（${emptyText('nearestLine', true)}）`
+                                }
                                 className="min-w-0 max-w-[8rem]"
                             />
-                        </span>
-                        <span>｜ {engineer.available_from ? engineer.available_label : '稼働可能時期未定'}</span>
-                        <span>｜ {engineer.desired_rate != null ? `${engineer.desired_rate}万円` : '希望単価未設定'}</span>
-                        <span>
-                            ｜{' '}
+                        </MetaItem>
+                        <MetaItem field="availableFrom" valueHasFieldName={!engineer.available_from}>
+                            {engineer.available_from ? engineer.available_label : emptyText('availableFrom', true)}
+                        </MetaItem>
+                        {/* 希望単価は単一値。案件の単価（レンジ）と単位「万円」の見せ方を揃えるため Rate に載せる。 */}
+                        <MetaItem field="desiredRate" valueHasFieldName={engineer.desired_rate == null}>
+                            <Rate value={engineer.desired_rate} variant="plain" withFieldName />
+                        </MetaItem>
+                        <MetaItem field="workStyle" valueHasFieldName={engineer.work_styles.length === 0}>
                             {engineer.work_styles.length > 0
                                 ? engineer.work_styles.map((w) => w.name).join(' / ')
-                                : '勤務形態未定'}
-                        </span>
-                    </div>
+                                : emptyText('workStyle', true)}
+                        </MetaItem>
+                    </MetaRow>
 
                     {/* スキル：マッチングカードと同じくラベル（見出し）なしでタグを直接並べる。
                         空でも高さを揃えるためプレースホルダタグを出す（カードのスキル行と同じ流儀）。 */}
@@ -260,7 +277,7 @@ export default function Show({
                         </CollapsibleTagRow>
                     ) : (
                         <div className="mt-1.5">
-                            <span className="text-[11px] text-muted-foreground">スキル未設定</span>
+                            <span className="text-[11px] text-muted-foreground">{emptyText('skills', true)}</span>
                         </div>
                     )}
 

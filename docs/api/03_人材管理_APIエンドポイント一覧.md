@@ -139,7 +139,7 @@
     // { "sort": "created_at",     "order": "desc", "label": "登録日順（新しい順）" }
     // { "sort": "created_at",     "order": "asc",  "label": "登録日順（古い順）" }
     // { "sort": "updated_at",     "order": "desc", "label": "更新日順（新しい順）" }
-    // { "sort": "available_from", "order": "asc",  "label": "提案可能タイミング順" }
+    // { "sort": "available_from", "order": "asc",  "label": "稼働可能時期順" }  ※2026-08-18 に項目名へ統一
   ]
 }
 ```
@@ -294,10 +294,10 @@
 | proc_testing | bool | 任意 | テスト経験（true:有）。proc_experience の is_required 設定で制御 |
 | proc_maintenance | bool | 任意 | 保守運用経験（true:有）。proc_experience の is_required 設定で制御 |
 | has_negotiation_exp | bool | 任意 | 顧客折衝経験（true:有・form_field_settings制御） |
-| appeal_note | string | 任意 | アピールポイント（form_field_settings制御） |
+| appeal_note | string | 任意 | アピールポイント（form_field_settings制御・最大4000文字） |
 | desired_rate | int | 任意 | 希望単価月額（単位：万円・form_field_settings制御） |
 | work_styles | string[] | 任意 | 勤務形態。選択値を配列で送る（onsite / hybrid / remote）。未選択の場合は空配列 [] または省略。Controller内で work_style_* カラムに変換する（form_field_settings制御） |
-| remarks | string | 任意 | 特記事項（form_field_settings制御） |
+| remarks | string | 任意 | 特記事項（form_field_settings制御・最大1000文字） |
 | status | string | ✓ | ステータス（システム固定必須・proposable / interviewing / not_proposable） |
 | main_user_id | int | ✓ | 主担当ユーザーID（システム固定必須） |
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |

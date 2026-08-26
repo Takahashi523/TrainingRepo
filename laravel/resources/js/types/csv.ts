@@ -95,7 +95,7 @@ export const CSV_FIELD_LABELS: Record<CsvResource, Record<string, string>> = {
         rate_note: '単価備考',
         commercial_flow: '商流',
         work_style: '稼働形態',
-        work_location_line: '勤務地（路線）',
+        work_location_line: '勤務地（路線名）',
         work_location_station: '勤務地（最寄駅）',
         interview_count: '面談回数',
         negotiation_required: '顧客折衝経験要否',

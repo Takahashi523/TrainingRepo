@@ -152,7 +152,11 @@ export default function EngineerForm({
                 />
             </FormRow>
 
-            <FormRow label="カナ" required error={errors.name_kana}>
+            {/* [PR #96 レビュー指摘] 表示名の SSOT は FormFieldSetting::FIELD_LABELS で、
+                同定数・WF_12・CSV ヘッダー・EngineerRequest の属性名はいずれも「氏名カナ」。
+                ここだけ「カナ」だったため、必須エラーが「氏名カナは必須です」と出るのに
+                入力欄のラベルは「カナ」という不一致になっていた。 */}
+            <FormRow label="氏名カナ" required error={errors.name_kana}>
                 <Input
                     value={data.name_kana}
                     onChange={(e) => setData('name_kana', e.target.value)}
@@ -290,15 +294,25 @@ export default function EngineerForm({
             <FormRow
                 label="アピールポイント"
                 required={fieldSettings.appeal_note.is_required}
-                hint="AIによる職務要約の生成元となります。人材の強み・経験・自己PRを記載してください"
                 error={errors.appeal_note}
             >
+                {/* 過大な入力によるPostTooLargeExceptionを避けるため、バックエンドのmax:4000と揃えてフロントでも制限する */}
                 <Textarea
                     value={data.appeal_note}
                     onChange={(e) => setData('appeal_note', e.target.value)}
                     placeholder="例：Java・Spring Bootを用いた金融系システムの開発経験が豊富です。チームリードの経験もあり、コミュニケーション能力にも自信があります。"
-                    rows={4}
+                    className={`min-h-40 ${errors.appeal_note ? 'border-destructive' : ''}`}
+                    maxLength={4000}
                 />
+                {/* ヒントと文字数カウンタ(メール等からの貼り付けで末尾が無言で切り詰められても気付けるように)を同じ行に表示する */}
+                <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                        AIによる職務要約の生成元となります。人材の強み・経験・自己PRを記載してください
+                    </p>
+                    <p className="shrink-0 text-[11px] text-muted-foreground">
+                        {data.appeal_note.length.toLocaleString()} / 4,000
+                    </p>
+                </div>
             </FormRow>
 
             {/* ==================== 希望条件 ==================== */}
@@ -338,11 +352,13 @@ export default function EngineerForm({
                 hint="スコア計算には使用しません。担当営業が把握しておきたい条件を自由記述してください"
                 error={errors.remarks}
             >
+                {/* 過大な入力によるPostTooLargeExceptionを避けるため、バックエンドのmax:1000と揃えてフロントでも制限する */}
                 <Textarea
                     value={data.remarks}
                     onChange={(e) => setData('remarks', e.target.value)}
                     placeholder="例：土日祝休み希望、出張NG、残業月20h以内希望 など"
-                    rows={3}
+                    className={`min-h-28 ${errors.remarks ? 'border-destructive' : ''}`}
+                    maxLength={1000}
                 />
             </FormRow>
 
