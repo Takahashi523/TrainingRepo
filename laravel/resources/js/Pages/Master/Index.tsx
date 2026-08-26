@@ -73,7 +73,7 @@ export default function Index({
                     <div className="border-b border-border px-10 py-4">
                         <h1 className="text-lg font-bold text-foreground">マスタ管理</h1>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            ユーザーアカウントと登録フォームの必須/任意設定を管理します。
+                            ユーザーアカウントと登録フォームの必須/任意設定を管理します
                         </p>
                     </div>
 
@@ -94,7 +94,7 @@ export default function Index({
                 </div>
 
                 {/* コンテンツエリア（スクロール） */}
-                <div className="flex-1 overflow-y-auto bg-muted/60 px-10 py-6">
+                <div className="flex-1 overflow-y-auto bg-muted/30 px-10 py-6">
                     {activeTab === 'users' && (
                         <>
                             <div className="mb-3 flex justify-end">

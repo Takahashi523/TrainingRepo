@@ -69,10 +69,9 @@ class MatchingResource extends JsonResource
                 'start_date' => $project->start_date
                     ? Carbon::parse($project->start_date)->format('Y-m-d')
                     : null,
-                // 開始時期ラベルは人材の available_label と同じ生成規則で揃える。
-                'start_label' => $project->start_date
-                    ? Carbon::parse($project->start_date)->format('Y/m/d').'〜'
-                    : '未定',
+                // 開始時期ラベルの生成は Project::startLabel に集約（一覧・詳細と同一の規則。
+                // 人材の available_label と同じ生成規則でもある）。
+                'start_label' => $project->start_label,
                 'required_skills' => $this->skillLabels($project, 'required'),
                 'preferred_skills' => $this->skillLabels($project, 'preferred'),
                 // 対象工程（6固定）。キー/名称は人材と共通の Engineer::PHASES を再利用する（DRY）。

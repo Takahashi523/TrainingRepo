@@ -374,6 +374,11 @@
           <div class="detail-value">2名</div>
         </div>
         <div class="detail-row">
+          <!-- [Issue #43] 勤務条件から移設（募集人数 → 面談回数 → 参画開始時期の時系列） -->
+          <div class="detail-label">面談回数</div>
+          <div class="detail-value">1回</div>
+        </div>
+        <div class="detail-row">
           <div class="detail-label">参画開始時期</div>
           <div class="detail-value">2026/05/01〜</div>
         </div>
@@ -391,6 +396,11 @@
           </div>
         </div>
         <div class="detail-row">
+          <!-- [Issue #43] 就業条件から移設（単価とセットで読む取引条件のため単価の直後） -->
+          <div class="detail-label">精算幅</div>
+          <div class="detail-value">140〜180h</div>
+        </div>
+        <div class="detail-row">
           <div class="detail-label">商流</div>
           <!-- QA #80: 「1次請け」→「プライム」 -->
           <div class="detail-value">プライム</div>
@@ -401,28 +411,17 @@
       <div class="section-card">
         <div class="section-card-header">勤務条件</div>
         <div class="detail-row">
+          <!-- [Issue #43] 「どう働くか」→「どこで働くか」の順に入れ替え（登録フォームと同順） -->
+          <div class="detail-label">稼働形態</div>
+          <div class="detail-value">一部リモート可</div>
+        </div>
+        <div class="detail-row">
           <!-- [Issue #50] 値は最寄駅・路線名を結合表示のまま、ラベルを実際の中身に合わせて修正 -->
           <div class="detail-label">勤務地（最寄駅 / 路線名）</div>
           <div class="detail-value">大手町駅（東京メトロ丸ノ内線）</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">稼働形態</div>
-          <div class="detail-value">一部リモート可</div>
-        </div>
-        <div class="detail-row">
-          <div class="detail-label">面談回数</div>
-          <div class="detail-value">1回</div>
-        </div>
-      </div>
-      
-      <!-- ==================== 就業条件 ==================== -->
-      <div class="section-card">
-        <div class="section-card-header">就業条件</div>
-        <div class="detail-row">
-          <div class="detail-label">精算幅</div>
-          <div class="detail-value">140〜180h</div>
-        </div>
-        <div class="detail-row">
+          <!-- [Issue #43] 就業条件から移設（勤務の補足を書く自由記述のため勤務条件の末尾） -->
           <div class="detail-label">特記事項</div>
           <div class="detail-value" style="color:#555;line-height:1.8;">
             基本勤務時間：10:00〜19:00　シフト制なし　出張なし
@@ -569,7 +568,8 @@
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>スキル：一覧画面と同じ角型タグ表示。詳細テキストがある場合のみ「▼ 詳細」ボタンをタグ内に表示し、クリックでツールチップ展開</li>
           <li>稼働環境：スキル要件カードに追加（QA #67）</li>
-          <li>精算幅：就業条件カードに独立行として追加（QA #66）</li>
+          <li>精算幅：独立行として追加（QA #66）。<strong>【2026-08-26 修正】就業条件カード → 契約条件カード（単価の直後）へ移設</strong>　<strong>背景：</strong>「就業条件」の中身が精算幅・特記事項の2項目だけで、独立セクションとしてのまとまりが弱かった（issue #43）。<strong>理由：</strong>精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件のため、単価の直後に置き、性質の異なる商流を間に挟まない</li>
+          <li><strong>【2026-08-26 修正】セクション再編（issue #43）</strong>：面談回数を勤務条件 → 基本情報（募集人数の後）、特記事項を就業条件 → 勤務条件（末尾）へ移設し、空になった「就業条件」カードを削除。勤務条件は「稼働形態 → 勤務地」の順に入れ替え。<strong>背景：</strong>面談回数は選考プロセスの属性で、勤務地・稼働形態（働く場所・形態）とは性質が違うのに勤務条件に置かれていた。<strong>理由：</strong>基本情報を「募集人数 → 面談回数 → 参画開始時期」の時系列にそろえ、面談回数1項目のために「選考プロセス」セクションを新設するのは過剰と判断した。案件詳細・案件登録編集・マスタ管理のフォーム設定一覧の3箇所を同じ順序にそろえている</li>
           <li>削除ボタン：管理者のみ・物理削除（確定済み）</li>
           <li>担当営業：担当＋サブの2名体制（確定済み）</li>
         </ul>

@@ -525,6 +525,9 @@
               </tr>
             </thead>
             <tbody>
+              <!-- [Issue #43] 行の並びは案件登録フォーム（WF_07）のセクション・項目順に合わせる。
+                   実装上の表示順は FormFieldSetting::FIELD_LABELS['project'] の定義順が SSOT。 -->
+              <!-- 基本情報 -->
               <tr>
                 <td class="col-name">案件名</td>
                 <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
@@ -534,21 +537,31 @@
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">必須スキル</td>
-                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
-              </tr>
-              <tr>
-                <td class="col-name">尚可スキル</td>
+                <td class="col-name">募集人数</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">単価（月額）</td>
-                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+                <td class="col-name">面談回数</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
                 <td class="col-name">参画開始時期</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
+              <!-- 契約条件 -->
+              <tr>
+                <td class="col-name">単価（月額）</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">精算幅</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <tr>
+                <td class="col-name">商流</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+              </tr>
+              <!-- 勤務条件 -->
               <tr>
                 <td class="col-name">稼働形態</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
@@ -556,25 +569,19 @@
               <tr>
                 <td class="col-name">勤務地（路線名）</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
+                <td style="font-size:10px;color:#aaa;">[Issue #50] トグルが制御するのは路線名のみ。勤務地（最寄駅）は業務ルールで固定必須のため設定対象外</td>
               </tr>
               <tr>
-                <td class="col-name">商流</td>
+                <td class="col-name">特記事項</td>
+                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+              </tr>
+              <!-- スキル要件 -->
+              <tr>
+                <td class="col-name">必須スキル</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">面談回数</td>
-                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
-              </tr>
-              <tr>
-                <td class="col-name">募集人数</td>
-                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
-              </tr>
-              <tr>
-                <td class="col-name">稼働環境</td>
-                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
-              </tr>
-              <tr>
-                <td class="col-name">精算幅</td>
+                <td class="col-name">尚可スキル</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
               <tr>
@@ -591,12 +598,18 @@
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">必須</span></div></td>
               </tr>
               <tr>
-                <td class="col-name">特記事項</td>
+                <td class="col-name">稼働環境</td>
                 <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
               </tr>
+              <!-- 管理情報：ステータス・担当営業はシステム必須（FormFieldSettingSeeder の
+                   $projectSystemRequiredFields）。実画面には行が出るため WF にも記載する。 -->
               <tr>
-                <td class="col-name">特記事項</td>
-                <td><div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label" style="color:#888;">任意</span></div></td>
+                <td class="col-name">ステータス</td>
+                <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
+              </tr>
+              <tr>
+                <td class="col-name">担当営業</td>
+                <td colspan="2"><span style="font-size:11px;font-weight:700;color:#333;">必須（固定）</span><span style="font-size:10px;color:#aaa;margin-left:8px;">変更不可（システム必須）</span></td>
               </tr>
             </tbody>
           </table>
@@ -607,7 +620,8 @@
               <div class="annotation-item">・ [QA #82] 案件登録フォームも人材登録フォームと同様の必須/任意切替設定を実装（前田様 4/29 確定）</div>
               <div class="annotation-item">・ 必須/任意の変更は管理者ロールのみ実行可能（QA #65確定）</div>
               <div class="annotation-item">・ 変更はシステム全体に即時反映。全営業担当者の登録画面に適用される</div>
-              <div class="annotation-item">・ 「案件名」はシステム上の必須項目のため管理者も変更不可</div>
+              <div class="annotation-item">・ 「案件名」「ステータス」「担当営業」はシステム上の必須項目のため管理者も変更不可</div>
+              <div class="annotation-item">・ <strong>【2026-08-26 修正】案件登録フォーム設定の行順を、再編後の案件登録フォーム（WF_07）のセクション・項目順にそろえた（issue #43）。あわせて重複していた「特記事項」の行を削除し、実画面に出る「ステータス」「担当営業」の行を追記した</strong>　<strong>背景：</strong>フォーム設定一覧の並びが登録フォームと無関係な順序だったため、設定したい項目をフォームと同じ順で辿れなかった。<strong>理由：</strong>実装の表示順は <code>FormFieldSetting::FIELD_LABELS['project']</code> の定義順が SSOT で、この定数をフォームのセクション順に並べ替えたため、WF もそれに合わせる</div>
             </div>
           </div>
         </div>

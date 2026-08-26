@@ -1,3 +1,4 @@
+import { emptyText } from '@/lib/emptyValue';
 import { cn } from '@/lib/utils';
 
 /**
@@ -33,7 +34,7 @@ export const RANK_BAR_STYLES: Record<string, string> = {
 export const RANK_BAR_FALLBACK_STYLE = 'bg-muted-foreground';
 
 interface Props {
-    /** マッチングランク（A/B/C/D）。null はランク未算出として「—」を表示 */
+    /** マッチングランク（A/B/C/D）。null は「未算出」を表示（記号は使わない：docs/UI表示規約.md §3） */
     rank: string | null;
     /** 追加クラス（フォントサイズなど呼び出し側の調整用） */
     className?: string;
@@ -52,7 +53,7 @@ export default function RankBadge({ rank, className }: Props) {
                     className,
                 )}
             >
-                —
+                {emptyText('matchRank')}
             </span>
         );
     }

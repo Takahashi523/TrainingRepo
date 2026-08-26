@@ -517,6 +517,15 @@
 </style>
 </head>
 <body>
+<!--
+  【2026-08-17 確定】メタ行から項目ラベル語（最寄駅：）を削除
+  背景：同じ条件が人材一覧・案件一覧・マッチング結果で別表現になっており（WF 側も WF_03=最寄駅にラベルあり／
+        WF_09=なし、WF_06=全項目にラベル／WF_09 カード=ラベルなし と不統一だった）、issue #57 で表示規約を制定した。
+  理由：見出し直下の圧縮メタ行は「型2＝ラベル語を出さず、値の書式で自己識別させる」に統一した（docs/UI表示規約.md §2）。
+        項目名は捨てず sr-only で支援技術に渡すため、情報は失われない。欠損時は「クライアント未設定」のように
+        項目名入りトークンを表示する。
+-->
+
 
 <div class="app-shell">
 
@@ -681,7 +690,7 @@
           <select class="wf-select">
             <option>登録日順（新しい順）</option>
             <option>登録日順（古い順）</option>
-            <option>提案可能タイミング順</option>
+            <option>稼働可能時期順</option>
           </select>
         </div>
       </div>
@@ -695,7 +704,7 @@
             <div class="card-top-row">
               <div>
                 <div class="engineer-name">山田 太郎</div>
-                <div class="engineer-meta">35歳　｜　最寄駅：新宿駅（JR中央線）</div>
+                <div class="engineer-meta">35歳　｜　新宿駅（JR中央線）</div>
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
@@ -752,7 +761,7 @@
             <div class="card-top-row">
               <div>
                 <div class="engineer-name">佐藤 花子</div>
-                <div class="engineer-meta">28歳　｜　最寄駅：渋谷駅（東急東横線）</div>
+                <div class="engineer-meta">28歳　｜　渋谷駅（東急東横線）</div>
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
@@ -806,7 +815,7 @@
             <div class="card-top-row">
               <div>
                 <div class="engineer-name">鈴木 一郎</div>
-                <div class="engineer-meta">42歳　｜　最寄駅：品川駅（JR京浜東北線）</div>
+                <div class="engineer-meta">42歳　｜　品川駅（JR京浜東北線）</div>
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
@@ -864,7 +873,7 @@
             <div class="card-top-row">
               <div>
                 <div class="engineer-name">高橋 美咲</div>
-                <div class="engineer-meta">31歳　｜　最寄駅：池袋駅（東京メトロ丸ノ内線）</div>
+                <div class="engineer-meta">31歳　｜　池袋駅（東京メトロ丸ノ内線）</div>
               </div>
               <div class="card-badges">
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">

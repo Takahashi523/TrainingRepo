@@ -118,6 +118,13 @@ export default function ProjectForm({
 
     return (
         <div className="max-w-3xl">
+            {/* [Issue #43] このフォームのセクション・項目順は
+                FormFieldSetting::FIELD_LABELS['project'] の定義順と 1 対 1 で対応させる
+                （マスタ管理のフォーム設定一覧は同定数の順で表示されるため、ここを並べ替えると
+                「設定画面とフォームで項目の並びが違う」状態になる）。
+                並べ替えるときは同定数と
+                MasterFormSettingControllerTest::test_project_form_settings_are_ordered_by_form_section
+                の期待順も必ず合わせること。TS 側にテスト基盤が無く、この対応は CI で検知できない。 */}
             <SectionHeading>基本情報</SectionHeading>
 
             <FormRow label="案件名" required error={errors.name}>
@@ -134,7 +141,6 @@ export default function ProjectForm({
                 label="顧客名"
                 required={fieldSettings.client_name.is_required}
                 error={errors.client_name}
-                hint="顧客ごとの傾向分析が必要な場合に活用できます"
             >
                 <Input
                     type="text"
@@ -158,6 +164,24 @@ export default function ProjectForm({
                         className={`w-20 ${errors.headcount ? "border-destructive" : ""}`}
                     />
                     <span className="text-sm text-muted-foreground">名</span>
+                </div>
+            </FormRow>
+
+            {/* [Issue #43] 面談回数は「何名を・何回会って選び・いつ参画するか」という
+                募集〜選考〜参画の時系列の一部なので、勤務条件ではなく基本情報に置く。 */}
+            <FormRow
+                label="面談回数"
+                required={fieldSettings.interview_count.is_required}
+                error={errors.interview_count}
+            >
+                <div className="flex items-center gap-2">
+                    <NumberInput
+                        value={data.interview_count}
+                        onChange={(v) => setData("interview_count", v)}
+                        placeholder="1"
+                        className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
+                    />
+                    <span className="text-sm text-muted-foreground">回</span>
                 </div>
             </FormRow>
 
@@ -231,6 +255,23 @@ export default function ProjectForm({
                         className={`w-64 ${errors.rate_note ? "border-destructive" : ""}`}
                     />
                 )}
+            </FormRow>
+
+            {/* [Issue #43] 精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件なので、
+                単価の直後に置き、性質の異なる商流を間に挟まない。 */}
+            <FormRow
+                label="精算幅"
+                required={fieldSettings.billing_range.is_required}
+                error={errors.billing_range}
+                hint="月の精算時間帯をフリーテキストで入力してください"
+            >
+                <Input
+                    type="text"
+                    value={data.billing_range}
+                    onChange={(e) => setData("billing_range", e.target.value)}
+                    placeholder="例：140〜180h"
+                    className={`w-48 ${errors.billing_range ? "border-destructive" : ""}`}
+                />
             </FormRow>
 
             <FormRow
@@ -327,39 +368,8 @@ export default function ProjectForm({
                 </>
             )}
 
-            <FormRow
-                label="面談回数"
-                required={fieldSettings.interview_count.is_required}
-                error={errors.interview_count}
-            >
-                <div className="flex items-center gap-2">
-                    <NumberInput
-                        value={data.interview_count}
-                        onChange={(v) => setData("interview_count", v)}
-                        placeholder="1"
-                        className={`w-20 ${errors.interview_count ? "border-destructive" : ""}`}
-                    />
-                    <span className="text-sm text-muted-foreground">回</span>
-                </div>
-            </FormRow>
-
-            <SectionHeading>就業条件</SectionHeading>
-
-            <FormRow
-                label="精算幅"
-                required={fieldSettings.billing_range.is_required}
-                error={errors.billing_range}
-                hint="月の精算時間帯をフリーテキストで入力してください"
-            >
-                <Input
-                    type="text"
-                    value={data.billing_range}
-                    onChange={(e) => setData("billing_range", e.target.value)}
-                    placeholder="例：140〜180h"
-                    className={`w-48 ${errors.billing_range ? "border-destructive" : ""}`}
-                />
-            </FormRow>
-
+            {/* [Issue #43] 特記事項は勤務の補足を書く自由記述で、これ1項目のために
+                「就業条件」セクションを残す必然性が無いため勤務条件の末尾に置く。 */}
             <FormRow
                 label="特記事項"
                 required={fieldSettings.remarks.is_required}

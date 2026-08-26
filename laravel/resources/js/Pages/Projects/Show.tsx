@@ -3,6 +3,10 @@ import ConfirmDialog from "@/Components/Common/ConfirmDialog";
 import ProcessCheckboxGroup, {
     buildProcessPhaseProps,
 } from "@/Components/Common/ProcessCheckboxGroup";
+import EmptyValue from "@/Components/Common/EmptyValue";
+import FieldRow from "@/Components/Common/FieldRow";
+import MetaRow, { MetaItem } from "@/Components/Common/MetaRow";
+import Rate from "@/Components/Common/Rate";
 import SkillTagDetail from "@/Components/Common/SkillTagDetail";
 import StatusBadge from "@/Components/Common/StatusBadge";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
@@ -27,7 +31,7 @@ function SectionCard({
     children: React.ReactNode;
 }) {
     return (
-        <div className="mb-4 overflow-visible rounded-md border border-border">
+        <div className="mb-4 overflow-visible rounded-md border border-border bg-white">
             <div className="rounded-t-md border-b border-border bg-muted/50 px-4 py-2.5 text-xs font-bold text-foreground">
                 {title}
             </div>
@@ -36,24 +40,6 @@ function SectionCard({
     );
 }
 
-function DetailRow({
-    label,
-    children,
-}: {
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="flex items-start border-b border-border/50 px-4 py-2.5 last:border-b-0">
-            <div className="w-44 shrink-0 pr-4 pt-0.5 text-xs font-semibold text-muted-foreground">
-                {label}
-            </div>
-            <div className="min-w-0 flex-1 break-words text-sm text-foreground">
-                {children}
-            </div>
-        </div>
-    );
-}
 
 export default function Show({ project }: Props) {
     const { auth } = usePage<Props>().props;
@@ -76,27 +62,8 @@ export default function Show({ project }: Props) {
         });
     };
 
-    const rateLabel = (() => {
-        if (project.rate_min != null && project.rate_max != null) {
-            return `${project.rate_min}万円　〜　${project.rate_max}万円`;
-        }
-        if (project.rate_note) {
-            return project.rate_note;
-        }
-        return "—";
-    })();
-
-    const workLocationLabel =
-        project.work_location_station || project.work_location_line
-            ? `${project.work_location_station ?? ""}${
-                  project.work_location_line
-                      ? `（${project.work_location_line}）`
-                      : ""
-              }`
-            : "—";
-
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="案件詳細" />
 
             <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between border-b border-border bg-white px-10 py-4">
@@ -135,131 +102,169 @@ export default function Show({ project }: Props) {
             <div className="max-w-3xl">
                 {/* 案件サマリー */}
                 <div className="mb-6 border-b border-border pb-6">
-                    <p className="break-words text-2xl font-bold text-foreground">
-                        {project.name}
-                    </p>
-                    {(project.client_name || project.commercial_flow) && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            {project.client_name &&
-                                `クライアント：${project.client_name}`}
-                            {project.client_name &&
-                                project.commercial_flow &&
-                                "　｜　"}
-                            {project.commercial_flow && (
-                                <>
-                                    商流：
-                                    {COMMERCIAL_FLOW_LABELS[
-                                        project.commercial_flow
-                                    ] ?? project.commercial_flow}
-                                </>
-                            )}
+                    {/* ステータスは案件名の右に置く（マッチングサマリー・人材詳細と同じ構成）。 */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="break-words text-2xl font-bold text-foreground">
+                            {project.name}
                         </p>
-                    )}
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
                         <StatusBadge
                             status={project.status}
                             label={
                                 PROJECT_STATUS_LABELS[project.status] ??
                                 project.status
                             }
+                            className="shrink-0"
                         />
-                        {project.headcount != null && (
-                            <span className="rounded border border-border bg-white px-3 py-0.5 text-xs">
-                                <Users className="mr-1 inline h-3 w-3" />
-                                {project.headcount}名
-                            </span>
-                        )}
-                        <span className="rounded-full border border-dashed border-border bg-muted/50 px-3 py-0.5 text-xs">
-                            <Clock className="mr-1 inline h-3 w-3" />
-                            {project.start_label}
-                        </span>
                     </div>
-                    <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
+                    {/* 属性メタ（型2）と担当／サブ（型3）を1つの流れに並べる。
+                        担当・サブは同型の人名が並ぶため型3 のラベルを維持する。
+                        サマリーなので値がある項目だけを出す（全項目は下部の項目表に出る）。 */}
+                    <MetaRow className="mt-2.5 text-xs">
+                        {project.client_name && (
+                            <MetaItem field="clientName">
+                                {project.client_name}
+                            </MetaItem>
+                        )}
+                        {project.commercial_flow && (
+                            <MetaItem field="commercialFlow">
+                                {COMMERCIAL_FLOW_LABELS[project.commercial_flow] ??
+                                    project.commercial_flow}
+                            </MetaItem>
+                        )}
+                        {project.headcount != null && (
+                            <MetaItem field="headcount" icon={Users}>
+                                {project.headcount}名
+                            </MetaItem>
+                        )}
+                        {project.start_date && (
+                            <MetaItem field="startDate" icon={Clock}>
+                                {project.start_label}
+                            </MetaItem>
+                        )}
+                        {/* 担当・サブは同型の人名が並ぶため型3 のラベルを維持する。 */}
                         <span>
-                            <span className="mr-1 font-semibold text-foreground/60">
-                                担当
-                            </span>
-                            {project.users.main.name}
+                            担当：{project.users.main.name}
                             {project.users.sub && (
                                 <>
                                     <span className="mx-1 text-border">／</span>
-                                    <span className="mr-1 font-semibold text-foreground/60">
-                                        サブ
-                                    </span>
-                                    {project.users.sub.name}
+                                    サブ：{project.users.sub.name}
                                 </>
                             )}
                         </span>
-                    </div>
+                    </MetaRow>
+
                 </div>
 
                 {/* 基本情報 */}
                 <SectionCard title="基本情報">
-                    <DetailRow label="案件名">{project.name}</DetailRow>
-                    <DetailRow label="顧客名">
-                        {project.client_name || "—"}
-                    </DetailRow>
-                    <DetailRow label="募集人数">
-                        {project.headcount != null
-                            ? `${project.headcount}名`
-                            : "—"}
-                    </DetailRow>
-                    <DetailRow label="参画開始時期">
-                        {project.start_label}
-                    </DetailRow>
+                    <FieldRow density="detail" label="案件名">{project.name}</FieldRow>
+                    <FieldRow density="detail" label="顧客名">
+                        {project.client_name || <EmptyValue field="clientName" />}
+                    </FieldRow>
+                    <FieldRow density="detail" label="募集人数">
+                        {project.headcount != null ? (
+                            `${project.headcount}名`
+                        ) : (
+                            <EmptyValue field="headcount" />
+                        )}
+                    </FieldRow>
+                    {/* [Issue #43] 面談回数は「何名を・何回会って選び・いつ参画するか」という
+                        募集〜選考〜参画の時系列の一部なので、勤務条件ではなく基本情報に置く。 */}
+                    <FieldRow density="detail" label="面談回数">
+                        {project.interview_count != null ? (
+                            `${project.interview_count}回`
+                        ) : (
+                            <EmptyValue field="interviewCount" />
+                        )}
+                    </FieldRow>
+                    <FieldRow density="detail" label="参画開始時期">
+                        {/* サーバの start_label は null のとき「未定」を返すが、欠損は控えめな色で
+                            見せるため値の有無で描き分ける（色はトークン側が持つ）。 */}
+                        {project.start_date ? (
+                            project.start_label
+                        ) : (
+                            <EmptyValue field="startDate" />
+                        )}
+                    </FieldRow>
                 </SectionCard>
 
                 {/* 契約条件 */}
                 <SectionCard title="契約条件">
-                    <DetailRow label="単価（月額）">{rateLabel}</DetailRow>
-                    <DetailRow label="商流">
+                    <FieldRow density="detail" label="単価（月額）">
+                        <Rate
+                            min={project.rate_min}
+                            max={project.rate_max}
+                            note={project.rate_note}
+                        />
+                    </FieldRow>
+                    {/* [Issue #43] 精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件なので、
+                        単価の直後に置き、性質の異なる商流を間に挟まない。 */}
+                    <FieldRow density="detail" label="精算幅">
+                        {project.billing_range || <EmptyValue field="billingRange" />}
+                    </FieldRow>
+                    <FieldRow density="detail" label="商流">
                         {project.commercial_flow
                             ? (COMMERCIAL_FLOW_LABELS[
                                   project.commercial_flow
                               ] ?? project.commercial_flow)
-                            : "—"}
-                    </DetailRow>
+                            : <EmptyValue field="commercialFlow" />}
+                    </FieldRow>
                 </SectionCard>
 
                 {/* 勤務条件 */}
                 <SectionCard title="勤務条件">
-                    {/* [Issue #50 レビュー対応] 登録フォームでは「最寄駅」「路線名」の語の意味を確定させたため、
-                        値を結合表示するこの行もラベルを実際の中身に合わせる（旧: 「勤務地（最寄駅）」のまま路線名も表示していた） */}
-                    <DetailRow label="勤務地（最寄駅 / 路線名）">
-                        {workLocationLabel}
-                    </DetailRow>
-                    <DetailRow label="稼働形態">
+                    {/* [Issue #43] 「どう働くか（稼働形態）」→「どこで働くか（勤務地）」の順にする。
+                        勤務地の行はフルリモートで消えるため、常に出る稼働形態を先頭に置いた方が
+                        行の増減でセクションの読み出し位置が動かない。登録フォームとも同順。 */}
+                    <FieldRow density="detail" label="稼働形態">
                         {project.work_style
                             ? (WORK_STYLE_LABELS[project.work_style] ??
                               project.work_style)
-                            : "—"}
-                    </DetailRow>
-                    <DetailRow label="面談回数">
-                        {project.interview_count != null
-                            ? `${project.interview_count}回`
-                            : "—"}
-                    </DetailRow>
-                </SectionCard>
+                            : <EmptyValue field="workStyle" />}
+                    </FieldRow>
+                    {/* フルリモートは勤務地を持たない項目なので行ごと出さない。
+                        登録フォーム（ProjectForm）も work_style === 'remote' では入力欄自体を描かず、
+                        保存時に ProjectService が最寄駅・路線名を null 化する。ここで「未設定」を出すと、
+                        埋めるべき項目が空いているように読めてしまう（欠損語彙の意味と食い違う）。
+                        稼働形態は直下の行に出るため、行が無いこと自体は文脈から読み取れる。
 
-                {/* 就業条件 */}
-                <SectionCard title="就業条件">
-                    <DetailRow label="精算幅">
-                        {project.billing_range || "—"}
-                    </DetailRow>
-                    <DetailRow label="特記事項">
+                        ただし値が入っている場合は remote でも行を出す。CSV 取込は ProjectService を
+                        通さず直接 upsert するため、work_style=remote かつ勤務地ありの行が保存され得る。
+                        稼働形態だけで隠すと、DB にある値が画面のどこにも出ない状態になってしまう。 */}
+                    {(project.work_style !== "remote" ||
+                        project.work_location_station ||
+                        project.work_location_line) && (
+                        /* [Issue #50 レビュー対応] 登録フォームでは「最寄駅」「路線名」の語の意味を確定させたため、
+                           ラベルを実際の中身に合わせる（旧: 「勤務地（最寄駅）」のまま路線名も表示していた）。
+                           値は最寄駅・路線名を1本の文字列に結合せず、項目ごとに欠損トークンを描く（人材詳細と同じ原子）。
+                           結合していた頃は、路線名だけが入った行が「（山手線）」と駅名の抜けた括弧になり、
+                           駅だけの行では路線名が空であることが画面から読み取れなかった。 */
+                        <FieldRow density="detail" label="勤務地（最寄駅 / 路線名）">
+                            {project.work_location_station || (
+                                <EmptyValue field="nearestStation" />
+                            )}
+                            {"　／　"}
+                            {project.work_location_line || (
+                                <EmptyValue field="nearestLine" />
+                            )}
+                        </FieldRow>
+                    )}
+                    {/* [Issue #43] 特記事項は勤務の補足を書く自由記述で、これ1項目のために
+                        「就業条件」セクションを残す必然性が無いため勤務条件の末尾に置く。 */}
+                    <FieldRow density="detail" label="特記事項">
                         {project.remarks ? (
                             <p className="whitespace-pre-wrap leading-relaxed">
                                 {project.remarks}
                             </p>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="remarks" />
                         )}
-                    </DetailRow>
+                    </FieldRow>
                 </SectionCard>
 
                 {/* スキル要件 */}
                 <SectionCard title="スキル要件">
-                    <DetailRow label="必須スキル">
+                    <FieldRow density="detail" label="必須スキル">
                         {project.required_skills.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {project.required_skills.map((skill, i) => (
@@ -271,10 +276,10 @@ export default function Show({ project }: Props) {
                                 ))}
                             </div>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="skills" />
                         )}
-                    </DetailRow>
-                    <DetailRow label="尚可スキル">
+                    </FieldRow>
+                    <FieldRow density="detail" label="尚可スキル">
                         {project.preferred_skills.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {project.preferred_skills.map((skill, i) => (
@@ -282,14 +287,15 @@ export default function Show({ project }: Props) {
                                         key={i}
                                         label={skill.label ?? ""}
                                         detail={skill.detail}
+                                        skillType="preferred"
                                     />
                                 ))}
                             </div>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="skills" />
                         )}
-                    </DetailRow>
-                    <DetailRow label="対象工程">
+                    </FieldRow>
+                    <FieldRow density="detail" label="対象工程">
                         {/* 人材詳細（Pages/Engineers/Show.tsx）と同一の指定にそろえ、
                             同じ「工程」が画面ごとに違う見え方になるのを防ぐ。 */}
                         <ProcessCheckboxGroup
@@ -298,37 +304,37 @@ export default function Show({ project }: Props) {
                             readOnly
                             className="flex-nowrap gap-x-4"
                         />
-                    </DetailRow>
-                    <DetailRow label="顧客折衝経験">
+                    </FieldRow>
+                    <FieldRow density="detail" label="顧客折衝経験">
                         {project.negotiation_required === true
                             ? "要"
                             : project.negotiation_required === false
                               ? "不問"
-                              : "—"}
-                    </DetailRow>
-                    <DetailRow label="業務内容詳細">
+                              : <EmptyValue field="negotiationExp" />}
+                    </FieldRow>
+                    <FieldRow density="detail" label="業務内容詳細">
                         {project.description ? (
                             <p className="whitespace-pre-wrap leading-relaxed">
                                 {project.description}
                             </p>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="description" />
                         )}
-                    </DetailRow>
-                    <DetailRow label="稼働環境">
+                    </FieldRow>
+                    <FieldRow density="detail" label="稼働環境">
                         {project.work_env ? (
                             <p className="whitespace-pre-wrap leading-relaxed">
                                 {project.work_env}
                             </p>
                         ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <EmptyValue field="workEnv" />
                         )}
-                    </DetailRow>
+                    </FieldRow>
                 </SectionCard>
 
                 {/* 管理情報 */}
                 <SectionCard title="管理情報">
-                    <DetailRow label="ステータス">
+                    <FieldRow density="detail" label="ステータス">
                         <StatusBadge
                             status={project.status}
                             label={
@@ -336,15 +342,15 @@ export default function Show({ project }: Props) {
                                 project.status
                             }
                         />
-                    </DetailRow>
-                    <DetailRow label="担当営業">
+                    </FieldRow>
+                    <FieldRow density="detail" label="担当営業">
                         <span>担当：{project.users.main.name}</span>
                         {project.users.sub && (
                             <span className="ml-3">
                                 ／　サブ：{project.users.sub.name}
                             </span>
                         )}
-                    </DetailRow>
+                    </FieldRow>
                 </SectionCard>
             </div>
 

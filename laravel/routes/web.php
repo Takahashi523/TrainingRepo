@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ErrorPageResponder;
 use App\Http\Controllers\CsvController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EngineerController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\MatchingController;
 use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SavedSearchController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -53,3 +55,17 @@ Route::middleware(['auth', 'admin'])->prefix('master')->name('master.')->group(f
 });
 
 require __DIR__.'/auth.php';
+
+/*
+ * 未定義 URL の受け皿（issue #70）。
+ *
+ * ルート未一致のまま例外ハンドラへ落とすと、web ミドルウェアグループ（StartSession /
+ * HandleInertiaRequests）が実行されない。するとログイン済みでも共有 Props の auth.user が
+ * null になり、エラーページが未認証向けの表示（サイドバー無し・「ログイン画面へ」の導線）に
+ * なってしまう。fallback ルートはルート解決に成功するため、共有 Props が揃った状態で
+ * 404 の案内ページを描画できる。
+ *
+ * auth ミドルウェアは付けない。未ログインでの 404 をログイン画面へリダイレクトさせず、
+ * 404 のまま返すため（応答の意味を変えない）。
+ */
+Route::fallback(fn (Request $request) => app(ErrorPageResponder::class)->fallback($request));
