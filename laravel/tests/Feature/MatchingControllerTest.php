@@ -425,6 +425,31 @@ class MatchingControllerTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_rerun_loop_guard_matches_by_path_even_when_referer_host_and_scheme_differ(): void
+    {
+        // 上のテストは `from()`（= セッションの previous url）経由だが、本番で実際に使われるのは
+        // Referer ヘッダーである（`UrlGenerator::previous()` は Referer を優先し、Inertia リクエストは
+        // X-Requested-With を送るため StartSession が現在 URL をセッションに積まない）。
+        // ここでは Referer 経由・かつリバースプロキシ配下を模して「Referer と現在リクエストで
+        // スキーム・ホストが食い違う」状態を作り、パス比較でループを断てることを固定する
+        // （URL 文字列の比較に戻すと一致せず back() になり、自己ループが復活して落ちる）。
+        // 末尾スラッシュ付きの Referer も同じパスとして扱えること（previousPath の正規化）も併せて見る。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'status' => 'not_proposable',
+        ]);
+        Http::fake();
+
+        $response = $this->actingAs($user)
+            ->withHeaders(['referer' => "http://internal-app:8000/engineers/{$engineer->id}/matching/"])
+            ->get("http://localhost/engineers/{$engineer->id}/matching");
+
+        $response->assertRedirect("/engineers/{$engineer->id}");
+        $response->assertSessionHas('error', '提案不可の人材はマッチングを実行できません。');
+        Http::assertNothingSent();
+    }
+
     public function test_proposable_and_interviewing_engineers_can_run_matching(): void
     {
         $user = User::factory()->create();

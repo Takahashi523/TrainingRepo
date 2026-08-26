@@ -60,8 +60,11 @@ class MatchingController extends Controller
             // 戻り先が現在 URL と同じときだけ人材詳細へ振り替え、ループを断つ（他画面からの流入は従来どおり back）。
             // 判定はパスだけで行う。Referer とリクエストではスキーム・ホストが食い違うことがあり
             // （プロキシ配下など）、URL 文字列の比較だとループ対策が静かに無効化されるため。
+            // パスの取り出しは url()->previousPath() に任せる。自前の parse_url と違い、
+            // サブディレクトリ配置時の base path 除去と末尾スラッシュの正規化まで行うため、
+            // Referer が `/engineers/5/matching/` のような表記で来ても判定が外れない。
             $fallback = route('engineers.show', $engineer);
-            $redirect = parse_url(url()->previous(), PHP_URL_PATH) === $request->getPathInfo()
+            $redirect = url()->previousPath() === (rtrim($request->getPathInfo(), '/') ?: '/')
                 ? redirect($fallback)
                 : back(fallback: $fallback);
 

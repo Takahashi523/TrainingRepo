@@ -121,8 +121,8 @@ export default function Index({
                 onCancelToken: (token) => {
                     matchingCancel.current = token.cancel;
                 },
-                // 通信断（サーバーに到達できない失敗）は onError では拾えないため、AuthenticatedLayout の
-                // exception 購読で全画面共通に通知する（#84）。到達済みのエンジン通信失敗はサーバーが
+                // 通信断（サーバーに到達できない失敗）は onError では拾えないため、レイアウトの
+                // useConnectionErrorToast()（exception 購読）で通知する（#84）。到達済みのエンジン通信失敗はサーバーが
                 // flash.error で通知する。
                 // onFinish は成功・失敗・キャンセルすべてで発火するためオーバーレイは必ず解除される。
                 onFinish: () => {

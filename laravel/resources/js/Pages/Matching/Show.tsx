@@ -138,8 +138,8 @@ export default function Show({
         selectedBeforeRerun.current = selected;
         setSelected(null);
 
-        // サーバーに到達できない通信断は onError にも flash にも乗らないが、AuthenticatedLayout が
-        // exception を全画面共通で購読してトーストを出すため（#84）、ここでは購読しない
+        // サーバーに到達できない通信断は onError にも flash にも乗らないが、レイアウトが
+        // useConnectionErrorToast() で exception を購読してトーストを出すため（#84）、ここでは購読しない
         // （到達済みのエンジン失敗はサーバーが flash.error で通知するので、そちらとも重複しない）。
 
         // 現在 URL への素の GET。preserve_matching_results フラグが無いためサーバーがエンジンを再実行する。
