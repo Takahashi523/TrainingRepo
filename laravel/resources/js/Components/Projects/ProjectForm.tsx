@@ -134,7 +134,6 @@ export default function ProjectForm({
                 label="顧客名"
                 required={fieldSettings.client_name.is_required}
                 error={errors.client_name}
-                hint="顧客ごとの傾向分析が必要な場合に活用できます"
             >
                 <Input
                     type="text"
