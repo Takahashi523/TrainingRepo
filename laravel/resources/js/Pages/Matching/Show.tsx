@@ -7,7 +7,6 @@ import TruncatedText from '@/Components/Common/TruncatedText';
 import MatchCard from '@/Components/Matching/MatchCard';
 import MatchDrawer from '@/Components/Matching/MatchDrawer';
 import { Button } from '@/Components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { MatchingEmptyReason, MatchingShowPageProps } from '@/types/matching';
@@ -121,7 +120,6 @@ export default function Show({
     // 自動再実行は行わない（コスト・並び替わり・成功直後の空状態化を避けるため）方針は維持し、
     // ユーザーが押したときだけ回す。リロード/ブラウザバックしか最新化手段が無い状態を解消する。
     const [isRerunning, setIsRerunning] = useState(false);
-    const { toast } = useToast();
 
     // マッチングは読み取り専用（DB保存なし）のため、途中キャンセルは安全（副作用が残らない）。
     // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する（人材詳細と同方式）。
@@ -137,17 +135,9 @@ export default function Show({
         selectedBeforeRerun.current = selected;
         setSelected(null);
 
-        // Inertia の onError は「サーバーが検証エラー（props.errors）を返した」ときだけ発火する。
-        // この GET は検証エラーを返さないため、サーバーに到達できない通信断は onError にも flash にも
-        // 乗らず、何も表示されないまま終わる。再実行中だけ exception を購読してトーストを出す
-        // （到達済みのエンジン失敗はサーバーが flash.error で通知するので、そちらは重複しない）。
-        // リスナーは値を返さない（false を返すと Inertia の既定動作＝例外の再スローまで抑止してしまう）。
-        const offException = router.on('exception', () => {
-            toast({
-                description: '再マッチングに失敗しました。通信環境をご確認のうえ、再度お試しください。',
-                variant: 'destructive',
-            });
-        });
+        // サーバーに到達できない通信断は onError にも flash にも乗らないが、AuthenticatedLayout が
+        // exception を全画面共通で購読してトーストを出すため（#84）、ここでは購読しない
+        // （到達済みのエンジン失敗はサーバーが flash.error で通知するので、そちらとも重複しない）。
 
         // 現在 URL への素の GET。preserve_matching_results フラグが無いためサーバーがエンジンを再実行する。
         // reload() は preserveState を強制するため、通信失敗時にサーバーが返す results=null（＝既存表示の
@@ -163,7 +153,6 @@ export default function Show({
             onFinish: () => {
                 setIsRerunning(false);
                 rerunCancel.current = null;
-                offException();
             },
             onCancelToken: (token) => {
                 rerunCancel.current = token.cancel;
@@ -174,7 +163,14 @@ export default function Show({
     // オーバーレイのキャンセル（ボタン / ESC）。一覧は一切変わらないので、開いていたドロワーも戻して
     // 「何も起きなかった」状態にする（実行前に閉じるのは並び替わり対策であり、キャンセルには不要なため）。
     const handleRerunCancel = () => {
-        rerunCancel.current?.();
+        // 応答が着地した後（onFinish でトークンを捨てた後）は復元しない。
+        // AiLoadingOverlay の Content は閉じるアニメーション（duration-200）の間マウントが残るため、
+        // 一覧が差し替わった直後の ESC / クリックがここに届き得る。そのとき復元すると
+        // 「旧一覧に対する index」で新一覧のドロワーを開くことになり、実行前に setSelected(null) して
+        // 防いだはずの「見ている対象と中身がズレる」状態を作ってしまう。
+        if (!rerunCancel.current) return;
+
+        rerunCancel.current();
         setSelected(selectedBeforeRerun.current);
     };
 
