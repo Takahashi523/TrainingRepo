@@ -13,6 +13,7 @@ use App\Models\Pipeline;
 use App\Models\User;
 use App\Services\Matching\MatchTargetStateResolver;
 use App\Services\PipelineService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -223,7 +224,15 @@ class PipelineController extends Controller
      */
     public function destroy(Request $request, Pipeline $pipeline): RedirectResponse
     {
-        $this->authorize('delete', $pipeline);
+        // 権限不足時は 403 を素で投げず、設計書 06_進捗管理 DELETE #5 のとおり
+        // 前画面へ戻し flash.error を返す（人材側 EngineerController::destroy と同様）。
+        try {
+            $this->authorize('delete', $pipeline);
+        } catch (AuthorizationException) {
+            // referer が無い場合（直接リクエストされた場合等）でも flash が失われないよう、
+            // ダッシュボードへのfallbackを明示する（#78 TokenMismatchInertiaRedirectorと同方針）。
+            return back(fallback: route('dashboard'))->with('error', '削除権限がありません。');
+        }
 
         $this->pipelineService->delete($pipeline);
 

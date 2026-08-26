@@ -13,6 +13,7 @@ use App\Models\SavedSearch;
 use App\Models\User;
 use App\Models\Project;
 use App\Services\ProjectService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -219,9 +220,17 @@ class ProjectController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Project $project)
+    public function destroy(Project $project): RedirectResponse
     {
-        $this->authorize('delete', $project);
+        // 認可はコントローラに残す（人材側 EngineerController::destroy と同様）。権限不足時は 403 を
+        // 素で投げず、設計書 04_案件管理 DELETE #7 のとおり前画面へ戻し flash.error を返す。
+        try {
+            $this->authorize('delete', $project);
+        } catch (AuthorizationException) {
+            // referer が無い場合（直接リクエストされた場合等）でも flash が失われないよう、
+            // ダッシュボードへのfallbackを明示する（#78 TokenMismatchInertiaRedirectorと同方針）。
+            return back(fallback: route('dashboard'))->with('error', '削除権限がありません。');
+        }
 
         $this->projectService->destroy($project);
 
