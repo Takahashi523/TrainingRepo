@@ -118,6 +118,13 @@ export default function ProjectForm({
 
     return (
         <div className="max-w-3xl">
+            {/* [Issue #43] このフォームのセクション・項目順は
+                FormFieldSetting::FIELD_LABELS['project'] の定義順と 1 対 1 で対応させる
+                （マスタ管理のフォーム設定一覧は同定数の順で表示されるため、ここを並べ替えると
+                「設定画面とフォームで項目の並びが違う」状態になる）。
+                並べ替えるときは同定数と
+                MasterFormSettingControllerTest::test_project_form_settings_are_ordered_by_form_section
+                の期待順も必ず合わせること。TS 側にテスト基盤が無く、この対応は CI で検知できない。 */}
             <SectionHeading>基本情報</SectionHeading>
 
             <FormRow label="案件名" required error={errors.name}>

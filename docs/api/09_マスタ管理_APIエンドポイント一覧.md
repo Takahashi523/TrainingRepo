@@ -214,6 +214,10 @@
 > **背景：** 案件側の並びが登録フォームと無関係な順序で、設定したい項目をフォームと同じ順に辿れなかった（issue #43）。  
 > **理由：** 表示順を定数1箇所に集約したまま、その定数を登録フォームのセクション順（基本情報 → 契約条件 → 勤務条件 → スキル要件 → 管理情報）に並べ替えることで、この一覧表の記述形式を変えずに画面の順序整合を取れるため。順序の固定は `MasterFormSettingControllerTest` が担保する。
 
+> **【2026-08-26 修正】表示名を `FormFieldSetting::FIELD_LABELS` に合わせた（PR #96 レビュー指摘）**
+> **背景：** この表の表示名のうち 4 件（`birth_date`「年齢（生年月日）」/ `desired_rate`「希望単価」/ `work_styles`「勤務形態タグ」/ `rate`「単価（下限〜上限）」）が、実装と WF_12 の表示名（順に「生年月日」「希望単価（月額）」「勤務形態」「単価（月額）」）とずれたまま残っていた。
+> **理由：** 表示名の SSOT は `FormFieldSetting::FIELD_LABELS` であり、この表はその対応を読むためのものなので、ずれていると「どちらが画面に出る名前か」を判断できない。**`field_key`・`is_system_required`・WF_12初期値は変更していない**（表示名の表記のみ）。
+
 > **キー名の統一方針**：`fieldSettings` の各キーは form_field_settings テーブルの `field_key` カラムと1対1で対応する。人材管理・案件管理の API 定義書の `fieldSettings` と完全に一致させること。
 
 ### 人材登録フォーム（form_type = engineer）
@@ -224,7 +228,7 @@
 | name_kana | 氏名カナ | true（変更不可） | 必須（固定） |
 | status | ステータス | true（変更不可） | 必須（固定） |
 | main_user_id | 担当営業 | true（変更不可） | 必須（固定） |
-| birth_date | 年齢（生年月日） | false | 必須 |
+| birth_date | 生年月日 | false | 必須 |
 | nearest_station | 最寄駅 | false | 必須 |
 | nearest_line | 路線 | false | 必須 |
 | available_from | 稼働可能時期 | false | 必須 |
@@ -232,8 +236,8 @@
 | proc_experience | 経験工程 | false | 必須 |
 | has_negotiation_exp | 顧客折衝経験 | false | 必須 |
 | appeal_note | アピールポイント | false | 任意 |
-| desired_rate | 希望単価 | false | 任意 |
-| work_styles | 勤務形態タグ | false | 任意 |
+| desired_rate | 希望単価（月額） | false | 任意 |
+| work_styles | 勤務形態 | false | 任意 |
 | remarks | 特記事項 | false | 任意 |
 
 > **`name` / `name_kana` / `status` / `main_user_id` は `is_system_required = true`** のため管理者もトグル変更不可。  
@@ -249,7 +253,7 @@
 | client_name | 顧客名 | false | 任意 |
 | required_skills | 必須スキル | false | 必須 |
 | preferred_skills | 尚可スキル | false | 任意 |
-| rate | 単価（下限〜上限） | false | 必須 |
+| rate | 単価（月額） | false | 必須 |
 | start_date | 参画開始時期 | false | 必須 |
 | work_style | 稼働形態 | false | 必須 |
 | work_location | 勤務地（路線名） | false | 必須 |

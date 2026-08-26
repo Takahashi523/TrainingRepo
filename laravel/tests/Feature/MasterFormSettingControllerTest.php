@@ -118,6 +118,45 @@ class MasterFormSettingControllerTest extends TestCase
         );
     }
 
+    /**
+     * マスタ管理のフォーム設定一覧（人材）が、人材登録フォームのセクション・項目順で返ることを固定する。
+     *
+     * FIELD_LABELS の docblock は engineer / project の両方に「フォームのセクション・項目順と一致させること」を
+     * 課しているが、順序テストは project 側にしか無かった（PR #96 レビュー指摘）。
+     * engineer 側も現時点で EngineerForm.tsx と一致しているため、一致しているうちに固定する。
+     * 期待値を literal で書く理由・id 順と一致しない理由は上のテストと同じ。
+     */
+    public function test_engineer_form_settings_are_ordered_by_form_section(): void
+    {
+        $this->seed(FormFieldSettingSeeder::class);
+
+        $expected = [
+            // 基本情報
+            'name', 'name_kana', 'birth_date', 'nearest_station', 'nearest_line', 'available_from',
+            // スキル情報
+            'skills', 'proc_experience', 'has_negotiation_exp',
+            // 経歴・PR
+            'appeal_note',
+            // 希望条件
+            'desired_rate', 'work_styles', 'remarks',
+            // 管理情報
+            'status', 'main_user_id',
+        ];
+
+        $response = $this->actingAs($this->admin())->get('/master');
+        $response->assertOk();
+
+        $actual = collect($response->viewData('page')['props']['form_settings']['engineer'])
+            ->pluck('field_key')
+            ->all();
+
+        $this->assertSame(
+            $expected,
+            $actual,
+            'マスタ管理（人材）の表示順が登録フォームのセクション順と一致していません。FormFieldSetting::FIELD_LABELS の並びを確認してください。',
+        );
+    }
+
     // -------------------------------------------------------
     // 更新
     // -------------------------------------------------------

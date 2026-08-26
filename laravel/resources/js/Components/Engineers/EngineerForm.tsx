@@ -152,7 +152,11 @@ export default function EngineerForm({
                 />
             </FormRow>
 
-            <FormRow label="カナ" required error={errors.name_kana}>
+            {/* [PR #96 レビュー指摘] 表示名の SSOT は FormFieldSetting::FIELD_LABELS で、
+                同定数・WF_12・CSV ヘッダー・EngineerRequest の属性名はいずれも「氏名カナ」。
+                ここだけ「カナ」だったため、必須エラーが「氏名カナは必須です」と出るのに
+                入力欄のラベルは「カナ」という不一致になっていた。 */}
+            <FormRow label="氏名カナ" required error={errors.name_kana}>
                 <Input
                     value={data.name_kana}
                     onChange={(e) => setData('name_kana', e.target.value)}
