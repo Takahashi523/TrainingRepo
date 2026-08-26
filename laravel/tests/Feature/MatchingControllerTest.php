@@ -490,8 +490,10 @@ class MatchingControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSessionHas('error');
+        // results は空配列ではなく null（＝スコアを1件も取得できていない・既存表示の据え置き指示）。
+        // [] は「スコアリングは成立したが0件」の意味に限定する（#52）。
         $response->assertInertia(fn ($page) => $page->component('Matching/Show')
-            ->has('results', 0)
+            ->where('results', null)
             ->where('emptyReason', 'engine_error')
             ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
     }
@@ -513,7 +515,8 @@ class MatchingControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSessionHas('error');
-        $response->assertInertia(fn ($page) => $page->has('results', 0)
+        // 上と同じく、上流障害の results は null で返る（#52）。
+        $response->assertInertia(fn ($page) => $page->where('results', null)
             ->where('emptyReason', 'engine_error')
             ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
     }
