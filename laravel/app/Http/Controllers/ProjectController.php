@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesSort;
 use App\Http\Requests\ProjectIndexRequest;
 use App\Http\Requests\ProjectRequest;
 use App\Http\Resources\ProjectResource;
@@ -12,7 +13,6 @@ use App\Models\SavedSearch;
 use App\Models\User;
 use App\Models\Project;
 use App\Services\ProjectService;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -20,6 +20,8 @@ use Inertia\Response;
 
 class ProjectController extends Controller
 {
+    use ResolvesSort;
+
     public function __construct(
         private readonly ProjectService $projectService
     ) {}
@@ -51,7 +53,7 @@ class ProjectController extends Controller
 
         $keyword = trim((string) $request->input('keyword', ''));
 
-        [$sort, $order] = $this->resolveSort($request);
+        [$sort, $order] = $this->resolveSort($request, Project::SORT_OPTIONS);
 
         $perPage = (int) $request->input('per_page', self::PER_PAGE_DEFAULT);
         $perPage = max(1, min(self::PER_PAGE_MAX, $perPage));
@@ -161,25 +163,6 @@ class ProjectController extends Controller
         ]);
     }
 
-    /**
-     * ソートを sort×order のペア単位で検証する。
-     * Project::SORT_OPTIONS（許可組の配列。SSOT）に一致するペアだけ採用し、
-     * 無ければ先頭（デフォルト）へフォールバックする。
-     */
-    private function resolveSort(Request $request): array
-    {
-        $sortInput = (string) $request->input('sort', '');
-        $orderInput = strtolower((string) $request->input('order', ''));
-
-        foreach (Project::SORT_OPTIONS as $opt) {
-            if ($opt['sort'] === $sortInput && $opt['order'] === $orderInput) {
-                return [$opt['sort'], $opt['order']];
-            }
-        }
-
-        return [Project::SORT_OPTIONS[0]['sort'], Project::SORT_OPTIONS[0]['order']];
-    }
-    
     /**
      * Show the form for creating a new resource.
      */
