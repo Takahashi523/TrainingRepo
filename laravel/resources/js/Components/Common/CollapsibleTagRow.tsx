@@ -85,7 +85,9 @@ export default function CollapsibleTagRow({ children, className }: Props) {
         'inline-flex shrink-0 items-center gap-0.5 rounded border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground';
 
     return (
-        <div className={cn('relative', className)}>
+        // w-full：flex コンテナの子として置かれても内容幅に縮まないようにする。
+        // 幅が縮むと「1行に収まる数」を狭い幅で測ってしまい、余白があるのに畳まれる。
+        <div className={cn('relative w-full', className)}>
             {/* 計測用ミラー：全タグ＋トグルのプレースホルダを不可視で描画し、収まる数を測る（表示側と同幅）。
                 プレースホルダのラベルは最大幅（全件隠れる想定 = +items.length）にして、実ボタンが必ず収まるようにする。 */}
             <div

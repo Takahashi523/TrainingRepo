@@ -5,7 +5,6 @@ namespace App\Http\Resources;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Carbon;
 
 class ProjectResource extends JsonResource
 {
@@ -21,9 +20,8 @@ class ProjectResource extends JsonResource
             'commercial_flow' => $this->commercial_flow,
             'headcount' => $this->headcount,
             'start_date' => $this->start_date,
-            'start_label' => $this->start_date
-                ? Carbon::parse($this->start_date)->format('Y/m/d') . '〜'
-                : '未定',
+            // 表示ラベルの生成は Project::startLabel に集約（一覧・マッチングと同一の規則）。
+            'start_label' => $this->start_label,
             'rate_min' => $this->rate_min,
             'rate_max' => $this->rate_max,
             'rate_note' => $this->rate_note,
