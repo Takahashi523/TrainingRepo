@@ -541,11 +541,14 @@
         <span class="active-tag">Java <span style="cursor:pointer;">✕</span></span>
         <span class="active-tag">募集中 <span style="cursor:pointer;">✕</span></span>
         <span class="active-tag">フルリモート <span style="cursor:pointer;">✕</span></span>
-        <!-- 「☆ 条件を保存」「✕ すべてクリア」はどちらも左の絞り込みタグ（＝現在の条件）に作用するため隣接させる。
+        <!-- 「(ファネル+) 条件を保存」「✕ すべてクリア」はどちらも左の絞り込みタグ（＝現在の条件）に作用するため隣接させる。
              どちらも絞り込み条件が1つ以上ある時のみ表示（保存対象がない場合は非表示）。同時に出没するので、
              常時表示の右クラスタ（保存済み条件の呼び出し・管理）は絞り込みの有無で横位置がズレない。
-             並び順は建設的な「保存」を先、破壊的な「すべてクリア」を後にする。（issue #66） -->
-        <button class="btn" style="margin-left:4px;">☆ 条件を保存 <span class="should-badge">Should</span></button>
+             並び順は建設的な「保存」を先、破壊的な「すべてクリア」を後にする。
+             アイコンは漏斗＋（呼び出しトリガーの漏斗と対象を共有し、＋で「保存済みに追加する」を表す）。
+             星は使わない。星は ON/OFF を持つトグルの記号だが本操作は名前を付けて作る生成操作であり、案件カード一覧の直上では
+             「この案件をお気に入り」とも誤読されるため。（issue #66） -->
+        <button class="btn" style="margin-left:4px;">(ファネル+) 条件を保存 <span class="should-badge">Should</span></button>
         <button class="btn btn-ghost">✕ すべてクリア</button>
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
           <!-- 呼び出しUIは select ではなくメニュー（押すと適用されるアクションの一覧）。

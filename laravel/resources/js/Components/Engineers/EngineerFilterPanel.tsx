@@ -8,7 +8,7 @@ import { Input } from '@/Components/ui/input';
 import { EngineerFilters, EngineerSearchConditions, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
 import { SavedSearchItem } from '@/types/savedSearch';
 import { SortOption } from '@/types';
-import { List, Search, Star, X } from 'lucide-react';
+import { FunnelPlus, List, Search, X } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {
@@ -199,7 +199,12 @@ export default function EngineerFilterPanel({
                         className="ml-1 h-7 gap-1 bg-white text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground [&_svg]:size-3.5"
                         onClick={() => setShowSaveModal(true)}
                     >
-                        <Star />
+                        {/* 漏斗＋（FunnelPlus）。呼び出し側トリガーの Filter（実体は Funnel）と対象を共有し、
+                            「＋＝この絞り込みを保存済みに追加する」を表す。
+                            星（お気に入り）は使わない。星は ON/OFF を持つトグルの記号だが、この操作は
+                            ダイアログで名前を付けて新規レコードを作る生成操作で、点灯状態を持たない。
+                            人材・案件のカード一覧の直上にあるため「この人材をお気に入り」とも誤読されうる。 */}
+                        <FunnelPlus />
                         条件を保存
                     </Button>
                 )}
