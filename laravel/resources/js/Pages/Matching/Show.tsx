@@ -9,6 +9,7 @@ import TruncatedText from '@/Components/Common/TruncatedText';
 import MatchCard from '@/Components/Matching/MatchCard';
 import MatchDrawer from '@/Components/Matching/MatchDrawer';
 import { Button } from '@/Components/ui/button';
+import { Sheet, SheetContent } from '@/Components/ui/sheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { emptyText } from '@/lib/emptyValue';
 import { PageProps } from '@/types';
@@ -119,6 +120,22 @@ export default function Show({
     // 工程経験を人材登録・一覧と同じ ProcessCheckboxGroup で表示する（readOnly）。人材は has_experience。
     const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
+    // ドロワー（Sheet）の Portal 先。WF_09 どおりドロワー本体をコンテンツ領域内に収め、
+    // サイドバーの上に乗せないため、body ではなくこのページのコンテナへ描画する。
+    // ref ではなく state で保持するのは、ref 代入では再レンダリングが起きず、
+    // 初回描画時に container が null（＝ body へフォールバック）のままになるため。
+    const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
+
+    // ドロワーを開いた起点の要素。閉じたときにここへフォーカスを戻す。
+    // Sheet は SheetTrigger 経由で開いていないため、Radix は復帰先を知らない（放置するとフォーカスが body に落ち、
+    // キーボード操作では一覧の先頭から辿り直しになる）。開いた瞬間の activeElement を自前で覚えておく。
+    const openerRef = useRef<HTMLElement | null>(null);
+
+    const openDrawer = (index: number) => {
+        openerRef.current = document.activeElement as HTMLElement | null;
+        setSelected(index);
+    };
+
     // 再マッチング（#52）：AI を再実行して一覧を最新化する明示的オプトイン導線。
     // 自動再実行は行わない（コスト・並び替わり・成功直後の空状態化を避けるため）方針は維持し、
     // ユーザーが押したときだけ回す。リロード/ブラウザバックしか最新化手段が無い状態を解消する。
@@ -129,12 +146,18 @@ export default function Show({
     const rerunCancel = useRef<(() => void) | null>(null);
 
     // キャンセル時に開いていたドロワーへ戻すための退避先（キャンセル＝何も起きなかったことにする）。
+    // 下記のとおり現状は常に null が入る。
     const selectedBeforeRerun = useRef<number | null>(null);
 
     const handleRerun = () => {
         // 再取得で並びが変わると、index で選択しているドロワーが別案件の内容に化ける。
-        // 実行前に必ず閉じ、ユーザーが見ている対象と中身がズレた状態を作らない
-        // （マウスでは背景幕に阻まれるが、ドロワーはフォーカストラップを持たないためキーボードで到達できる）。
+        // そのため実行前に必ず閉じ、ユーザーが見ている対象と中身がズレた状態を作らない。
+        //
+        // ⚠️ 現状この2行は実質デッドコード：ドロワー（Sheet）は modal なので、開いている間は
+        // Radix が body の pointer-events を無効化し、かつフォーカストラップが効くため、
+        // 再マッチングボタンにはマウスでもキーボードでも到達できない（＝ selected は常に null）。
+        // それでも残すのは、Sheet を modal={false} に変えた瞬間に上記のズレが無言で復活するため
+        // （防御的プログラミング。到達不能でもコストは実質ゼロ）。
         selectedBeforeRerun.current = selected;
         setSelected(null);
 
@@ -165,6 +188,7 @@ export default function Show({
 
     // オーバーレイのキャンセル（ボタン / ESC）。一覧は一切変わらないので、開いていたドロワーも戻して
     // 「何も起きなかった」状態にする（実行前に閉じるのは並び替わり対策であり、キャンセルには不要なため）。
+    // ただし handleRerun のとおり Sheet が modal である限り退避先は常に null＝実際には復元は起きない。
     const handleRerunCancel = () => {
         // 応答が着地した後（onFinish でトークンを捨てた後）は復元しない。
         // AiLoadingOverlay の Content は閉じるアニメーション（duration-200）の間マウントが残るため、
@@ -192,7 +216,12 @@ export default function Show({
 
             {/* WF_09：ヘッダ・対象人材サマリーは上部固定、下の結果一覧のみスクロール。
                 進捗管理・人材一覧と同じく p-6 を -m-6 で打ち消し、画面全高（h-screen）の flex カラムにする。 */}
-            <div className="relative -m-6 flex h-screen flex-col overflow-hidden">
+            <div
+                ref={setDrawerContainer}
+                // ドロワーを閉じたときの復帰先（起点のカードが消えている場合）。マウスでは焦点化しない
+                tabIndex={-1}
+                className="relative -m-6 flex h-screen flex-col overflow-hidden outline-none"
+            >
                 {/* ページヘッダー（WF_09：タイトル＋サブタイトル。#52 で右側に再マッチングを追加） */}
                 <div className="flex shrink-0 items-center justify-between border-b border-border bg-white px-10 py-4">
                     <div>
@@ -315,7 +344,7 @@ export default function Show({
                                         key={result.project.id}
                                         result={result}
                                         selected={selected === i}
-                                        onSelect={() => setSelected(i)}
+                                        onSelect={() => openDrawer(i)}
                                     />
                                 ))}
                             </div>
@@ -324,15 +353,42 @@ export default function Show({
                 </div>
             </div>
 
-            {/* 右ドロワー */}
-            {current && (
-                <>
-                    <div
-                        className="fixed inset-0 z-40 bg-black/30"
-                        onClick={() => setSelected(null)}
-                        aria-hidden="true"
-                    />
-                    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-border bg-white shadow-xl">
+            {/* 右ドロワー（shadcn Sheet＝Radix Dialog。ESC・フォーカストラップ・スクロールロックを標準で得る）。
+                ・パネルは container 指定＋absolute でコンテンツ領域内に収め、サイドバーの上に乗せない（WF_09 の .drawer）
+                ・幕は fixed のまま画面全体に敷く。modal によりサイドバーは操作できなくなるため、
+                  暗くして「今は操作できない」ことを見た目でも示す（明るいまま押せない状態にしない）
+                ・閉じるは onOpenChange 一本に集約する（ESC・幕クリック・ヘッダーの ✕ すべてここを通る） */}
+            <Sheet
+                // container が確定するまで開かない（body へ Portal されてサイドバーに被る一瞬を作らない）
+                open={!!current && drawerContainer !== null}
+                onOpenChange={(open) => {
+                    if (!open) setSelected(null);
+                }}
+            >
+                <SheetContent
+                    container={drawerContainer}
+                    overlayClassName="z-20 bg-black/25"
+                    className="absolute inset-y-0 right-0 z-30 h-full w-full max-w-md gap-0 border-l border-border bg-white p-0 shadow-xl sm:max-w-md"
+                    showCloseButton={false}
+                    // ドロワーは説明文を持たないため、存在しない id を指す aria-describedby を出さない
+                    aria-describedby={undefined}
+                    tabIndex={-1}
+                    onOpenAutoFocus={(event) => {
+                        // 既定では最初の tabbable（ヘッダーの ✕）に乗る。パネル自身に当てて
+                        // SheetTitle（案件名）から読ませ、進捗管理側と挙動を揃える。
+                        event.preventDefault();
+                        (event.currentTarget as HTMLElement).focus();
+                    }}
+                    onCloseAutoFocus={(event) => {
+                        // Radix は SheetTrigger 経由で開いていないと復帰先を知らず、既定のまま抜けると
+                        // フォーカスが body に落ちる。起点が残っていればそこへ、消えていれば一覧コンテナへ戻す。
+                        event.preventDefault();
+                        const opener = openerRef.current;
+                        (opener?.isConnected ? opener : drawerContainer)?.focus();
+                    }}
+                >
+                    {/* 別カードを選び直したときにフォーム状態を持ち越さないため、案件IDで再マウントする */}
+                    {current && (
                         <MatchDrawer
                             key={current.project.id}
                             result={current}
@@ -340,9 +396,9 @@ export default function Show({
                             onAdded={() => handleAdded(current.project.id)}
                             onClose={() => setSelected(null)}
                         />
-                    </div>
-                </>
-            )}
+                    )}
+                </SheetContent>
+            </Sheet>
         </AuthenticatedLayout>
     );
 }
