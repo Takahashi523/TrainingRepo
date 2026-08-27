@@ -58,7 +58,10 @@ export default function SavedSearchMenu<
                     // disabled にするとロービングフォーカスの対象外になり、キーボードでは案内文に
                     // 到達できず「空のメニューが開いただけ」になるため、フォーカスは受けられるようにし、
                     // onSelect を握りつぶして「押しても何も起きない」状態にする。
+                    // ただし role="menuitem" のままでは支援技術に「押せる項目」と伝わるため、
+                    // aria-disabled で無効であることを明示する（到達できる／ただし選べない）。
                     <DropdownMenuItem
+                        aria-disabled="true"
                         onSelect={(e) => e.preventDefault()}
                         className="cursor-default text-muted-foreground"
                     >

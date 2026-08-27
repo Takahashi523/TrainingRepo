@@ -75,21 +75,28 @@ export default function EngineerFilterPanel({
             ? currentSortOption.label
             : undefined;
 
-    // 保存済み条件の適用。conditions はサーバに生 JSON で保存されているため、
-    // 保存後にフィルタ項目を増減させると古いレコードにはキーが欠けうる。
-    // patch をそのままマージすると欠けた次元に現在の絞り込みが残り、
-    // 「保存したものと違う条件が適用された」状態（部分適用）になるため、
-    // 先に全次元を既定値へ戻してから保存値を上書きする。
+    // 保存済み条件の適用。
+    // 保存時は SavedSearchService::sanitizeConditions() が全キーを埋めた配列を組み立てるため、
+    // 現行の保存経路を通ったレコードにキー欠落はない。ただし保存後にフィルタ次元を増やすと、
+    // それ以前に保存された古いレコードには新しいキーが無い。patch をそのままマージすると
+    // 欠けた次元に現在の絞り込みが残り、「保存したものと違う条件が適用された」状態（部分適用）に
+    // なるため、適用は merge ではなく replace として扱い、先に全次元を既定値へ戻す。
+    //
+    // 既定値には型注釈を付ける。onFilterChange の引数は Partial<EngineerFilters> のため、
+    // 注釈が無いとキーが1つ欠けてもコンパイルエラーにならず、次元追加時に部分適用が静かに再発する。
+    // なお「フィルタ次元の一覧」は EngineerSearchConditions（型）／SavedSearchService::sanitizeConditions()
+    // ／ここの既定値 の3か所に分散しているため、次元を増やすときは3か所とも揃える
+    // （型注釈で守れるのは TS 側の2か所のみ）。
     const applySavedConditions = (conditions: Partial<EngineerSearchConditions>) => {
-        onFilterChange({
+        const defaults: EngineerSearchConditions = {
             status: [],
             work_styles: [],
             phases: [],
             keyword: '',
             sort: sortOptions[0].sort as EngineerFilters['sort'],
             order: sortOptions[0].order as EngineerFilters['order'],
-            ...conditions,
-        });
+        };
+        onFilterChange({ ...defaults, ...conditions });
     };
 
     const [showSaveModal, setShowSaveModal] = useState(false);
