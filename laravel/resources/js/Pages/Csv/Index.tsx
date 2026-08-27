@@ -56,7 +56,7 @@ export default function CsvIndex({
                 </div>
 
                 {/* コンテンツエリア（スクロール）。両パネルを常時マウントし、非アクティブ側は hidden で隠す（結果 state を独立保持）。 */}
-                <div className="flex-1 overflow-y-auto bg-muted/60 px-10 py-8">
+                <div className="flex-1 overflow-y-auto bg-muted/30 px-10 py-8">
                     <div className={cn(tab !== 'engineers' && 'hidden')}>
                         <EngineerCsvPanel
                             options={engineer_filter_options}

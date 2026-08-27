@@ -1,16 +1,22 @@
+import AiLoadingOverlay from '@/Components/Common/AiLoadingOverlay';
 import CollapsibleTagRow from '@/Components/Common/CollapsibleTagRow';
+import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
+import Rate from '@/Components/Common/Rate';
 import SkillTag from '@/Components/Common/SkillTag';
 import StatusBadge from '@/Components/Common/StatusBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import MatchCard from '@/Components/Matching/MatchCard';
 import MatchDrawer from '@/Components/Matching/MatchDrawer';
+import { Button } from '@/Components/ui/button';
+import { Sheet, SheetContent } from '@/Components/ui/sheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { emptyText } from '@/lib/emptyValue';
 import { PageProps } from '@/types';
 import { MatchingEmptyReason, MatchingShowPageProps } from '@/types/matching';
-import { Head } from '@inertiajs/react';
-import { AlertTriangle, PackageX, SearchX } from 'lucide-react';
-import { ComponentType, useEffect, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, PackageX, RefreshCw, SearchX } from 'lucide-react';
+import { ComponentType, useEffect, useRef, useState } from 'react';
 
 type Props = PageProps<MatchingShowPageProps>;
 
@@ -56,6 +62,15 @@ export default function Show({
     useEffect(() => {
         if (resultsProp !== null) {
             setResults(resultsProp);
+            setEmptyReason(emptyReasonProp);
+            return;
+        }
+
+        // 据え置き指示（results=null）でも理由が来ているとき（＝エンジン通信失敗・#52）は理由だけ更新する。
+        // 一覧が0件のまま再マッチングに失敗すると、据え置くべき中身が無いのに前回の理由（例：no_match＝
+        // 「条件に合う募集中の案件が見つかりませんでした」）が残り、確認できていない事実を断定してしまう。
+        // 追加直後の back は emptyReason=null で来るため、この分岐に入らず従来の空状態を壊さない。
+        if (emptyReasonProp !== null) {
             setEmptyReason(emptyReasonProp);
         }
     }, [resultsProp, emptyReasonProp]);
@@ -105,17 +120,125 @@ export default function Show({
     // 工程経験を人材登録・一覧と同じ ProcessCheckboxGroup で表示する（readOnly）。人材は has_experience。
     const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
+    // ドロワー（Sheet）の Portal 先。WF_09 どおりドロワー本体をコンテンツ領域内に収め、
+    // サイドバーの上に乗せないため、body ではなくこのページのコンテナへ描画する。
+    // ref ではなく state で保持するのは、ref 代入では再レンダリングが起きず、
+    // 初回描画時に container が null（＝ body へフォールバック）のままになるため。
+    const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
+
+    // ドロワーを開いた起点の要素。閉じたときにここへフォーカスを戻す。
+    // Sheet は SheetTrigger 経由で開いていないため、Radix は復帰先を知らない（放置するとフォーカスが body に落ち、
+    // キーボード操作では一覧の先頭から辿り直しになる）。開いた瞬間の activeElement を自前で覚えておく。
+    const openerRef = useRef<HTMLElement | null>(null);
+
+    const openDrawer = (index: number) => {
+        openerRef.current = document.activeElement as HTMLElement | null;
+        setSelected(index);
+    };
+
+    // 再マッチング（#52）：AI を再実行して一覧を最新化する明示的オプトイン導線。
+    // 自動再実行は行わない（コスト・並び替わり・成功直後の空状態化を避けるため）方針は維持し、
+    // ユーザーが押したときだけ回す。リロード/ブラウザバックしか最新化手段が無い状態を解消する。
+    const [isRerunning, setIsRerunning] = useState(false);
+
+    // マッチングは読み取り専用（DB保存なし）のため、途中キャンセルは安全（副作用が残らない）。
+    // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する（人材詳細と同方式）。
+    const rerunCancel = useRef<(() => void) | null>(null);
+
+    // キャンセル時に開いていたドロワーへ戻すための退避先（キャンセル＝何も起きなかったことにする）。
+    // 下記のとおり現状は常に null が入る。
+    const selectedBeforeRerun = useRef<number | null>(null);
+
+    const handleRerun = () => {
+        // 再取得で並びが変わると、index で選択しているドロワーが別案件の内容に化ける。
+        // そのため実行前に必ず閉じ、ユーザーが見ている対象と中身がズレた状態を作らない。
+        //
+        // ⚠️ 現状この2行は実質デッドコード：ドロワー（Sheet）は modal なので、開いている間は
+        // Radix が body の pointer-events を無効化し、かつフォーカストラップが効くため、
+        // 再マッチングボタンにはマウスでもキーボードでも到達できない（＝ selected は常に null）。
+        // それでも残すのは、Sheet を modal={false} に変えた瞬間に上記のズレが無言で復活するため
+        // （防御的プログラミング。到達不能でもコストは実質ゼロ）。
+        selectedBeforeRerun.current = selected;
+        setSelected(null);
+
+        // サーバーに到達できない通信断は onError にも flash にも乗らないが、レイアウトが
+        // useConnectionErrorToast() で exception を購読してトーストを出すため（#84）、ここでは購読しない
+        // （到達済みのエンジン失敗はサーバーが flash.error で通知するので、そちらとも重複しない）。
+
+        // 現在 URL への素の GET。preserve_matching_results フラグが無いためサーバーがエンジンを再実行する。
+        // reload() は preserveState を強制するため、通信失敗時にサーバーが返す results=null（＝既存表示の
+        // 据え置き指示）がそのまま効く（コンポーネントが再マウントされると据え置きが成立しない）。
+        // 併せて async 実行のため、二重実行はボタンの disabled とモーダルオーバーレイで防ぐ。
+        router.reload({
+            // reload() は async 実行のため Inertia の既定（showProgress = !async）では進捗バーが出ない。
+            // 人材詳細からの初回マッチング（router.get）では出るので、明示的に有効化して体裁を揃える。
+            // 全画面オーバーレイは「何が起きているか」を、進捗バーは「リクエストが飛んでいること」を伝える。
+            showProgress: true,
+            onStart: () => setIsRerunning(true),
+            // onFinish は成功・失敗・キャンセルすべてで発火するため、後片付けはここに集約する。
+            onFinish: () => {
+                setIsRerunning(false);
+                rerunCancel.current = null;
+            },
+            onCancelToken: (token) => {
+                rerunCancel.current = token.cancel;
+            },
+        });
+    };
+
+    // オーバーレイのキャンセル（ボタン / ESC）。一覧は一切変わらないので、開いていたドロワーも戻して
+    // 「何も起きなかった」状態にする（実行前に閉じるのは並び替わり対策であり、キャンセルには不要なため）。
+    // ただし handleRerun のとおり Sheet が modal である限り退避先は常に null＝実際には復元は起きない。
+    const handleRerunCancel = () => {
+        // 応答が着地した後（onFinish でトークンを捨てた後）は復元しない。
+        // AiLoadingOverlay の Content は閉じるアニメーション（duration-200）の間マウントが残るため、
+        // 一覧が差し替わった直後の ESC / クリックがここに届き得る。そのとき復元すると
+        // 「旧一覧に対する index」で新一覧のドロワーを開くことになり、実行前に setSelected(null) して
+        // 防いだはずの「見ている対象と中身がズレる」状態を作ってしまう。
+        if (!rerunCancel.current) return;
+
+        rerunCancel.current();
+        setSelected(selectedBeforeRerun.current);
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="マッチング結果" />
 
+            {/* AI 再実行中（Python 同期計算・数秒）に全画面で計算中を表示する。文言・見た目は遷移元
+                （人材詳細のマッチング実行）と同一にし、初回ロードと再実行で体験を割らない。
+                マッチングは読み取り専用でキャンセルが安全なため onCancel を渡す（visit を中断）。 */}
+            <AiLoadingOverlay
+                show={isRerunning}
+                message="AIがマッチングを計算しています…"
+                onCancel={handleRerunCancel}
+            />
+
             {/* WF_09：ヘッダ・対象人材サマリーは上部固定、下の結果一覧のみスクロール。
                 進捗管理・人材一覧と同じく p-6 を -m-6 で打ち消し、画面全高（h-screen）の flex カラムにする。 */}
-            <div className="relative -m-6 flex h-screen flex-col overflow-hidden">
-                {/* ページヘッダー（WF_09：タイトル＋サブタイトルのみ。アクションボタンは持たない） */}
-                <div className="shrink-0 border-b border-border bg-white px-10 py-4">
-                    <h1 className="text-lg font-bold text-foreground">マッチング結果</h1>
-                    <p className="mt-0.5 text-xs text-muted-foreground">対象人材にマッチする案件をAIスコアの高い順に表示します</p>
+            <div
+                ref={setDrawerContainer}
+                // ドロワーを閉じたときの復帰先（起点のカードが消えている場合）。マウスでは焦点化しない
+                tabIndex={-1}
+                className="relative -m-6 flex h-screen flex-col overflow-hidden outline-none"
+            >
+                {/* ページヘッダー（WF_09：タイトル＋サブタイトル。#52 で右側に再マッチングを追加） */}
+                <div className="flex shrink-0 items-center justify-between border-b border-border bg-white px-10 py-4">
+                    <div>
+                        <h1 className="text-lg font-bold text-foreground">マッチング結果</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">対象人材にマッチする案件をAIスコアの高い順に表示します</p>
+                    </div>
+                    {/* 実行中は disabled にして二重実行を防ぐ（オーバーレイでも背後の操作は遮断される）。 */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 shrink-0 gap-1.5 text-xs"
+                        onClick={handleRerun}
+                        disabled={isRerunning}
+                    >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        再マッチング
+                    </Button>
                 </div>
 
                 {/* 対象人材サマリー（WF_09：薄グレーの帯・下境界のみ */}
@@ -132,31 +255,45 @@ export default function Show({
                         <StatusBadge status={engineer.status} className="shrink-0" />
                     </div>
 
-                    {/* 年齢・最寄駅・希望単価・勤務形態を、マッチングカードのメタと同じ「ラベルなし・｜区切りの横一列」で表示する。
-                        未指定も同じ流儀でフィールド名入りトークンにし（入力済み属性＝未設定／柔軟に決まり得る条件＝未定）、カードと語彙を揃える。 */}
-                    <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] text-muted-foreground">
-                        <span>{engineer.age != null ? `${engineer.age}歳` : '年齢未設定'}</span>
+                    {/* 年齢・最寄駅・希望単価・勤務形態を、マッチングカードのメタと同じ型2（ラベル語なし・｜区切りの横一列）で表示する。
+                        項目名は MetaItem が sr-only で支援技術に渡す。未指定も同じ流儀で項目名入りトークンにし
+                        （入力済み属性＝未設定／柔軟に決まり得る条件＝未定）、カードと語彙を揃える。 */}
+                    <MetaRow className="mt-1.5">
+                        <MetaItem field="age" valueHasFieldName={engineer.age == null}>
+                            {engineer.age != null ? `${engineer.age}歳` : emptyText('age', true)}
+                        </MetaItem>
                         {/* 最寄駅・路線名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（max-w で幅を抑える）。 */}
-                        <span className="inline-flex min-w-0 max-w-[18rem] items-baseline gap-1">
-                            <span className="shrink-0">｜</span>
+                        <MetaItem
+                            field="nearestStation"
+                            valueHasFieldName={!engineer.nearest_station}
+                            className="max-w-[18rem]"
+                        >
                             <TruncatedText
-                                text={engineer.nearest_station || '最寄駅未設定'}
+                                text={engineer.nearest_station || emptyText('nearestStation', true)}
                                 className="min-w-0 max-w-[8rem]"
                             />
                             <TruncatedText
-                                text={engineer.nearest_line ? `（${engineer.nearest_line}）` : '（路線未設定）'}
+                                text={
+                                    engineer.nearest_line
+                                        ? `（${engineer.nearest_line}）`
+                                        : `（${emptyText('nearestLine', true)}）`
+                                }
                                 className="min-w-0 max-w-[8rem]"
                             />
-                        </span>
-                        <span>｜ {engineer.available_from ? engineer.available_label : '稼働可能時期未定'}</span>
-                        <span>｜ {engineer.desired_rate != null ? `${engineer.desired_rate}万円` : '希望単価未設定'}</span>
-                        <span>
-                            ｜{' '}
+                        </MetaItem>
+                        <MetaItem field="availableFrom" valueHasFieldName={!engineer.available_from}>
+                            {engineer.available_from ? engineer.available_label : emptyText('availableFrom', true)}
+                        </MetaItem>
+                        {/* 希望単価は単一値。案件の単価（レンジ）と単位「万円」の見せ方を揃えるため Rate に載せる。 */}
+                        <MetaItem field="desiredRate" valueHasFieldName={engineer.desired_rate == null}>
+                            <Rate value={engineer.desired_rate} variant="plain" withFieldName />
+                        </MetaItem>
+                        <MetaItem field="workStyle" valueHasFieldName={engineer.work_styles.length === 0}>
                             {engineer.work_styles.length > 0
                                 ? engineer.work_styles.map((w) => w.name).join(' / ')
-                                : '勤務形態未定'}
-                        </span>
-                    </div>
+                                : emptyText('workStyle', true)}
+                        </MetaItem>
+                    </MetaRow>
 
                     {/* スキル：マッチングカードと同じくラベル（見出し）なしでタグを直接並べる。
                         空でも高さを揃えるためプレースホルダタグを出す（カードのスキル行と同じ流儀）。 */}
@@ -169,7 +306,7 @@ export default function Show({
                         </CollapsibleTagRow>
                     ) : (
                         <div className="mt-1.5">
-                            <span className="text-[11px] text-muted-foreground">スキル未設定</span>
+                            <span className="text-[11px] text-muted-foreground">{emptyText('skills', true)}</span>
                         </div>
                     )}
 
@@ -207,7 +344,7 @@ export default function Show({
                                         key={result.project.id}
                                         result={result}
                                         selected={selected === i}
-                                        onSelect={() => setSelected(i)}
+                                        onSelect={() => openDrawer(i)}
                                     />
                                 ))}
                             </div>
@@ -216,15 +353,42 @@ export default function Show({
                 </div>
             </div>
 
-            {/* 右ドロワー */}
-            {current && (
-                <>
-                    <div
-                        className="fixed inset-0 z-40 bg-black/30"
-                        onClick={() => setSelected(null)}
-                        aria-hidden="true"
-                    />
-                    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-border bg-white shadow-xl">
+            {/* 右ドロワー（shadcn Sheet＝Radix Dialog。ESC・フォーカストラップ・スクロールロックを標準で得る）。
+                ・パネルは container 指定＋absolute でコンテンツ領域内に収め、サイドバーの上に乗せない（WF_09 の .drawer）
+                ・幕は fixed のまま画面全体に敷く。modal によりサイドバーは操作できなくなるため、
+                  暗くして「今は操作できない」ことを見た目でも示す（明るいまま押せない状態にしない）
+                ・閉じるは onOpenChange 一本に集約する（ESC・幕クリック・ヘッダーの ✕ すべてここを通る） */}
+            <Sheet
+                // container が確定するまで開かない（body へ Portal されてサイドバーに被る一瞬を作らない）
+                open={!!current && drawerContainer !== null}
+                onOpenChange={(open) => {
+                    if (!open) setSelected(null);
+                }}
+            >
+                <SheetContent
+                    container={drawerContainer}
+                    overlayClassName="z-20 bg-black/25"
+                    className="absolute inset-y-0 right-0 z-30 h-full w-full max-w-md gap-0 border-l border-border bg-white p-0 shadow-xl sm:max-w-md"
+                    showCloseButton={false}
+                    // ドロワーは説明文を持たないため、存在しない id を指す aria-describedby を出さない
+                    aria-describedby={undefined}
+                    tabIndex={-1}
+                    onOpenAutoFocus={(event) => {
+                        // 既定では最初の tabbable（ヘッダーの ✕）に乗る。パネル自身に当てて
+                        // SheetTitle（案件名）から読ませ、進捗管理側と挙動を揃える。
+                        event.preventDefault();
+                        (event.currentTarget as HTMLElement).focus();
+                    }}
+                    onCloseAutoFocus={(event) => {
+                        // Radix は SheetTrigger 経由で開いていないと復帰先を知らず、既定のまま抜けると
+                        // フォーカスが body に落ちる。起点が残っていればそこへ、消えていれば一覧コンテナへ戻す。
+                        event.preventDefault();
+                        const opener = openerRef.current;
+                        (opener?.isConnected ? opener : drawerContainer)?.focus();
+                    }}
+                >
+                    {/* 別カードを選び直したときにフォーム状態を持ち越さないため、案件IDで再マウントする */}
+                    {current && (
                         <MatchDrawer
                             key={current.project.id}
                             result={current}
@@ -232,9 +396,9 @@ export default function Show({
                             onAdded={() => handleAdded(current.project.id)}
                             onClose={() => setSelected(null)}
                         />
-                    </div>
-                </>
-            )}
+                    )}
+                </SheetContent>
+            </Sheet>
         </AuthenticatedLayout>
     );
 }

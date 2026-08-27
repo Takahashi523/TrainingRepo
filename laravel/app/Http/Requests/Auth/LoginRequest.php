@@ -75,6 +75,27 @@ class LoginRequest extends FormRequest
     }
 
     /**
+     * 送信元 IP ごとの試行上限（1分あたり）。Breeze 既定。
+     */
+    private const MAX_ATTEMPTS_PER_IP = 5;
+
+    /**
+     * アカウント単位の試行上限（保持時間あたり）。送信元 IP を分散されても効く第2段。
+     */
+    private const MAX_ATTEMPTS_PER_EMAIL = 10;
+
+    /**
+     * アカウント単位のカウンタの保持時間（秒）＝ ロックが自然に解ける時間。
+     *
+     * ⚠️ この値は「攻撃者が MAX_ATTEMPTS_PER_EMAIL 回の投資で買えるサービス停止時間」でもある。
+     *    第2段は IP を見ないため、攻撃者は任意のアカウントを狙って上限まで叩ける
+     *    （＝ロックアウトを意図的に起こせる）。時間あたりの試行上限（40回/時）を保ったまま
+     *    窓を短くすることで、巻き込まれた正規ユーザーが最長15分で自力復帰できるようにしている。
+     *    長い窓を選ぶ積極的な理由は無い。
+     */
+    private const EMAIL_DECAY_SECONDS = 900;
+
+    /**
      * Attempt to authenticate the request's credentials.
      *
      * @throws ValidationException
@@ -85,6 +106,7 @@ class LoginRequest extends FormRequest
 
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->emailThrottleKey(), self::EMAIL_DECAY_SECONDS);
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
@@ -92,29 +114,53 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+        RateLimiter::clear($this->emailThrottleKey());
     }
 
     /**
      * Ensure the login request is not rate limited.
      *
+     * 2段構えにしている理由：
+     *
+     * リバースプロキシ配下で X-Forwarded-For を信頼するようになった結果（bootstrap/app.php）、
+     * throttleKey() の IP は「前段 Nginx の固定 IP」から「実クライアント IP」に変わった。
+     * これは「攻撃者が他人のアカウントを意図的にロックアウトできる」問題を解消した一方で、
+     * 送信元を分散されると `5 × 送信元数` 回/分まで試行できることを意味し、
+     * 総当たりに対しては**弱くなる**。IP 単独の上限では塞げないため、
+     * アカウント単位の上限を第2段として重ねる。
+     *
+     * ⚠️ トレードオフ：アカウント単位の上限は、原理上「攻撃者が特定ユーザーを
+     *    ロックアウトできる」経路を作り直すことになる。キーに email が入る限り避けられないため、
+     *    (1) 窓を短くして正規ユーザーが自力復帰できるようにする（EMAIL_DECAY_SECONDS）、
+     *    (2) 運用者が即時解除できる手段を用意する（php artisan auth:unlock）、
+     *    の2点で受け止める。管理者が全員ロックされると復旧操作の入口自体が消えるため、
+     *    (2) は必須（docs/インフラ構成図.md「リリース前チェックリスト（本番）」の 6）。
+     *
      * @throws ValidationException
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
-            return;
+        $limits = [
+            [$this->throttleKey(), self::MAX_ATTEMPTS_PER_IP],
+            [$this->emailThrottleKey(), self::MAX_ATTEMPTS_PER_EMAIL],
+        ];
+
+        foreach ($limits as [$key, $maxAttempts]) {
+            if (! RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+                continue;
+            }
+
+            event(new Lockout($this));
+
+            $seconds = RateLimiter::availableIn($key);
+
+            throw ValidationException::withMessages([
+                'email' => trans('auth.throttle', [
+                    'seconds' => $seconds,
+                    'minutes' => ceil($seconds / 60),
+                ]),
+            ]);
         }
-
-        event(new Lockout($this));
-
-        $seconds = RateLimiter::availableIn($this->throttleKey());
-
-        throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
-        ]);
     }
 
     /**
@@ -123,5 +169,28 @@ class LoginRequest extends FormRequest
     public function throttleKey(): string
     {
         return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+    }
+
+    /**
+     * 送信元 IP を含まない、アカウント単位のレート制限キー。
+     */
+    public function emailThrottleKey(): string
+    {
+        return self::emailThrottleKeyFor((string) $this->string('email'));
+    }
+
+    /**
+     * アカウント単位のレート制限キーを組み立てる。
+     *
+     * throttleKey() と衝突しないよう接頭辞を付ける（IP 部分が無いだけの文字列だと、
+     * 「メールアドレスに `|` を含む入力」で別キーと重なりうる）。
+     *
+     * ⚠️ ロック解除コマンド（UnlockLogin）からも同じキーを引くため static で公開する。
+     *    キーの組み立てを二重定義すると、片方だけ変えたときに「解除したのに解除されない」
+     *    という、失敗が無言の形で現れる不具合になる（SSOT）。
+     */
+    public static function emailThrottleKeyFor(string $email): string
+    {
+        return 'login-email|'.Str::transliterate(Str::lower($email));
     }
 }

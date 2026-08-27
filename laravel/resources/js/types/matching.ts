@@ -41,7 +41,8 @@ export interface MatchResult {
  * 結果0件のときの理由。空状態の文言・アイコンを出し分ける（結果ありのときは null）。
  * サーバー MatchingController の EMPTY_* 定数と一致させること。
  *  - no_match     : 候補案件なし / スコア0件
- *  - engine_error : エンジン通信失敗（flash.error も併発）
+ *  - engine_error : エンジン通信失敗（flash.error も併発）。results=null で返るため、既存表示がある
+ *                   （再マッチング）ときは一覧を据え置いてトーストのみ、初回ロードでは空状態を表示する
  *  - unavailable  : マッチはあったが対象案件が全てハード削除で全滅（掲載停止は残して無効表示するため該当しない）
  */
 export type MatchingEmptyReason = 'no_match' | 'engine_error' | 'unavailable';
@@ -66,8 +67,11 @@ export type MatchTargetState =
 export type MatchingShowPageProps = {
     engineer: Engineer;
     /**
-     * マッチング結果。通常は配列。パイプライン追加直後の back では `null`＝「サーバーは再スコアリング
-     * しない（#4）。フロントは既存表示を保持し、追加カードのみ楽観更新する」ことを表す。
+     * マッチング結果。配列＝この内容で一覧を置き換える（0件なら emptyReason の空状態を出す）。
+     * `null` は「サーバーはスコアを取得していない＝一覧を置き換える中身が無い」ことを表し、
+     * フロントは既存表示を据え置く。該当するのは次の2ケース。
+     *  - パイプライン追加直後の back：意図的にエンジンを再実行しない（#4。追加カードのみ楽観更新する）
+     *  - エンジン通信失敗：スコアを得られていない（#52。再マッチングで手元の一覧を失わないため）
      */
     results: MatchResult[] | null;
     emptyReason: MatchingEmptyReason | null;

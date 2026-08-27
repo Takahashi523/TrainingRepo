@@ -71,7 +71,7 @@
                                                // 単価表示ロジック（一覧・詳細共通）：
                                                //   1. rate_min/rate_max があればその範囲を表示
                                                //   2. 無くても rate_note があればそれを表示（"スキル見合い"等）
-                                               //   3. どちらも無ければ「—」と表示する
+                                               //   3. どちらも無ければ「未定」と表示する（2026-08-18 変更）
                                                //    ※ 単価を意図的に非公開にする専用フラグは
                                                //       採用していないため（WF_06確定事項）、
                                                //       ③は常に「単なる未入力」を意味する
@@ -160,14 +160,20 @@
     "rate":                 { "is_required": "bool" },
     "commercial_flow":      { "is_required": "bool" },
     "work_style":           { "is_required": "bool" },
-    // 勤務地（work_location_line / work_location_station）はまとめて1設定として管理する
+    // 勤務地：この設定が制御するのは work_location_line（路線名）の必須/任意のみ。
+    // work_location_station（最寄駅）はこの設定の対象外（下記コメント参照）。
     // form_field_settings の field_key = "work_location" で1レコード管理
     "work_location":        { "is_required": "bool" },
     // ※ work_location_station（最寄駅）の条件付き必須について：
     // work_style が onsite / hybrid の場合、work_location_station は業務ルールにより必須となる。
     // この制御は fieldSettings の is_required とは独立した固定ルールであり、
     // フロントは work_style の選択値を監視して必須バッジ・バリデーションを切り替えること。
-    // work_style が remote の場合は work_location_station を非表示またはクリアすること。
+    // [Issue #50] work_location_line / work_location_station は「勤務地（路線名）」「勤務地（最寄駅）」の
+    // 別行・別バッジとしてフロントに表示する（旧: 1行に統合しwork_locationのバッジのみ表示していたため、
+    // 最寄駅の実際の必須条件と表示が矛盾していた）。
+    // work_style が remote の場合は行を非表示にする（画面上はクリアせず、送信時にフロントで一次null化、
+    // 保存時にバックエンドが再度null化して最終保証する二段構え。両者とも work_style === 'remote' の
+    // 一致判定のみのため、work_style が空（未選択）のまま保存された場合は対象外）。
     "interview_count":      { "is_required": "bool" },
     "required_skills":      { "is_required": "bool" },
     "preferred_skills":     { "is_required": "bool" },
@@ -225,7 +231,7 @@
     "rate_note": "string",                     // 単価備考（"スキル見合い"等）
                                                // 単価表示ロジックは一覧Propsと同じ（③参照）
     "work_style": "string",                    // onsite | hybrid | remote
-    "work_location_line": "string",            // 勤務地（路線）。フリーテキスト
+    "work_location_line": "string",            // 勤務地（路線名）。フリーテキスト
     "work_location_station": "string",         // 勤務地（最寄駅）。フリーテキスト
     "interview_count": "int",                  // 面談回数
     "negotiation_required": "bool",            // 顧客折衝経験要否（true=要 / false=不問）
@@ -287,9 +293,17 @@
 > **PATCHについて**：部分更新（PATCH）は使用しない。ステータスのみ変更する場合も PUT で全フィールドを送信すること。  
 > **bool値の変換**：`proc_requirements` 〜 `proc_maintenance` / `negotiation_required` の bool 値はEloquentモデルに `boolean` キャストを定義し、DB側の `TINYINT(1)`（1:true / 0:false）へ変換すること。
 > **単価の扱い**：`rate_is_negotiable`（スキル見合いフラグ）が `true` の場合は `rate_min` / `rate_max` を null として扱い、`rate_note` に "スキル見合い" 等のテキストを保存する（QA #14確定）。  
-> **単価の表示ルール（一覧・詳細共通）**：① rate_min/rate_max があれば範囲表示、② 無くても rate_note があればそれを表示、③ どちらも無ければ「—」と表示する。rate_min/rate_maxは片方のみの登録ができないため、③は「未入力」または「rate_is_negotiableかつrate_note未入力」の場合のみ発生する。  
-> ※ 単価を意図的に非公開にする専用フラグは採用しておらず（WF_06確定事項）、③は常に「単なる未入力」を意味するため、表示文言も「非公開」ではなく「—」に統一する。  
-> **勤務地の扱い**：`work_style` が `remote`（フルリモート）の場合は `work_location_line` / `work_location_station` を null として扱う。フロント側で `work_style` 変更時に勤務地フィールドをクリアすること（WF_07確定）。  
+> **単価の表示ルール（一覧・詳細共通）**：① rate_min/rate_max があれば範囲表示、② レンジが無く rate_note があればそれを表示、③ どちらも無ければ「**未定**」と表示する。rate_min/rate_max は**片方のみの登録ができない**（フォーム・CSV 取込とも相互必須）ため、③は「未入力」または「rate_is_negotiable かつ rate_note 未入力」の場合のみ発生する。表示は共通コンポーネント `Components/Common/Rate` に集約する。
+> ※ 単価を意図的に非公開にする専用フラグは採用しておらず（WF_06確定事項）、③は常に「単なる未入力」を意味するため、表示文言も「非公開」ではなく「未定」とする。
+>
+> **【2026-08-18 修正】③の文言を「—」から「未定」へ変更（issue #57）**
+> **背景：** 欠損の表現が画面ごとに「未設定／未定」「省略」「—」の3通りに分かれており、表示規約（`docs/UI表示規約.md`）を新設して語彙を統一した。
+> **理由：** 記号はスクリーンリーダーで意味が伝わらず、営業が「埋めるべき項目」かどうかを判断できないため。
+>
+> **【2026-08-18 追加】CSV 取込に「単価下限・上限の相互必須」と「レンジと備考の排他」を追加（issue #57 のレビュー指摘）**
+> **背景：** フォーム（`ProjectRequest` / `ProjectService`）は下限・上限が相互必須で、かつ `rate_is_negotiable` によりレンジと備考が排他になる。一方 CSV 取込（`ProjectCsvSchema`）は両方入力された行にしか lte/gte を課しておらず、片側だけのレンジや「レンジ＋備考」を取り込めた。
+> **理由：** 取り込めるが編集画面では保存できないレコード（`rate_max` 必須エラー）や、備考が画面のどこにも出ないレコードが生まれるため。**経路によって作れるデータが変わらないようにそろえた。**備考は「スキル見合い」＝レンジを提示できない場合に書く欄であり、レンジとの同時入力は業務上も不正。  
+> **勤務地の扱い**：`work_style` が `remote`（フルリモート）の場合は `work_location_line` / `work_location_station` を null として扱う。画面上（稼働形態の切替時）は値をクリアしない。送信時に `Create.tsx` / `Edit.tsx` のtransformがフロント側で一次的にnull化し、保存時にバックエンド（`ProjectService`）が同条件で再度null化して最終的な保証とする二段構え（WF_07確定・Issue #50レビュー対応でフロント実装と整合するよう記述を修正）。いずれも `work_style === 'remote'` の一致判定のみのため、`work_style` が空（未選択）のまま保存されたケースはこの経路の対象外となる点に注意（通常のUI操作では稼働形態を未選択に戻せないため到達しない）。  
 > **スキルの更新処理**：PUT時に `required_skills[]` / `preferred_skills[]` を送信した場合、既存レコードを全件削除後に再挿入する（人材スキルと同方針）。空配列または省略の場合は全件削除として扱う。  
 
 | フィールド名 | 型 | 必須 | 備考 |
@@ -304,8 +318,8 @@
 | rate_note | string | 任意 | 単価備考（最大100文字）。スキル見合い時に使用 |
 | commercial_flow | string | 任意 | 商流（form_field_settings制御）。prime / secondary / tertiary / other |
 | work_style | string | 任意 | 稼働形態（form_field_settings制御）。onsite / hybrid / remote（単一選択） |
-| work_location_line | string | 任意 | 勤務地（路線）。work_style が remote の場合はnull（フロント側でクリア）（form_field_settings の work_location 設定で制御） |
-| work_location_station | string | 任意 | 勤務地（最寄駅）。work_style が remote の場合はnull（フロント側でクリア）。onsite / hybrid の場合は必須（form_field_settings の work_location 設定で制御） |
+| work_location_line | string | 任意 | 勤務地（路線名）。work_style が remote の場合はnull（保存時にバックエンドでクリア）（form_field_settings の work_location 設定で制御。onsite / hybrid の場合のみ） |
+| work_location_station | string | 任意 | 勤務地（最寄駅）。work_style が remote の場合はnull（保存時にバックエンドでクリア）。onsite / hybrid の場合は常に必須（業務ルール固定・form_field_settings非依存） |
 | interview_count | int | 任意 | 面談回数（form_field_settings制御） |
 | required_skills[] | array | 任意 | 必須スキル配列。空配列 [] または省略で全削除。PUT時は全件洗い替え（全削除後に再挿入）。件数の必須制御は form_field_settings に従いアプリ層で行う |
 | required_skills[].label | string | 任意 | 必須スキルラベル（最大15文字） |
@@ -320,13 +334,15 @@
 | proc_testing | bool | 任意 | テスト（true:対象）。proc_experience の is_required 設定で制御 |
 | proc_maintenance | bool | 任意 | 保守運用（true:対象）。proc_experience の is_required 設定で制御 |
 | negotiation_required | bool | 任意 | 顧客折衝経験要否（form_field_settings制御）。true=要 / false=不問 |
-| description | string | 任意 | 業務内容詳細（form_field_settings制御） |
-| work_env | string | 任意 | 稼働環境（form_field_settings制御） |
+| description | string | 任意 | 業務内容詳細（form_field_settings制御・最大4000文字） |
+| work_env | string | 任意 | 稼働環境（form_field_settings制御・最大1000文字） |
 | status | string | ✓ | ステータス（システム固定必須）。open / closed / pending |
 | main_user_id | int | ✓ | 主担当ユーザーID（システム固定必須） |
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |
 | billing_range | string | 任意 | 精算幅（form_field_settings制御・最大100文字） |
-| remarks | string | 任意 | 特記事項（form_field_settings制御） |
+| remarks | string | 任意 | 特記事項（form_field_settings制御・最大1000文字） |
+
+> **文字数上限について（2026-08-17確定・#34対応）**：`description`(max:4000) / `work_env`(max:1000) / `remarks`(max:1000)は、人材側`appeal_note`(max:4000) / `remarks`(max:1000)と揃える形で確定した。§3 TBDにあった同項目は解消済み。
 
 ---
 
@@ -377,5 +393,4 @@
 
 | # | 項目 | QA# | 理由 |
 |---|------|-----|------|
-| 1 | `description` / `work_env` / `remarks` の文字数上限 | - | DBはTEXT型のため上限なし。バリデーション上の制限値を設けるか確認が必要 |
-| 2 | `interview_count` の上限値 | - | WF_06では「3回以上」という表示があるが、DB上の上限（TINYINT UNSIGNED: 最大255）以外の業務的な上限の要否を確認すること |
+| 1 | `interview_count` の上限値 | - | WF_06では「3回以上」という表示があるが、DB上の上限（TINYINT UNSIGNED: 最大255）以外の業務的な上限の要否を確認すること |

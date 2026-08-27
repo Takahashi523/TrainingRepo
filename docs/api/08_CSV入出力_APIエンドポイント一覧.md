@@ -340,7 +340,7 @@ Content-Disposition: attachment; filename="projects_YYYYMMDD_HHmmss.csv"
 | H | 単価備考 | rate_note | スキル見合い等 |
 | I | 商流 | commercial_flow | prime / secondary / tertiary / other |
 | J | 稼働形態 | work_style | onsite / hybrid / remote |
-| K | 勤務地（路線） | work_location_line | |
+| K | 勤務地（路線名） | work_location_line | |
 | L | 勤務地（最寄駅） | work_location_station | |
 | M | 面談回数 | interview_count | 整数 |
 | N | 顧客折衝経験要否 | negotiation_required | 0 / 1 |

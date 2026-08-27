@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesSort;
 use App\Http\Requests\PipelineCompletedRequest;
 use App\Http\Requests\PipelineStoreRequest;
 use App\Http\Requests\PipelineUpdateRequest;
@@ -12,6 +13,7 @@ use App\Models\Pipeline;
 use App\Models\User;
 use App\Services\Matching\MatchTargetStateResolver;
 use App\Services\PipelineService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +24,8 @@ use Inertia\Response;
 
 class PipelineController extends Controller
 {
+    use ResolvesSort;
+
     public function __construct(private PipelineService $pipelineService) {}
 
     /**
@@ -220,7 +224,15 @@ class PipelineController extends Controller
      */
     public function destroy(Request $request, Pipeline $pipeline): RedirectResponse
     {
-        $this->authorize('delete', $pipeline);
+        // 権限不足時は 403 を素で投げず、設計書 06_進捗管理 DELETE #5 のとおり
+        // 前画面へ戻し flash.error を返す（人材側 EngineerController::destroy と同様）。
+        try {
+            $this->authorize('delete', $pipeline);
+        } catch (AuthorizationException) {
+            // referer が無い場合（直接リクエストされた場合等）でも flash が失われないよう、
+            // ダッシュボードへのfallbackを明示する（#78 TokenMismatchInertiaRedirectorと同方針）。
+            return back(fallback: route('dashboard'))->with('error', '削除権限がありません。');
+        }
 
         $this->pipelineService->delete($pipeline);
 
@@ -377,34 +389,6 @@ class PipelineController extends Controller
             $q->whereHas('engineer', fn (Builder $e) => $e->where('name', 'like', $like))
                 ->orWhereHas('project', fn (Builder $p) => $p->where('name', 'like', $like));
         });
-    }
-
-    /**
-     * sort / order をホワイトリスト化して解決する。
-     *
-     * @param  array<int, string>  $allowedSorts
-     * @return array{0: string, 1: string}
-     */
-    /**
-     * ソートを sort×order のペア単位で検証する。
-     * $sortOptions（許可組の配列）に一致するペアだけ採用し、無ければ先頭（デフォルト）へフォールバックする。
-     * これにより仕様外の sort×order の組み合わせを弾き、UI の選択肢と完全に一致させる。
-     *
-     * @param  array<int, array{sort: string, order: string, label: string}>  $sortOptions
-     * @return array{0: string, 1: string} [$sort, $order]
-     */
-    private function resolveSort(Request $request, array $sortOptions): array
-    {
-        $sortInput = (string) $request->input('sort', '');
-        $orderInput = strtolower((string) $request->input('order', ''));
-
-        foreach ($sortOptions as $opt) {
-            if ($opt['sort'] === $sortInput && $opt['order'] === $orderInput) {
-                return [$opt['sort'], $opt['order']];
-            }
-        }
-
-        return [$sortOptions[0]['sort'], $sortOptions[0]['order']];
     }
 
     /**

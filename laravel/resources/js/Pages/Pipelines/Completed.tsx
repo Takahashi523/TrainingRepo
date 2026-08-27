@@ -17,6 +17,7 @@ import {
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { CompletedFilters, PipelineCompletedPageProps } from '@/types/pipeline';
+import { emptyText } from '@/lib/emptyValue';
 import { isValidYmd } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
@@ -70,9 +71,9 @@ function buildQuery(filters: CompletedFilters, page: number): QueryPayload {
     };
 }
 
-/** 終了日（datetime）を日本語日付に整形。null は「—」。 */
+/** 終了日（datetime）を日本語日付に整形。null は欠損語彙（未設定）。 */
 function formatEndedAt(value: string | null): string {
-    if (!value) return '—';
+    if (!value) return emptyText('endedAt');
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value;
     return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -227,7 +228,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                 </div>
 
                 {/* テーブル本体（残り高さを占有・内部スクロール・muted 背景を最下部まで） */}
-                <div className="flex-1 overflow-y-auto bg-muted/60 px-6 py-5">
+                <div className="flex-1 overflow-y-auto bg-muted/30 px-6 py-5">
                 {/* テーブル上部：件数（左）＋ソート（右）を同一行に配置（WF_10 準拠） */}
                 <div className="mb-3 flex items-center">
                     <span className="text-xs text-muted-foreground">
@@ -276,8 +277,8 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-muted-foreground">
                                             {/* 顧客名は nullable かつ空文字もあり得る。テーブルの固定カラムでは空セルが曖昧なため、
-                                                null・空文字の両方（|| で falsy を一括判定）を NG理由と平仄を合わせ「—」で表す */}
-                                            <TruncatedText as="div" text={row.project.client_name || '—'} />
+                                                null・空文字の両方（|| で falsy を一括判定）を NG理由と平仄を合わせ欠損語彙で表す */}
+                                            <TruncatedText as="div" text={row.project.client_name || emptyText('clientName')} />
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-muted-foreground">
                                             <TruncatedText as="div" text={row.project.name} />
@@ -290,14 +291,14 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                                             />
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-muted-foreground">
-                                            <TruncatedText as="div" text={row.engineer.main_user?.name ?? '未割当'} />
+                                            <TruncatedText as="div" text={row.engineer.main_user?.name ?? emptyText('mainUser')} />
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-muted-foreground">
                                             {formatEndedAt(row.ended_at)}
                                         </TableCell>
                                         <TableCell className="px-3 py-2.5 text-[11px] text-muted-foreground">
-                                            {/* NG理由は nullable な自由記述。空文字も漏らさないよう || で falsy を一括判定し「—」に揃える */}
-                                            <TruncatedText as="div" text={row.ng_reason || '—'} />
+                                            {/* NG理由は nullable な自由記述。空文字も漏らさないよう || で falsy を一括判定し欠損語彙に揃える */}
+                                            <TruncatedText as="div" text={row.ng_reason || emptyText('ngReason')} />
                                         </TableCell>
                                         {isAdmin && (
                                             <TableCell className="px-3 py-2.5">

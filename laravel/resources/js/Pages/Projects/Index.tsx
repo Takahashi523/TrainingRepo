@@ -142,7 +142,7 @@ export default function Index({
                                 案件一覧
                             </h1>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                登録案件の検索・絞り込みと詳細確認
+                                登録済みの案件を検索・確認します
                             </p>
                         </div>
                         <div>

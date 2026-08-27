@@ -1,6 +1,8 @@
 import RankBadge, { RANK_BAR_STYLES, RANK_BAR_FALLBACK_STYLE } from '@/Components/Common/RankBadge';
 import TruncatedText from '@/Components/Common/TruncatedText';
 import { Button } from '@/Components/ui/button';
+import { SheetClose, SheetTitle } from '@/Components/ui/sheet';
+import { emptyText } from '@/lib/emptyValue';
 import { MatchResult } from '@/types/matching';
 import { useForm } from '@inertiajs/react';
 import { Ban, Check, Plus, X } from 'lucide-react';
@@ -38,7 +40,8 @@ function AiBlock({ title, children }: { title: string; children: React.ReactNode
  * フッター（＋パイプラインに追加）で構成する。AI 表示は PipelineDrawer と異なりアコーディオンにしない。
  *
  * 追加はスナップショット（マッチング実行時点の値）を POST /pipelines し、成功時はリダイレクトで props 更新＋成功トースト。
- * オーバーレイ・固定パネルは呼び出し元（Pages/Matching/Show）が持つため、ここは中身のみ（h-full の flex カラム）。
+ * 器（Sheet＝オーバーレイ・パネル・開閉状態）は呼び出し元（Pages/Matching/Show）が持つため、ここは中身のみ
+ * （h-full の flex カラム）。Sheet 配下で描画される前提のため SheetTitle / SheetClose を使う。
  */
 export default function MatchDrawer({ result, engineerId, onAdded, onClose }: Props) {
     const { project } = result;
@@ -85,6 +88,9 @@ export default function MatchDrawer({ result, engineerId, onAdded, onClose }: Pr
         <div className="flex h-full w-full flex-col">
             <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
                 <div className="min-w-0">
+                    {/* ドロワーのアクセシブルな名前。TruncatedText は内部で ref を握り asChild に渡せないため、
+                        可視要素を置き換えず sr-only の SheetTitle を併置して読み上げだけを補う。 */}
+                    <SheetTitle className="sr-only">{project.name}</SheetTitle>
                     {/* 案件名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ。 */}
                     <TruncatedText
                         as="p"
@@ -92,16 +98,18 @@ export default function MatchDrawer({ result, engineerId, onAdded, onClose }: Pr
                         className="text-[15px] font-bold text-foreground"
                     />
                 </div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={onClose}
-                    className="ml-2 h-7 w-7 shrink-0 text-muted-foreground [&_svg]:size-3.5"
-                    aria-label="閉じる"
-                >
-                    <X />
-                </Button>
+                {/* 閉じる操作は Sheet の開閉状態に一本化する（ESC・幕クリックと同じ経路を通す） */}
+                <SheetClose asChild>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="ml-2 h-7 w-7 shrink-0 text-muted-foreground [&_svg]:size-3.5"
+                        aria-label="閉じる"
+                    >
+                        <X />
+                    </Button>
+                </SheetClose>
             </div>
 
             {/* ボディ */}
@@ -138,7 +146,7 @@ export default function MatchDrawer({ result, engineerId, onAdded, onClose }: Pr
                                     {result.ai_score_reason}
                                 </p>
                             ) : (
-                                <p className="text-xs text-muted-foreground">—</p>
+                                <p className="text-xs text-muted-foreground">{emptyText('aiScoreReason')}</p>
                             )}
                         </AiBlock>
                     </div>

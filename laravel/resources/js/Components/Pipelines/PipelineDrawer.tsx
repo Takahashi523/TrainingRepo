@@ -11,7 +11,9 @@ import {
     AccordionTrigger,
 } from '@/Components/ui/accordion';
 import { Button } from '@/Components/ui/button';
+import { SheetClose, SheetTitle } from '@/Components/ui/sheet';
 import { Textarea } from '@/Components/ui/textarea';
+import { emptyText } from '@/lib/emptyValue';
 import { PageProps } from '@/types';
 import { PipelineDetail, PipelineStatus, StatusOption } from '@/types/pipeline';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
@@ -38,7 +40,10 @@ function formatDateTime(value: string): string {
 }
 
 /**
- * パイプライン詳細ドロワー（右スライドのオーバーレイ）。
+ * パイプライン詳細ドロワーの中身（右スライドのオーバーレイ）。
+ * 器（Sheet＝オーバーレイ・パネル・開閉状態）は呼び出し元（Pages/Pipelines/Index）が持つため、
+ * ここは中身のみ（h-full の flex カラム）。Sheet 配下で描画される前提のため SheetTitle / SheetClose を使う。
+ *
  * - スコアサマリ / AI 折りたたみ（推薦理由・不足条件）
  * - 管理情報フォーム（useForm：next_action_date / client_comment / ng_reason）
  * - ステータス変更 select（終了ステータス選択時は元に戻せない旨を共通 ConfirmDialog で警告）
@@ -110,18 +115,14 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
 
     return (
         <>
-            {/* オーバーレイ */}
-            <div
-                className="absolute inset-0 z-20 bg-black/25"
-                onClick={onClose}
-                aria-hidden="true"
-            />
-
-            {/* ドロワー本体 */}
-            <div className="absolute inset-y-0 right-0 z-30 flex w-[480px] max-w-full flex-col border-l border-border bg-white shadow-[-4px_0_16px_rgba(0,0,0,0.12)]">
+            {/* 中身のみ。オーバーレイ・パネル・開閉状態は呼び出し元（Pages/Pipelines/Index）の Sheet が持つ */}
+            <div className="flex h-full w-full flex-col">
                 {/* ヘッダ */}
                 <div className="flex shrink-0 items-start justify-between border-b border-border p-4">
                     <div className="min-w-0">
+                        {/* ドロワーのアクセシブルな名前。TruncatedText は内部で ref を握り asChild に渡せないため、
+                            可視要素を置き換えず sr-only の SheetTitle を併置して読み上げだけを補う。 */}
+                        <SheetTitle className="sr-only">{pipeline.engineer.name}</SheetTitle>
                         {/* 氏名は最大255文字になり得るため TruncatedText で1行省略＋省略時のみ全文ツールチップを表示する */}
                         <TruncatedText
                             as="p"
@@ -174,16 +175,18 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             </Link>
                         </div>
                     </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={onClose}
-                        className="ml-2 h-7 w-7 shrink-0 text-muted-foreground [&_svg]:size-3.5"
-                        aria-label="閉じる"
-                    >
-                        <X />
-                    </Button>
+                    {/* 閉じる操作は Sheet の開閉状態に一本化する（ESC・幕クリックと同じ経路を通す） */}
+                    <SheetClose asChild>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="ml-2 h-7 w-7 shrink-0 text-muted-foreground [&_svg]:size-3.5"
+                            aria-label="閉じる"
+                        >
+                            <X />
+                        </Button>
+                    </SheetClose>
                 </div>
 
                 {/* ボディ */}
@@ -197,8 +200,17 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             <div className="flex shrink-0 flex-col items-center gap-1">
                                 <RankBadge rank={pipeline.match_rank} className="text-xs" />
                                 <div className="text-3xl font-bold leading-none text-foreground">
-                                    {score != null ? score : '—'}
-                                    <span className="text-xs font-normal text-muted-foreground"> 点</span>
+                                    {score != null ? (
+                                        <>
+                                            {score}
+                                            <span className="text-xs font-normal text-muted-foreground"> 点</span>
+                                        </>
+                                    ) : (
+                                        // 未算出のときは単位「点」ごと出さない（「未算出 点」にならないようにする）
+                                        <span className="text-sm font-normal text-muted-foreground">
+                                            {emptyText('matchScore')}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex-1">
@@ -278,7 +290,7 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
                             </span>
                             {/* 氏名は最大255文字になり得るため break-all で折り返す（レビュー指摘 #9） */}
                             <span className="break-all py-1 text-xs text-foreground">
-                                {pipeline.engineer.main_user?.name ?? '未割当'}
+                                {pipeline.engineer.main_user?.name ?? emptyText('mainUser')}
                             </span>
                         </div>
 

@@ -27,7 +27,7 @@ class ProjectCsvSchema extends CsvSchema
             ['header' => '単価備考', 'field' => 'rate_note', 'type' => 'string'],
             ['header' => '商流', 'field' => 'commercial_flow', 'type' => 'enum'],
             ['header' => '稼働形態', 'field' => 'work_style', 'type' => 'enum'],
-            ['header' => '勤務地（路線）', 'field' => 'work_location_line', 'type' => 'string'],
+            ['header' => '勤務地（路線名）', 'field' => 'work_location_line', 'type' => 'string'],
             ['header' => '勤務地（最寄駅）', 'field' => 'work_location_station', 'type' => 'string'],
             ['header' => '面談回数', 'field' => 'interview_count', 'type' => 'integer'],
             ['header' => '顧客折衝経験要否', 'field' => 'negotiation_required', 'type' => 'flag'],
@@ -70,9 +70,24 @@ class ProjectCsvSchema extends CsvSchema
     }
 
     /**
+     * 案件固有のバリデーションメッセージ。
+     *
+     * @return array<string, string>
+     */
+    public function importMessages(): array
+    {
+        return array_merge(parent::importMessages(), [
+            // 既定の prohibited 文言は理由が伝わらないため、対処が分かる文にする。
+            'rate_note.prohibited' => ':attributeは単価下限・上限を入力した行には入力できません（スキル見合いの場合のみ入力してください）。',
+        ]);
+    }
+
+    /**
      * 案件固有の条件付きルール：
      *   - 最寄駅は稼働形態が onsite/hybrid の行で必須（業務ルール固定・form_field_settings 対象外）
-     *   - 単価は下限・上限が両方入力されている行でのみ相互 lte/gte を課す（フォームと同じ挙動）
+     *   - 単価は下限・上限を相互必須にし、両方入力されている行では lte/gte も課す（フォームと同じ挙動）
+     *   - 単価備考は「スキル見合い」を表す欄のため、レンジと同時には入力できない（フォームでは
+     *     rate_is_negotiable により排他になっており、取込でも同じ制約を課す）
      *
      * @param  array<string, mixed>  $row
      * @return array<string, array<int, mixed>>
@@ -89,6 +104,18 @@ class ProjectCsvSchema extends CsvSchema
         if ($rateMinFilled && $rateMaxFilled) {
             $extra['rate_min'] = ['lte:rate_max'];
             $extra['rate_max'] = ['gte:rate_min'];
+        } elseif ($rateMinFilled) {
+            // 片側だけのレンジを許すと、取込はできるがフォーム（相互必須）では保存できない
+            // レコードが生まれる。ProjectRequest と同じ制約をここでも課す。
+            $extra['rate_max'] = ['required'];
+        } elseif ($rateMaxFilled) {
+            $extra['rate_min'] = ['required'];
+        }
+
+        if ($rateMinFilled || $rateMaxFilled) {
+            // 備考はレンジを提示できない場合（スキル見合い）に書く欄。両方入ると
+            // フォームでは作れない状態になり、備考が画面のどこにも出なくなる。
+            $extra['rate_note'] = ['prohibited'];
         }
 
         return $extra;

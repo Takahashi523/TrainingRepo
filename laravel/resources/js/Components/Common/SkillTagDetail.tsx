@@ -10,12 +10,22 @@ import { useState } from "react";
 interface Props {
     label: string;
     detail: string | null;
+    /**
+     * 必須（実線）／尚可（点線）の区別。SkillTag と同じ表現に揃える
+     * （同じ尚可スキルが一覧・マッチングでは点線、詳細だけ実線になるのを防ぐ）。
+     */
+    skillType?: "required" | "preferred";
 }
 
 const TAG_CLASS =
     "inline-flex items-center gap-1.5 rounded border border-border bg-white px-2 py-0.5 text-xs text-foreground";
 
-export default function SkillTagDetail({ label, detail }: Props) {
+export default function SkillTagDetail({
+    label,
+    detail,
+    skillType = "required",
+}: Props) {
+    const tagClass = cn(TAG_CLASS, skillType === "preferred" && "border-dashed");
     // 開閉そのものは Popover（Radix）が管理する。ここで状態を持つのは
     // トリガーのシェブロンの向きを開閉に追従させるためだけ。
     const [open, setOpen] = useState(false);
@@ -23,7 +33,7 @@ export default function SkillTagDetail({ label, detail }: Props) {
     // 詳細を持たないタグは押しても何も起きないため、非対話の span のままにする
     // （押せそうに見えて反応しない要素を作らない）。
     if (!detail) {
-        return <span className={TAG_CLASS}>{label}</span>;
+        return <span className={tagClass}>{label}</span>;
     }
 
     return (
@@ -34,7 +44,7 @@ export default function SkillTagDetail({ label, detail }: Props) {
                 <button
                     type="button"
                     className={cn(
-                        TAG_CLASS,
+                        tagClass,
                         "cursor-pointer text-left hover:bg-muted/50",
                     )}
                 >

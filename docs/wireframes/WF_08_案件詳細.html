@@ -374,6 +374,11 @@
           <div class="detail-value">2名</div>
         </div>
         <div class="detail-row">
+          <!-- [Issue #43] 勤務条件から移設（募集人数 → 面談回数 → 参画開始時期の時系列） -->
+          <div class="detail-label">面談回数</div>
+          <div class="detail-value">1回</div>
+        </div>
+        <div class="detail-row">
           <div class="detail-label">参画開始時期</div>
           <div class="detail-value">2026/05/01〜</div>
         </div>
@@ -391,6 +396,11 @@
           </div>
         </div>
         <div class="detail-row">
+          <!-- [Issue #43] 就業条件から移設（単価とセットで読む取引条件のため単価の直後） -->
+          <div class="detail-label">精算幅</div>
+          <div class="detail-value">140〜180h</div>
+        </div>
+        <div class="detail-row">
           <div class="detail-label">商流</div>
           <!-- QA #80: 「1次請け」→「プライム」 -->
           <div class="detail-value">プライム</div>
@@ -401,27 +411,17 @@
       <div class="section-card">
         <div class="section-card-header">勤務条件</div>
         <div class="detail-row">
-          <div class="detail-label">勤務地（最寄駅）</div>
-          <div class="detail-value">大手町駅（東京メトロ丸ノ内線）</div>
-        </div>
-        <div class="detail-row">
+          <!-- [Issue #43] 「どう働くか」→「どこで働くか」の順に入れ替え（登録フォームと同順） -->
           <div class="detail-label">稼働形態</div>
           <div class="detail-value">一部リモート可</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">面談回数</div>
-          <div class="detail-value">1回</div>
-        </div>
-      </div>
-      
-      <!-- ==================== 就業条件 ==================== -->
-      <div class="section-card">
-        <div class="section-card-header">就業条件</div>
-        <div class="detail-row">
-          <div class="detail-label">精算幅</div>
-          <div class="detail-value">140〜180h</div>
+          <!-- [Issue #50] 値は最寄駅・路線名を結合表示のまま、ラベルを実際の中身に合わせて修正 -->
+          <div class="detail-label">勤務地（最寄駅 / 路線名）</div>
+          <div class="detail-value">大手町駅（東京メトロ丸ノ内線）</div>
         </div>
         <div class="detail-row">
+          <!-- [Issue #43] 就業条件から移設（勤務の補足を書く自由記述のため勤務条件の末尾） -->
           <div class="detail-label">特記事項</div>
           <div class="detail-value" style="color:#555;line-height:1.8;">
             基本勤務時間：10:00〜19:00　シフト制なし　出張なし
@@ -548,6 +548,7 @@
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>スキル表示：年数入りタグ → ラベルタグ（角丸・グレー背景）＋詳細テキストの縦並び構成に変更（登録画面と統一）</li>
           <li>必須スキル：実線タグ / 尚可スキル：点線タグで視覚区分を維持</li>
+          <li>[Issue #50 レビュー対応] 勤務条件の行ラベルを「勤務地（最寄駅）」→「勤務地（最寄駅 / 路線名）」に修正。値は従来どおり最寄駅と路線名を結合表示するため、登録フォームで確定させた語の意味とラベルを一致させた</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v1.1 変更点（差分レポート適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
@@ -567,7 +568,8 @@
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>スキル：一覧画面と同じ角型タグ表示。詳細テキストがある場合のみ「▼ 詳細」ボタンをタグ内に表示し、クリックでツールチップ展開</li>
           <li>稼働環境：スキル要件カードに追加（QA #67）</li>
-          <li>精算幅：就業条件カードに独立行として追加（QA #66）</li>
+          <li>精算幅：独立行として追加（QA #66）。<strong>【2026-08-26 修正】就業条件カード → 契約条件カード（単価の直後）へ移設</strong>　<strong>背景：</strong>「就業条件」の中身が精算幅・特記事項の2項目だけで、独立セクションとしてのまとまりが弱かった（issue #43）。<strong>理由：</strong>精算幅は「80万円 / 140〜180h」と単価とセットで意味を成す取引条件のため、単価の直後に置き、性質の異なる商流を間に挟まない</li>
+          <li><strong>【2026-08-26 修正】セクション再編（issue #43）</strong>：面談回数を勤務条件 → 基本情報（募集人数の後）、特記事項を就業条件 → 勤務条件（末尾）へ移設し、空になった「就業条件」カードを削除。勤務条件は「稼働形態 → 勤務地」の順に入れ替え。<strong>背景：</strong>面談回数は選考プロセスの属性で、勤務地・稼働形態（働く場所・形態）とは性質が違うのに勤務条件に置かれていた。<strong>理由：</strong>基本情報を「募集人数 → 面談回数 → 参画開始時期」の時系列にそろえ、面談回数1項目のために「選考プロセス」セクションを新設するのは過剰と判断した。案件詳細・案件登録編集・マスタ管理のフォーム設定一覧の3箇所を同じ順序にそろえている</li>
           <li>削除ボタン：管理者のみ・物理削除（確定済み）</li>
           <li>担当営業：担当＋サブの2名体制（確定済み）</li>
         </ul>
@@ -585,9 +587,13 @@
 
 <!--
   WF_08_案件詳細.html
-  バージョン: v1.1
-  更新日: 2026-04-30
+  バージョン: v2.1
+  更新日: 2026-08-22
   変更履歴:
+    v2.1 (2026-08-22)
+      - [Issue #50 レビュー対応] 勤務条件の行ラベルを「勤務地（最寄駅）」→「勤務地（最寄駅 / 路線名）」に修正。
+        値（最寄駅＋路線名の結合表示）は変更なし。案件登録フォーム（WF_07）で「最寄駅」「路線名」の
+        語の意味を確定させたのに合わせ、両方を表示するこの行のラベルも実際の中身に一致させた
     v1.1 (2026-04-30)
       - [QA #77] システム名を「Nexus（ネクサス）」に統一
       - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示

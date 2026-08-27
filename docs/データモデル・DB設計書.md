@@ -213,7 +213,7 @@ erDiagram
 | 単価備考 | rate_note | VARCHAR(100) | NULL | | NULL | 「スキル見合い、応相談」等の短文。QA #14 確定。rate_min/rate_max が NULL の場合 AI はこのテキストを参考情報として扱う（配点加算なし） |
 | 商流 | commercial_flow | ENUM | NULL | | NULL | プライム / 2次 / 3次 / その他。QA #80 確定。→ §6-7 |
 | 稼働形態 | work_style | ENUM | NULL | | NULL | フルリモート / 一部リモート可 / 常駐。（NULL はCSV取り込み時の空欄に限る）AIマッチング入力パラメータ。→ §6-3 |
-| 勤務地（路線） | work_location_line | VARCHAR(100) | NULL | | NULL | 常駐・一部リモート時のみ入力 |
+| 勤務地（路線名） | work_location_line | VARCHAR(100) | NULL | | NULL | 常駐・一部リモート時のみ入力 |
 | 勤務地（最寄駅） | work_location_station | VARCHAR(100) | NULL | | NULL | 常駐・一部リモート時のみ入力。AIマッチング入力パラメータ |
 | 面談回数 | interview_count | TINYINT UNSIGNED | NULL | | NULL | |
 | 顧客折衝経験要否 | negotiation_required | TINYINT(1) | NULL | | NULL | 1=要 / 0=不問。AIマッチング入力パラメータ |
@@ -529,7 +529,7 @@ QA #78 にて固定確定。将来の追加なし。
 | `created_at DESC` | 登録日順（新しい順） | **◯** |
 | `created_at ASC` | 登録日順（古い順） | |
 | `updated_at DESC` | 更新日順（新しい順） | |
-| `available_from ASC` | 提案可能タイミング順 | |
+| `available_from ASC` | 稼働可能時期順 | ※2026-08-18：表示ラベルを「提案可能タイミング順」から項目名（稼働可能時期）に統一 |
 
 ### 案件一覧
 
@@ -538,7 +538,7 @@ QA #78 にて固定確定。将来の追加なし。
 | `created_at DESC` | 登録日順（新しい順） | **◯** |
 | `created_at ASC` | 登録日順（古い順） | |
 | `updated_at DESC` | 更新日順（新しい順） | |
-| `start_date ASC` | 稼働開始時期順 | |
+| `start_date ASC` | 参画開始時期順 | ※2026-08-18：表示ラベルを「稼働開始時期順」から項目名（参画開始時期）に統一 |
 | `rate_max DESC` | 単価順（高い順） | |
 | `rate_max ASC` | 単価順（低い順） | |
 

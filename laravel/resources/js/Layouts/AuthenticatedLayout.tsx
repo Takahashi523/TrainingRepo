@@ -1,16 +1,28 @@
 import { Toaster } from '@/Components/ui/toaster';
 import AppSidebar from '@/Components/Navigation/AppSidebar';
+import { useConnectionErrorToast } from '@/hooks/use-connection-error-toast';
 import { useToast } from '@/hooks/use-toast';
 import { PageProps } from '@/types';
 import { router, usePage } from '@inertiajs/react';
+import { cn } from '@/lib/utils';
 import { PropsWithChildren, ReactNode, useEffect } from 'react';
 
 export default function Authenticated({
     header,
+    /**
+     * スクロール領域（<main>）に足すクラス。地色の切り替えに使う。
+     * 参照系の画面（詳細など）は bg-muted/30、入力系（登録・編集）は既定の白のまま。
+     * ※一覧・進捗管理は -m-6 で <main> の padding を打ち消し自前のスクロール領域を持つため、
+     *   そちら側で背景を指定している。
+     */
+    mainClassName,
     children,
-}: PropsWithChildren<{ header?: ReactNode }>) {
+}: PropsWithChildren<{ header?: ReactNode; mainClassName?: string }>) {
     const page = usePage<PageProps>();
     const { toast } = useToast();
+
+    // 通信断（サーバーに到達できない失敗）の通知。GuestLayout でも同じ購読を行う（#84）。
+    useConnectionErrorToast();
 
     useEffect(() => {
         const showFlash = (flash?: PageProps['flash']) => {
@@ -30,9 +42,11 @@ export default function Authenticated({
         // useEffect の依存に flash 文字列を使うと、同一メッセージが連続した際に
         // 値が変わらず再表示されない（例：同じユーザーを続けて更新）ため、
         // Inertia の成功レスポンスごとに確実に表示する。
-        return router.on('success', (event) => {
+        const offSuccess = router.on('success', (event) => {
             showFlash((event.detail.page.props as unknown as PageProps).flash);
         });
+
+        return offSuccess;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -62,7 +76,7 @@ export default function Authenticated({
                  * padding を <main> 自身ではなく内側 div に置くことで
                  * sticky top-0 の吸着位置が正しく top:0 になる。
                  */}
-                <main className="flex-1 overflow-y-auto">
+                <main className={cn('flex-1 overflow-y-auto', mainClassName)}>
                     <div className="p-6">{children}</div>
                 </main>
             </div>

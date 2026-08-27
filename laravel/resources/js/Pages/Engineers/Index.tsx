@@ -4,7 +4,6 @@ import EngineerCard from '@/Components/Engineers/EngineerCard';
 import Pagination from '@/Components/Common/Pagination';
 import SortSelect from '@/Components/Common/SortSelect';
 import { Button } from '@/Components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerFilters, EngineerListPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
@@ -128,7 +127,6 @@ export default function Index({
     // 一覧はカードが複数あるため、オーバーレイ・キャンセルトークンはページ単位で1つだけ持ち（9-5）、
     // 押下されたカードからこのハンドラを起動する。人材詳細（Show.tsx 5-13）と同じ配線パターン。
     const [isMatching, setIsMatching] = useState(false);
-    const { toast } = useToast();
     // マッチングは読み取り専用（DB保存なし）のため途中キャンセルは安全。visit の cancel トークンを保持する。
     const matchingCancel = useRef<(() => void) | null>(null);
 
@@ -143,14 +141,9 @@ export default function Index({
                 onCancelToken: (token) => {
                     matchingCancel.current = token.cancel;
                 },
-                // サーバー到達エラー（通信断・中断）は成功レスポンスの flash.error では拾えないため
-                // ここでトースト表示し Silent Rejection を防ぐ（エンジン通信失敗はサーバーが flash.error で通知）。
-                onError: () =>
-                    toast({
-                        description:
-                            'マッチングの実行に失敗しました。通信環境をご確認のうえ、再度お試しください。',
-                        variant: 'destructive',
-                    }),
+                // 通信断（サーバーに到達できない失敗）は onError では拾えないため、レイアウトの
+                // useConnectionErrorToast()（exception 購読）で通知する（#84）。到達済みのエンジン通信失敗はサーバーが
+                // flash.error で通知する。
                 // onFinish は成功・失敗・キャンセルすべてで発火するためオーバーレイは必ず解除される。
                 onFinish: () => {
                     setIsMatching(false);
@@ -182,7 +175,7 @@ export default function Index({
                         <div>
                             <h1 className="text-lg font-bold text-foreground">人材一覧</h1>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                登録人材の検索・絞り込みと詳細確認
+                                登録済みの人材を検索・確認します
                             </p>
                         </div>
                         <div>
