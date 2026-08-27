@@ -96,8 +96,19 @@ export default function Index({
     // キーボード操作ではカンバンの先頭から辿り直しになる）。開いた瞬間の activeElement を自前で覚えておく。
     const openerRef = useRef<HTMLElement | null>(null);
 
+    // 「閉じた」ことをクライアント側で確定させるフラグ。
+    // ドロワーの中身は selectedPipeline（サーバー props）が正だが、開閉まで往復に依存させると
+    // ESC・幕クリックが応答を待つ間ぶん無反応になる（modal の ESC は即閉じるのが期待値）。
+    // 閉じる操作は即座にここへ反映し、selectedPipeline の破棄（＝URL の後始末）は後追いにする。
+    // ブラウザバックでは Inertia が preserveState:false でページを再マウントするため、この state は
+    // 自動的に false へ戻り、履歴から復活した selectedPipeline でドロワーは開き直る。
+    const [drawerClosed, setDrawerClosed] = useState(false);
+
     // カードクリック：現在のフィルタを載せて詳細のみ部分リロード
     const openCard = (id: number) => {
+        // 直前の closeDrawer が失敗して selectedPipeline が残っている場合でも開き直せるよう、
+        // 応答を待たずにフラグを解除する。
+        setDrawerClosed(false);
         openerRef.current = document.activeElement as HTMLElement | null;
         router.get(route('pipelines.show', id), buildQuery(filters), {
             preserveState: true,
@@ -106,8 +117,9 @@ export default function Index({
         });
     };
 
-    // ドロワーを閉じる：selectedPipeline を落とすため index へ戻る
+    // ドロワーを閉じる：見た目は即座に閉じ、selectedPipeline を落とすため index へ戻る
     const closeDrawer = () => {
+        setDrawerClosed(true);
         router.get(route('pipelines.index'), buildQuery(filters), {
             preserveState: true,
             preserveScroll: true,
@@ -206,12 +218,13 @@ export default function Index({
                     ・パネルは container 指定＋absolute でコンテンツ領域内に収め、サイドバーの上に乗せない（WF_10 の .drawer）
                     ・幕は fixed のまま画面全体に敷く。modal によりサイドバーは操作できなくなるため、
                       暗くして「今は操作できない」ことを見た目でも示す
-                    ・開閉はサーバー往復（selectedPipeline の有無）が正。閉じる操作は closeDrawer に集約する */}
+                    ・中身は selectedPipeline（サーバー props）が正。閉じる操作は closeDrawer に集約し、
+                      「閉じた」ことだけは drawerClosed で即座に反映する（ESC・幕クリックを往復待ちにしない） */}
                 <Sheet
                     // container が確定するまで開かない。/pipelines/{id} を直接開くと初回描画から
                     // detail が入っており、この条件が無いと一瞬 body へ Portal されてサイドバーに被る
                     // （その後 ref 確定で Portal 先が変わり unmount→remount する）。
-                    open={!!detail && drawerContainer !== null}
+                    open={!!detail && !drawerClosed && drawerContainer !== null}
                     onOpenChange={(open) => {
                         if (!open) closeDrawer();
                     }}
