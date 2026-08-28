@@ -78,15 +78,22 @@ class CsvController extends Controller
         // 生成トリガーの経過時間予算（issue #61 課題4）の起点。import() 自体（検証・バッチ書き込み）に
         // 使った時間も含めて計測するため、import() 呼び出し前に取得する。
         $importStartedAt = microtime(true);
+
+        // 新規行の特定を created_at（秒精度）だけに頼ると、無関係な既存行がたまたま同じ秒に作成されて
+        // いた場合に誤って巻き込まれてしまう（同一秒の衝突。テストで実際に再現した）。オートインクリメント
+        // の id はインポートより前に存在した行を超えないため、この時点の最大 id と組み合わせて絞り込む。
+        $maxIdBeforeImport = Engineer::max('id') ?? 0;
+
         $result = $this->importService->import($request->file('file'), new EngineerCsvSchema);
 
         // 生成トリガーの全経路適用（issue #61 課題4）。対象は今回のインポートで書き込まれた行のみ
-        // （updated_ids / written_at で限定。テーブル全体はスイープしない）。importResult（フロント契約）
-        // には影響させず、超過分があれば別途 flash.error で通知する。
+        // （updated_ids / written_at / maxIdBeforeImport で限定。テーブル全体はスイープしない）。
+        // importResult（フロント契約）には影響させず、超過分があれば別途 flash.error で通知する。
         $trigger = $this->engineerService->triggerAiSummaryForCsvImport(
             $result['updated_ids'],
             $result['written_at'],
             $importStartedAt,
+            $maxIdBeforeImport,
         );
 
         $redirect = redirect()->route('csv.index')->with('importResult', $this->importResultPayload($result));

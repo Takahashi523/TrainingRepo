@@ -38,14 +38,25 @@ return new class extends Migration
         // 追加前から ai_summary を持つ人材（過去の生成成功分）は、そのままだと DEFAULT 'none' になり
         // 「未生成」として誤表示されてしまう。ai_summary が既にある行は generated として確定させ、
         // source_hash も現在の appeal_note から計算しておく（以後の stale 判定を初回から正しく機能させる）。
-        // SHA2(str, 256) は PHP 側 hash('sha256', (string) $appeal_note) と同じ値になる（Engineer::isAiSummaryStale
-        // ／EngineerService::refreshAiSummary 参照）。appeal_note が NULL の場合は空文字列として扱う。
+        // 行ごとに appeal_note が異なり単一の UPDATE 文では計算できないため、chunkById で1行ずつ
+        // PHP 側の hash('sha256', ...) を使って更新する（Engineer::isAiSummaryStale／
+        // EngineerService::refreshAiSummary と同じ計算方法）。MySQL の SHA2() 関数を DB::raw() 経由で
+        // 使う実装も検討したが、SHA2() は MySQL 専用関数でテスト環境（sqlite）には存在せず、
+        // 全テストがマイグレーション失敗で壊れるため採用しない。appeal_note が NULL の場合は
+        // 空文字列として扱う。
         DB::table('engineers')
             ->whereNotNull('ai_summary')
-            ->update([
-                'ai_summary_status' => 'generated',
-                'ai_summary_source_hash' => DB::raw("SHA2(COALESCE(appeal_note, ''), 256)"),
-            ]);
+            ->orderBy('id')
+            ->chunkById(500, function ($engineers): void {
+                foreach ($engineers as $engineer) {
+                    DB::table('engineers')
+                        ->where('id', $engineer->id)
+                        ->update([
+                            'ai_summary_status' => 'generated',
+                            'ai_summary_source_hash' => hash('sha256', (string) $engineer->appeal_note),
+                        ]);
+                }
+            });
     }
 
     public function down(): void

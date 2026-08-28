@@ -135,10 +135,18 @@ WF_03（人材一覧）ではこれらの TEXT カラムは表示されない。
 
 **CSVインポート（PR #58）への適用方針**：CSVインポートは `upsert` によるバッチ書き込みのため、Eloquent イベントを
 通らない。`CsvImportService::write()` が「更新行の id 一覧（`updated_ids`）」と「このバッチの `created_at`/`updated_at`
-基準時刻（`written_at`）」を返し、`EngineerService::triggerAiSummaryForCsvImport($updatedIds, $writtenAt, $importStartedAt)`
-がこの2つで対象を**今回のインポートで書き込まれた行だけ**に絞り込んだうえで、`appeal_note` はあるのに
-`ai_summary_status` が `none`（未試行）の行にのみ生成を試みる。テーブル全体を都度スイープする方式ではないため、
-インポートと無関係な既存の未試行データが巻き込まれることはない（それらは各人材の詳細画面から個別に再生成する）。
+基準時刻（`written_at`）」を返し、`EngineerService::triggerAiSummaryForCsvImport($updatedIds, $writtenAt, $importStartedAt, $maxIdBeforeImport)`
+がこの2つ（＋ `$maxIdBeforeImport`）で対象を**今回のインポートで書き込まれた行だけ**に絞り込んだうえで、
+`appeal_note` はあるのに `ai_summary_status` が `none`（未試行）の行にのみ生成を試みる。テーブル全体を都度スイープ
+する方式ではないため、インポートと無関係な既存の未試行データが巻き込まれることはない（それらは各人材の詳細画面
+から個別に再生成する）。
+
+**新規行の特定に `created_at` だけでなく `id` の下限も併用する**：`created_at` は秒精度のため、無関係な既存行が
+たまたま同じ秒に作成されていた場合、`created_at` の一致だけでは誤って対象に含めてしまう（実際にテストで発生を
+確認した）。オートインクリメントの `id` はインポートで新規挿入された行が、それ以前に存在した行の `id` を超える
+性質を利用し、`CsvController` が `import()` 呼び出し前に取得した最大 `id`（`$maxIdBeforeImport`）より大きい、
+かつ `created_at` が一致する行だけを新規行とみなす。二重の条件にすることで、同一秒に無関係な行が作成されていても
+`id` 側で弾ける。
 
 **打ち切り方式は経過時間ベース（固定件数ではない）**：AI呼び出しは同期・直列（1件あたり最大30秒）で、キュー実行
 基盤（ワーカー）が現状の環境（`docker-compose.yml`）に無い。CSV読込・検証・バッチ書き込み自体で最大十数秒を

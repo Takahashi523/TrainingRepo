@@ -109,6 +109,14 @@ class EngineerService
      * 限定する。過去に取り込まれ未試行のまま残っている無関係な既存データはここでは対象にしない
      * （テーブル全体を都度スイープすると、今回インポートしていない行まで生成が走ってしまうため）。
      *
+     * 【新規行の特定：created_at だけでなく id の下限も併用する】
+     * created_at（秒精度）だけで新規行を判定すると、無関係な既存行がたまたま同じ秒に作成されていた
+     * 場合に誤って一致してしまう（同一秒の衝突。テストで実際に発生を確認した）。オートインクリメントの
+     * id はインポートで新規挿入された行がそれ以前に存在した行の id を超えることを利用し、呼び出し側
+     * （CsvController）が import() 呼び出し前に取得した最大 id（$maxIdBeforeImport）より大きい、
+     * かつ created_at が一致する行だけを新規行とみなす。二重の条件にすることで、同一秒に無関係な行が
+     * 作成されていても id 側で弾ける。
+     *
      * 【打ち切り方式：経過時間ベース（固定件数ではない）】
      * AI 呼び出しは同期・直列（1件あたり最大30秒）で、キュー実行基盤（ワーカー）が現状の環境に無い。
      * CSV読込・検証・バッチ書き込み自体で最大十数秒を使う想定（08_CSV入出力_APIエンドポイント一覧.md
@@ -126,17 +134,22 @@ class EngineerService
      * @param  array<int, int>  $updatedIds  既存行（id 指定で upsert された）の id 一覧。新規行はここに含まれない。
      * @param  \Illuminate\Support\Carbon  $writtenAt  このバッチの created_at/updated_at に使われた基準時刻。新規行の特定に使う。
      * @param  float  $importStartedAt  インポート処理開始時刻（microtime(true)）。経過時間予算の起点。
+     * @param  int  $maxIdBeforeImport  import() 呼び出し前時点の engineers の最大 id（0件なら0）。新規行の特定に使う。
      * @return array{triggered: int, skipped: int}
      */
-    public function triggerAiSummaryForCsvImport(array $updatedIds, Carbon $writtenAt, float $importStartedAt): array
+    public function triggerAiSummaryForCsvImport(array $updatedIds, Carbon $writtenAt, float $importStartedAt, int $maxIdBeforeImport): array
     {
         $pending = Engineer::query()
             ->where('ai_summary_status', 'none')
             ->whereNotNull('appeal_note')
             ->where('appeal_note', '!=', '')
-            ->where(function ($query) use ($updatedIds, $writtenAt): void {
-                // 新規行：upsert が id を返さないため created_at（このバッチの基準時刻）で特定する。
-                $query->where('created_at', $writtenAt->format('Y-m-d H:i:s'));
+            ->where(function ($query) use ($updatedIds, $writtenAt, $maxIdBeforeImport): void {
+                // 新規行：created_at（このバッチの基準時刻）に加え、インポート前の最大 id を超える
+                // ことも条件にする（同一秒に作成された無関係な既存行を誤って含めないため）。
+                $query->where(function ($newRowQuery) use ($writtenAt, $maxIdBeforeImport): void {
+                    $newRowQuery->where('created_at', $writtenAt->format('Y-m-d H:i:s'))
+                        ->where('id', '>', $maxIdBeforeImport);
+                });
 
                 // 更新行：id が判明しているのでそのまま絞り込む。
                 if ($updatedIds !== []) {

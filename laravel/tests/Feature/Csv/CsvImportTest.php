@@ -161,7 +161,10 @@ class CsvImportTest extends CsvTestCase
             'name' => '無関係太郎',
             'appeal_note' => 'インポート対象外の既存アピール',
         ]);
-        $this->assertSame('none', $untouched->ai_summary_status);
+        // create() 直後の $untouched は ai_summary_status を明示的に渡していないため、DB側の
+        // DEFAULT('none') が反映されない（Eloquent は fresh()/refresh() しない限り DB 側の
+        // デフォルト値をモデルに取り込まない）。ここでは fresh() で実際の DB の値を確認する。
+        $this->assertSame('none', $untouched->fresh()->ai_summary_status);
 
         Http::fake([
             '*/api/v1/ai/profile-summary' => Http::response([
