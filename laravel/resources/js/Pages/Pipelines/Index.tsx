@@ -4,6 +4,7 @@ import PipelineFilterPanel from '@/Components/Pipelines/PipelineFilterPanel';
 import PipelineFilterSummary from '@/Components/Pipelines/PipelineFilterSummary';
 import PipelineTabHeader from '@/Components/Pipelines/PipelineTabHeader';
 import { Button } from '@/Components/ui/button';
+import { Sheet, SheetContent } from '@/Components/ui/sheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { ActiveFilters, PipelineIndexPageProps } from '@/types/pipeline';
@@ -90,8 +91,30 @@ export default function Index({
         visit({ keyword: '', user_id: null, rank: [], status: [] });
     };
 
+    // ドロワーを開いた起点の要素。閉じたときにここへフォーカスを戻す。
+    // Sheet は SheetTrigger 経由で開いていないため、Radix は復帰先を知らない（放置するとフォーカスが body に落ち、
+    // キーボード操作ではカンバンの先頭から辿り直しになる）。開いた瞬間の activeElement を自前で覚えておく。
+    const openerRef = useRef<HTMLElement | null>(null);
+
+    // 「今どれを開いているか」をクライアント側で持つ（null＝閉じている）。
+    // ドロワーの中身は selectedPipeline（サーバー props）が正だが、開閉まで往復に依存させると
+    // ESC・幕クリックが応答を待つ間ぶん無反応になる（modal の ESC は即閉じるのが期待値）。
+    //
+    // 真偽値（閉じたか否か）ではなく id で持つのが要点。Inertia は新しい visit が始まると前の visit を
+    // キャンセルするため、「ESC で閉じる → 応答が返る前に別カードをクリック」すると index への visit が
+    // 破棄され、selectedPipeline は前のカードのまま残る。真偽値だと開き直した瞬間に前のカードの内容が
+    // 出てしまうので、props の id と一致するときだけ開く。
+    //
+    // 初期値を props から採るのは /pipelines/{id} を直接開く経路のため。ブラウザバックでは Inertia が
+    // preserveState:false でページを再マウントするので、この state も履歴の selectedPipeline で採り直される。
+    const [openPipelineId, setOpenPipelineId] = useState<number | null>(selectedPipeline?.id ?? null);
+
     // カードクリック：現在のフィルタを載せて詳細のみ部分リロード
     const openCard = (id: number) => {
+        // 応答を待たずに「この id を開く」と決める。props が届くまでは開かない（上記のとおり
+        // 前のカードの selectedPipeline が残っている可能性があるため）。
+        setOpenPipelineId(id);
+        openerRef.current = document.activeElement as HTMLElement | null;
         router.get(route('pipelines.show', id), buildQuery(filters), {
             preserveState: true,
             preserveScroll: true,
@@ -99,8 +122,9 @@ export default function Index({
         });
     };
 
-    // ドロワーを閉じる：selectedPipeline を落とすため index へ戻る
+    // ドロワーを閉じる：見た目は即座に閉じ、selectedPipeline を落とすため index へ戻る
     const closeDrawer = () => {
+        setOpenPipelineId(null);
         router.get(route('pipelines.index'), buildQuery(filters), {
             preserveState: true,
             preserveScroll: true,
@@ -111,6 +135,12 @@ export default function Index({
     const detail = selectedPipeline ?? null;
     const drawerStatusOptions = statusOptions ?? [];
 
+    // ドロワー（Sheet）の Portal 先。WF_10 どおりドロワー本体をコンテンツ領域内に収め、
+    // サイドバーの上に乗せないため、body ではなくこのページのコンテナへ描画する。
+    // ref ではなく state で保持するのは、ref 代入では再レンダリングが起きず、
+    // 初回描画時に container が null（＝ body へフォールバック）のままになるため。
+    const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
+
     return (
         <AuthenticatedLayout>
             <Head title="進捗管理" />
@@ -119,9 +149,14 @@ export default function Index({
              * ページ全体を p-6 打ち消し（-m-6）＋ 画面全高（h-screen）の relative コンテナにする。
              * - ヘッダ・タブ・フィルタは shrink-0 で常時固定（フレックスにより上部に固定）
              * - カンバンは flex-1 で残り高さを占有し内部スクロール
-             * - ドロワーはこのコンテナ直下に置き、ヘッダーを含む画面トップから全高でオーバーレイする
+             * - ドロワー（Sheet）はこのコンテナへ Portal し、ヘッダーを含む画面トップから全高でオーバーレイする
              */}
-            <div className="relative -m-6 flex h-screen flex-col overflow-hidden">
+            <div
+                ref={setDrawerContainer}
+                // ドロワーを閉じたときの復帰先（起点のカードが消えている場合）。マウスでは焦点化しない
+                tabIndex={-1}
+                className="relative -m-6 flex h-screen flex-col overflow-hidden outline-none"
+            >
                 {/* ヘッダ・タブ・フィルタ（常時固定） */}
                 <div className="z-10 shrink-0 bg-white">
                     {/* ページヘッダ */}
@@ -184,15 +219,56 @@ export default function Index({
                     </div>
                 </div>
 
-                {/* ドロワー：コンテナ直下に置きヘッダーを含む画面トップから全高でオーバーレイ */}
-                {detail && (
-                    <PipelineDrawer
-                        key={detail.id}
-                        pipeline={detail}
-                        statusOptions={drawerStatusOptions}
-                        onClose={closeDrawer}
-                    />
-                )}
+                {/* ドロワー（shadcn Sheet＝Radix Dialog。ESC・フォーカストラップ・スクロールロックを標準で得る）。
+                    ・パネルは container 指定＋absolute でコンテンツ領域内に収め、サイドバーの上に乗せない（WF_10 の .drawer）
+                    ・幕は fixed のまま画面全体に敷く。modal によりサイドバーは操作できなくなるため、
+                      暗くして「今は操作できない」ことを見た目でも示す
+                    ・中身は selectedPipeline（サーバー props）が正。閉じる操作は closeDrawer に集約し、
+                      「どれを開いているか」は openPipelineId で即座に反映する（ESC・幕クリックを往復待ちにしない） */}
+                <Sheet
+                    // 開くのは「開く対象として選んだ id」と「サーバーが返した詳細」が一致したときだけ。
+                    // 往復中に前のカードの selectedPipeline が残っていても、その内容では開かない。
+                    // container が確定するまで開かないのは、/pipelines/{id} を直接開くと初回描画から
+                    // detail が入っており、この条件が無いと一瞬 body へ Portal されてサイドバーに被るため
+                    // （その後 ref 確定で Portal 先が変わり unmount→remount する）。
+                    open={detail !== null && detail.id === openPipelineId && drawerContainer !== null}
+                    onOpenChange={(open) => {
+                        if (!open) closeDrawer();
+                    }}
+                >
+                    <SheetContent
+                        container={drawerContainer}
+                        overlayClassName="z-20 bg-black/25"
+                        className="absolute inset-y-0 right-0 z-30 h-full w-[480px] max-w-full gap-0 border-l border-border bg-white p-0 shadow-[-4px_0_16px_rgba(0,0,0,0.12)] sm:max-w-full"
+                        showCloseButton={false}
+                        // ドロワーは説明文を持たないため、存在しない id を指す aria-describedby を出さない
+                        aria-describedby={undefined}
+                        tabIndex={-1}
+                        onOpenAutoFocus={(event) => {
+                            // 既定では最初の tabbable（ヘッダーのステータス変更 Select）にフォーカスが乗る。
+                            // 不可逆操作に関わるコントロールから始めず、パネル自身に当てて SheetTitle から読ませる。
+                            event.preventDefault();
+                            (event.currentTarget as HTMLElement).focus();
+                        }}
+                        onCloseAutoFocus={(event) => {
+                            // Radix は SheetTrigger 経由で開いていないと復帰先を知らず、既定のまま抜けると
+                            // フォーカスが body に落ちる。起点が残っていればそこへ、消えていれば一覧コンテナへ戻す。
+                            event.preventDefault();
+                            const opener = openerRef.current;
+                            (opener?.isConnected ? opener : drawerContainer)?.focus();
+                        }}
+                    >
+                        {/* 開くたびに key={detail.id} で再マウントし、パイプライン切り替え時にフォームを初期化する */}
+                        {detail && (
+                            <PipelineDrawer
+                                key={detail.id}
+                                pipeline={detail}
+                                statusOptions={drawerStatusOptions}
+                                onClose={closeDrawer}
+                            />
+                        )}
+                    </SheetContent>
+                </Sheet>
             </div>
         </AuthenticatedLayout>
     );

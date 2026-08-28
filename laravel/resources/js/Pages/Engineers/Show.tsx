@@ -8,7 +8,6 @@ import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerShowPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
@@ -41,7 +40,6 @@ export default function Show({ engineer }: Props) {
     // マッチング実行は遷移先描画前にサーバーで Python AI を同期呼び出しするため数秒待つ。
     // その間、遷移元のこの画面に AI 計算中オーバーレイを被せる（onStart で表示・onFinish で解除）。
     const [isMatching, setIsMatching] = useState(false);
-    const { toast } = useToast();
 
     // マッチングは読み取り専用（DB保存なし）のため、途中キャンセルは安全（副作用が残らない）。
     // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する。
@@ -127,15 +125,9 @@ export default function Show({ engineer }: Props) {
                                     onCancelToken: (token) => {
                                         matchingCancel.current = token.cancel;
                                     },
-                                    // サーバー到達エラー（通信断・リクエスト中断）は成功レスポンスの
-                                    // flash.error では拾えないため、ここでトースト表示し Silent Rejection を防ぐ。
-                                    // （エンジン通信失敗など到達済みエラーはサーバーが flash.error で通知する）
-                                    onError: () =>
-                                        toast({
-                                            description:
-                                                'マッチングの実行に失敗しました。通信環境をご確認のうえ、再度お試しください。',
-                                            variant: 'destructive',
-                                        }),
+                                    // 通信断（サーバーに到達できない失敗）は onError では拾えないため、
+                                    // レイアウトの useConnectionErrorToast()（exception 購読）で通知する（#84）。
+                                    // 到達済みのエンジン通信失敗はサーバーが flash.error で通知する。
                                     // onFinish は成功・失敗・キャンセルすべてで発火するためオーバーレイは必ず解除される。
                                     onFinish: () => {
                                         setIsMatching(false);

@@ -4,7 +4,6 @@ import EngineerCard from '@/Components/Engineers/EngineerCard';
 import Pagination from '@/Components/Common/Pagination';
 import SortSelect from '@/Components/Common/SortSelect';
 import { Button } from '@/Components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerFilters, EngineerListPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
@@ -57,11 +56,19 @@ export default function Index({
         setKeywordInput(filters.keyword);
     }, [filters.keyword]);
 
+    // 保存済み条件の適用のように、keyword を含む visit を別経路で送った直後は、
+    // 入力欄の同期（setKeywordInput）で走る本 effect が二重に visit を出さないよう1回だけ抑止する。
+    const skipNextKeywordDebounce = useRef(false);
+
     // デバウンス：keywordInput が変わったら 300ms 待って visit
     const isInitialKeywordSync = useRef(true);
     useEffect(() => {
         if (isInitialKeywordSync.current) {
             isInitialKeywordSync.current = false;
+            return;
+        }
+        if (skipNextKeywordDebounce.current) {
+            skipNextKeywordDebounce.current = false;
             return;
         }
         if (keywordInput === filters.keyword) return;
@@ -89,6 +96,18 @@ export default function Index({
     };
 
     const handleFilterChange = (patch: Partial<EngineerFilters>) => {
+        // keyword を明示指定する patch（＝保存済み条件の適用）は、入力欄の値も保存条件に合わせる。
+        // 同期しないと、打鍵から 300ms 以内に条件を呼び出したとき保留中のデバウンスタイマーが
+        // 生き残り（keywordInput が変わらない＝effect の cleanup が走らない）、適用直後に
+        // 打鍵途中の語が後乗りして「保存条件＋入力中の語」になる。保存条件の keyword が
+        // サーバ側 filters.keyword と同じ（どちらも空など）ときは応答速度に関係なく再現する。
+        // setKeywordInput で effect が再実行されると cleanup がタイマーを消すため、
+        // 新しいタイマーだけをフラグで抑止して visit の重複を防ぐ。
+        // （「すべてクリア」を含む同種のレース全体の横断対応は issue #38）
+        if (patch.keyword !== undefined && patch.keyword !== keywordInput) {
+            skipNextKeywordDebounce.current = true;
+            setKeywordInput(patch.keyword);
+        }
         // フィルタ変更時はページを1に戻す
         visit({ ...patch, page: 1 });
     };
@@ -108,7 +127,6 @@ export default function Index({
     // 一覧はカードが複数あるため、オーバーレイ・キャンセルトークンはページ単位で1つだけ持ち（9-5）、
     // 押下されたカードからこのハンドラを起動する。人材詳細（Show.tsx 5-13）と同じ配線パターン。
     const [isMatching, setIsMatching] = useState(false);
-    const { toast } = useToast();
     // マッチングは読み取り専用（DB保存なし）のため途中キャンセルは安全。visit の cancel トークンを保持する。
     const matchingCancel = useRef<(() => void) | null>(null);
 
@@ -123,14 +141,9 @@ export default function Index({
                 onCancelToken: (token) => {
                     matchingCancel.current = token.cancel;
                 },
-                // サーバー到達エラー（通信断・中断）は成功レスポンスの flash.error では拾えないため
-                // ここでトースト表示し Silent Rejection を防ぐ（エンジン通信失敗はサーバーが flash.error で通知）。
-                onError: () =>
-                    toast({
-                        description:
-                            'マッチングの実行に失敗しました。通信環境をご確認のうえ、再度お試しください。',
-                        variant: 'destructive',
-                    }),
+                // 通信断（サーバーに到達できない失敗）は onError では拾えないため、レイアウトの
+                // useConnectionErrorToast()（exception 購読）で通知する（#84）。到達済みのエンジン通信失敗はサーバーが
+                // flash.error で通知する。
                 // onFinish は成功・失敗・キャンセルすべてで発火するためオーバーレイは必ず解除される。
                 onFinish: () => {
                     setIsMatching(false);

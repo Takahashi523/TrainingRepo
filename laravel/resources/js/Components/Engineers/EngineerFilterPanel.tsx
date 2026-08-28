@@ -1,14 +1,14 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
 import SavedSearchManageDialog from '@/Components/Common/SavedSearchManageDialog';
+import SavedSearchMenu from '@/Components/Common/SavedSearchMenu';
 import SavedSearchSaveDialog from '@/Components/Common/SavedSearchSaveDialog';
-import SavedSearchSelect from '@/Components/Common/SavedSearchSelect';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { EngineerFilters, EngineerSearchConditions, Phase, StatusOption, WorkTypeOption } from '@/types/engineer';
 import { SavedSearchItem } from '@/types/savedSearch';
 import { SortOption } from '@/types';
-import { List, Search, Star, X } from 'lucide-react';
+import { FunnelPlus, List, Search, X } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {
@@ -75,6 +75,30 @@ export default function EngineerFilterPanel({
             ? currentSortOption.label
             : undefined;
 
+    // 保存済み条件の適用。
+    // 保存時は SavedSearchService::sanitizeConditions() が全キーを埋めた配列を組み立てるため、
+    // 現行の保存経路を通ったレコードにキー欠落はない。ただし保存後にフィルタ次元を増やすと、
+    // それ以前に保存された古いレコードには新しいキーが無い。patch をそのままマージすると
+    // 欠けた次元に現在の絞り込みが残り、「保存したものと違う条件が適用された」状態（部分適用）に
+    // なるため、適用は merge ではなく replace として扱い、先に全次元を既定値へ戻す。
+    //
+    // 既定値には型注釈を付ける。onFilterChange の引数は Partial<EngineerFilters> のため、
+    // 注釈が無いとキーが1つ欠けてもコンパイルエラーにならず、次元追加時に部分適用が静かに再発する。
+    // なお「フィルタ次元の一覧」は EngineerSearchConditions（型）／SavedSearchService::sanitizeConditions()
+    // ／ここの既定値 の3か所に分散しているため、次元を増やすときは3か所とも揃える
+    // （型注釈で守れるのは TS 側の2か所のみ）。
+    const applySavedConditions = (conditions: Partial<EngineerSearchConditions>) => {
+        const defaults: EngineerSearchConditions = {
+            status: [],
+            work_styles: [],
+            phases: [],
+            keyword: '',
+            sort: sortOptions[0].sort as EngineerFilters['sort'],
+            order: sortOptions[0].order as EngineerFilters['order'],
+        };
+        onFilterChange({ ...defaults, ...conditions });
+    };
+
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [showManageModal, setShowManageModal] = useState(false);
 
@@ -84,8 +108,10 @@ export default function EngineerFilterPanel({
         filters.phases.length > 0 ||
         filters.keyword.length > 0;
 
+    // 左右パディングはページヘッダ（px-10）に合わせる。カード一覧はスクロール領域の px-6 に
+    // スクロールバー幅が加わって実質同じ位置になるため、px-6 のままだとこの行だけ左右にはみ出して見える。
     return (
-        <div className="border-b border-border bg-muted/40 px-6 py-3">
+        <div className="border-b border-border bg-muted/40 px-10 py-3">
             <div className="flex flex-wrap items-center gap-2.5">
                 {/* フリーワード */}
                 <div className="relative">
@@ -161,44 +187,57 @@ export default function EngineerFilterPanel({
                     <span className="text-[11px] text-muted-foreground">（適用中の条件はありません）</span>
                 )}
 
+                {/* 「条件を保存」「すべてクリア」はどちらも左の絞り込みタグ（＝現在の条件）に作用するため、
+                    作用対象の隣にまとめる。どちらも hasAnyFilter 依存なので同時に出没し、
+                    常時表示の右クラスタ（保存済み条件の呼び出し・管理）が横にズレない。
+                    並び順は建設的な「保存」を先、破壊的な「すべてクリア」を後にする。 */}
                 {hasAnyFilter && (
-                    <button
-                        type="button"
-                        onClick={onClearAll}
-                        className="ml-1 inline-flex h-7 items-center gap-1 rounded-md border border-input bg-white px-2.5 text-[11px] text-muted-foreground hover:bg-muted/50"
-                    >
-                        <X className="h-3 w-3" />
-                        すべてクリア
-                    </button>
-                )}
-
-                {/* 保存済み条件の呼び出し・保存（WF_03の配置に合わせて右端） */}
-                <div className="ml-auto flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground">保存済み条件</span>
-                    <SavedSearchSelect
-                        savedSearches={savedSearches}
-                        onApply={onFilterChange}
-                    />
-                    {hasAnyFilter && (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 gap-1 bg-white text-[11px]"
-                            onClick={() => setShowSaveModal(true)}
-                        >
-                            <Star className="h-3 w-3" />
-                            条件を保存
-                        </Button>
-                    )}
                     <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-8 gap-1 bg-white text-[11px]"
+                        className="ml-1 h-7 gap-1 bg-white text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground [&_svg]:size-3.5"
+                        onClick={() => setShowSaveModal(true)}
+                    >
+                        {/* 漏斗＋（FunnelPlus）。呼び出し側トリガーの Filter（実体は Funnel）と対象を共有し、
+                            「＋＝この絞り込みを保存済みに追加する」を表す。
+                            星（お気に入り）は使わない。星は ON/OFF を持つトグルの記号だが、この操作は
+                            ダイアログで名前を付けて新規レコードを作る生成操作で、点灯状態を持たない。
+                            人材・案件のカード一覧の直上にあるため「この人材をお気に入り」とも誤読されうる。 */}
+                        <FunnelPlus />
+                        条件を保存
+                    </Button>
+                )}
+
+                {hasAnyFilter && (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 bg-white text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground [&_svg]:size-3.5"
+                        onClick={onClearAll}
+                    >
+                        <X />
+                        すべてクリア
+                    </Button>
+                )}
+
+                {/* 保存済み条件の呼び出し・管理（WF_03の配置に合わせて右端）。
+                    「保存済み条件」の見出しラベルは置かない。呼び出し・管理のどちらもボタン文言だけで
+                    対象と操作が分かるため、ラベルは情報を足さずクラスタの幅だけを占める。 */}
+                <div className="ml-auto flex items-center gap-2">
+                    <SavedSearchMenu
+                        savedSearches={savedSearches}
+                        onApply={applySavedConditions}
+                    />
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1 bg-white text-[11px] [&_svg]:size-3.5"
                         onClick={() => setShowManageModal(true)}
                     >
-                        <List className="h-3 w-3" />
+                        <List />
                         条件管理
                     </Button>
                 </div>

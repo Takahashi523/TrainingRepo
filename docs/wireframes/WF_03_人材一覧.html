@@ -662,19 +662,33 @@
         <span style="font-size:11px;color:#aaa;">絞り込み条件：</span>
         <span class="active-tag">提案可 <span style="cursor:pointer;">✕</span></span>
         <span class="active-tag">フルリモート <span style="cursor:pointer;">✕</span></span>
-        <button class="btn btn-ghost" style="margin-left:4px;">✕ すべてクリア</button>
+        <!-- 「(ファネル+) 条件を保存」「✕ すべてクリア」はどちらも左の絞り込みタグ（＝現在の条件）に作用するため隣接させる。
+             どちらも絞り込み条件が1つ以上ある時のみ表示（保存対象がない場合は非表示）。同時に出没するので、
+             常時表示の右クラスタ（保存済み条件の呼び出し・管理）は絞り込みの有無で横位置がズレない。
+             並び順は建設的な「保存」を先、破壊的な「すべてクリア」を後にする。
+             アイコンは漏斗＋（呼び出しトリガーの漏斗と対象を共有し、＋で「保存済みに追加する」を表す）。
+             星は使わない。星は ON/OFF を持つトグルの記号だが本操作は名前を付けて作る生成操作であり、人材カード一覧の直上では
+             「この人材をお気に入り」とも誤読されるため。（issue #66） -->
+        <button class="btn" style="margin-left:4px;" onclick="openSaveModal()">(ファネル+) 条件を保存 <span class="should-badge">Should</span></button>
+        <button class="btn btn-ghost">✕ すべてクリア</button>
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-          <span class="filter-label">保存済み条件</span>
-          <select class="wf-select" style="width:175px;">
-            <option value="">条件を選択して呼び出す</option>
-            <option>Java × 提案可 × フルリモート</option>
-            <option>PHP × 開発 × 常駐可</option>
-            <option>Python × 要件定義あり</option>
-          </select>
-          <!-- 「☆ 条件を保存」は絞り込み条件が1つ以上ある時のみ表示（保存対象がない場合は非表示）。
-               「☰ 条件管理」は絞り込み状態に関わらず常時表示（保存済み条件の参照・削除はいつでも可能）。
+          <!-- 呼び出しUIは select ではなくメニュー（押すと適用されるアクションの一覧）。
+               適用中の条件はこのトリガーに表示せず、左の絞り込みタグを正とする。
+               select だと「適用中の条件を削除すると空表示で固まる」「同じ条件を選び直しても発火しない」
+               といった副作用が構造的に生じるため。
+               トリガーの意匠は隣の「☰ 条件管理」と揃え、シェブロン（▾）は付けない。固定幅＋淡色プレースホルダーや
+               シェブロンはセレクト＝「値を保持する部品」の記号であり、値を持たないという実態と食い違うため。
+               「保存済み条件」の見出しラベルも置かない（ボタン文言だけで対象と操作が分かる）。（issue #66） -->
+          <button class="btn">(ファネル) 保存済み条件を選択</button>
+          <!-- ▾ を押すと開くメニュー（イメージ）：
+               ┌─────────────────────────┐
+               │ Java × 提案可 × フルリモート  │ ← 押すと即適用
+               │ PHP × 開発 × 常駐可          │
+               │ Python × 要件定義あり        │
+               └─────────────────────────┘
+               保存が0件のときは「保存された検索条件はありません」を選択不可の項目として表示する。 -->
+          <!-- 「☰ 条件管理」は絞り込み状態に関わらず常時表示（保存済み条件の参照・削除はいつでも可能）。
                PR #60 レビュー対応：1ボタンで保存と削除（管理）を兼ねていたのを役割ごとに分離。 -->
-          <button class="btn" onclick="openSaveModal()">☆ 条件を保存 <span class="should-badge">Should</span></button>
           <button class="btn" onclick="openManageModal()">☰ 条件管理</button>
         </div>
       </div>

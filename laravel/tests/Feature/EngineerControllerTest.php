@@ -1232,10 +1232,31 @@ class EngineerControllerTest extends TestCase
         $user = User::factory()->create(['role' => 'general']);
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
 
+        // 削除は人材詳細画面から実行されるため、referer は詳細URL自身になる。
+        $response = $this->actingAs($user)->delete(
+            "/engineers/{$engineer->id}",
+            [],
+            ['X-Inertia' => 'true', 'referer' => "/engineers/{$engineer->id}"]
+        );
+
+        // 設計書 DELETE #7：権限不足は 403 を素で投げず、前画面（＝同じ詳細画面）へ戻し
+        // flash.error を返す。redirect先を固定しないと一覧へ飛ばす誤実装でも通ってしまうため、
+        // referer を明示してリダイレクト先まで検証する（StaleResourceHandlingTestと同粒度）。
+        $response->assertStatus(303);
+        $response->assertRedirect("/engineers/{$engineer->id}");
+        $response->assertSessionHas('error', '削除権限がありません。');
+        $this->assertDatabaseHas('engineers', ['id' => $engineer->id]);
+    }
+
+    public function test_general_user_delete_engineer_without_referer_falls_back_to_dashboard(): void
+    {
+        // referer が無い場合（直接リクエスト等）でも flash.error を失わずダッシュボードへ戻る。
+        $user = User::factory()->create(['role' => 'general']);
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
         $response = $this->actingAs($user)->delete("/engineers/{$engineer->id}");
 
-        // 設計書 DELETE #7：権限不足は 403 を素で投げず、前画面へ戻し flash.error を返す。
-        $response->assertRedirect();
+        $response->assertRedirect('/dashboard');
         $response->assertSessionHas('error', '削除権限がありません。');
         $this->assertDatabaseHas('engineers', ['id' => $engineer->id]);
     }

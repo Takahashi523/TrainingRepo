@@ -32,12 +32,24 @@ class MatchingControllerTest extends TestCase
     private function fakeEngine(array $matches): void
     {
         Http::fake([
-            '*/api/v1/matching/calculate' => Http::response([
-                'engineer_id' => 1,
-                'generated_at' => now()->toIso8601String(),
-                'matches' => $matches,
-            ], 200),
+            '*/api/v1/matching/calculate' => Http::response($this->engineBody($matches), 200),
         ]);
+    }
+
+    /**
+     * エンジン成功応答のボディ。再マッチング（#52）のテストでは1テスト内で2回エンジンを呼ぶため、
+     * Http::fakeSequence に応答を積むのに本文だけを組み立てられるようにしておく。
+     *
+     * @param  array<int, array<string, mixed>>  $matches
+     * @return array<string, mixed>
+     */
+    private function engineBody(array $matches): array
+    {
+        return [
+            'engineer_id' => 1,
+            'generated_at' => now()->toIso8601String(),
+            'matches' => $matches,
+        ];
     }
 
     private function match(int $projectId, int $score, string $rank): array
@@ -240,6 +252,135 @@ class MatchingControllerTest extends TestCase
     }
 
     // -------------------------------------------------------
+    // 再マッチング（#52：ヘッダーの明示操作による再実行）
+    // -------------------------------------------------------
+
+    public function test_rerun_without_preserve_flag_runs_engine_again(): void
+    {
+        // 再マッチングは専用フラグ・専用エンドポイントを持たない素の GET。preserve_matching_results が
+        // 無い限りサーバーは毎回エンジンを実行し、最新の結果で一覧を置き換える
+        // （リロード / ブラウザバックに頼らず最新化できることの土台）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $first = Project::factory()->create(['main_user_id' => $user->id]);
+        $second = Project::factory()->create(['main_user_id' => $user->id]);
+
+        Http::fakeSequence('*/api/v1/matching/calculate')
+            ->push($this->engineBody([$this->match($first->id, 90, 'A')]), 200)
+            ->push($this->engineBody([$this->match($second->id, 70, 'B')]), 200);
+
+        $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->has('results', 1)
+                ->where('results.0.project.id', $first->id));
+
+        // 2回目（＝再マッチング）でもエンジンが呼ばれ、結果が差し替わる。
+        $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->has('results', 1)
+                ->where('results.0.project.id', $second->id));
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_rerun_reflects_latest_project_state(): void
+    {
+        // 他担当が案件を停止・削除した／別人材が追加した後でも、再マッチングで最新状態が反映される
+        // （掲載停止＝残して無効表示・ハード削除＝一覧から除外・追加済み＝追加ボタン無効化）。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $closing = Project::factory()->create(['main_user_id' => $user->id]);
+        $deleting = Project::factory()->create(['main_user_id' => $user->id]);
+        $adding = Project::factory()->create(['main_user_id' => $user->id]);
+        $filling = Project::factory()->create(['main_user_id' => $user->id]);
+
+        $matches = [
+            $this->match($closing->id, 92, 'A'),
+            $this->match($deleting->id, 80, 'B'),
+            $this->match($adding->id, 70, 'B'),
+            $this->match($filling->id, 60, 'C'),
+        ];
+        Http::fakeSequence('*/api/v1/matching/calculate')
+            ->push($this->engineBody($matches), 200)
+            ->push($this->engineBody($matches), 200);
+
+        $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->has('results', 4)
+                ->where('results.0.is_available', true)
+                ->where('results.2.is_in_pipeline', false)
+                ->where('results.3.is_project_full', false));
+
+        // 表示中に別ユーザーが行った操作を再現する。
+        $closing->update(['status' => 'closed']);
+        $deleting->delete();
+        Pipeline::factory()->create(['engineer_id' => $engineer->id, 'project_id' => $adding->id]);
+        // 別人材で $filling を上限（5件）まで埋める（上限到達も再実行で反映されること）。
+        Pipeline::factory()->count(Pipeline::MAX_PER_PROJECT)->create(['project_id' => $filling->id]);
+
+        $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->has('results', 3)
+                // 掲載停止は一覧に残したまま無効表示にする（黙って消さない）。
+                ->where('results.0.project.id', $closing->id)
+                ->where('results.0.is_available', false)
+                // ハード削除された案件は表示できないため一覧から落ちる。
+                ->where('results.1.project.id', $adding->id)
+                ->where('results.1.is_in_pipeline', true)
+                // 上限到達は「上限到達」表示＋追加無効化（サーバー enforce の先出し）。
+                ->where('results.2.project.id', $filling->id)
+                ->where('results.2.is_project_full', true));
+    }
+
+    public function test_rerun_after_add_back_runs_engine_again(): void
+    {
+        // 追加直後の back ではエンジンをスキップする（#4）が、その状態から再マッチングを押せば
+        // 今度は実行される。「自動再実行はしない」と「ボタンで最新化できる」が両立することを固定する。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $project = Project::factory()->create(['main_user_id' => $user->id]);
+        $this->fakeEngine([$this->match($project->id, 90, 'A')]);
+
+        // 追加直後の back：フラグありでエンジンを呼ばない。
+        $this->actingAs($user)
+            ->withSession(['preserve_matching_results' => true])
+            ->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->where('results', null));
+        Http::assertNothingSent();
+
+        // 続けて再マッチング：フラグは pull 済みで残らないため、今度はエンジンが実行される。
+        $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->has('results', 1)
+                ->where('results.0.project.id', $project->id));
+        Http::assertSentCount(1);
+    }
+
+    public function test_rerun_engine_failure_returns_null_results_instead_of_empty_array(): void
+    {
+        // 再マッチングでエンジンが落ちていたとき、results=[] を返すと「更新を押したら一覧が消えた」に
+        // なってしまう。null（＝置き換える中身が無い）を返してフロントに据え置きを指示し、失敗自体は
+        // flash.error で伝える（Silent Rejection にはしない）。
+        // ※ サーバーは前回の一覧を保持しない（ステートレス）。据え置きの実体はフロントの state であり、
+        //   ここで固定できるのは「据え置きを指示する応答を返すこと」まで。1回目の GET は、その指示が
+        //   意味を持つ前提（手元に一覧がある状態）を再現するために置いている。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+        $project = Project::factory()->create(['main_user_id' => $user->id]);
+
+        Http::fakeSequence('*/api/v1/matching/calculate')
+            ->push($this->engineBody([$this->match($project->id, 90, 'A')]), 200)
+            ->push(['error_code' => 'UPSTREAM_TIMEOUT'], 504);
+
+        // 1回目：通常どおり結果が表示される（＝据え置くべき一覧が手元にある状態）。
+        $this->actingAs($user)->get("/engineers/{$engineer->id}/matching")
+            ->assertInertia(fn ($page) => $page->has('results', 1));
+
+        // 2回目（再マッチング）：エンジン失敗。results は空配列ではなく null で返る。
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}/matching");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->where('results', null)
+            ->where('emptyReason', 'engine_error')
+            ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
+    }
+
+    // -------------------------------------------------------
     // 人材ステータスによる実行可否（設計書 §3.4）
     // -------------------------------------------------------
 
@@ -260,6 +401,52 @@ class MatchingControllerTest extends TestCase
         $response->assertRedirect('/engineers');
         $response->assertSessionHas('error', '提案不可の人材はマッチングを実行できません。');
         // AI エンジンは一度も呼ばれない（無駄な採点を防ぐ）。
+        Http::assertNothingSent();
+    }
+
+    public function test_not_proposable_engineer_on_rerun_is_redirected_to_engineer_detail(): void
+    {
+        // 表示中に別タブで提案不可へ変えられた人材で再マッチングを押したケース（#52）。
+        // 再マッチングは同じ URL への GET のため、back() のままだと戻り先が自分自身になり
+        // 同じガードで再び弾かれ続ける（リダイレクトの自己ループ）。人材詳細へ振り替えて断つ。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'status' => 'not_proposable',
+        ]);
+        Http::fake();
+
+        $matchingUrl = "/engineers/{$engineer->id}/matching";
+        $response = $this->actingAs($user)->from($matchingUrl)->get($matchingUrl);
+
+        // マッチング画面自身へは戻さない（戻すとループする）。
+        $response->assertRedirect("/engineers/{$engineer->id}");
+        $response->assertSessionHas('error', '提案不可の人材はマッチングを実行できません。');
+        Http::assertNothingSent();
+    }
+
+    public function test_rerun_loop_guard_matches_by_path_even_when_referer_host_and_scheme_differ(): void
+    {
+        // 上のテストは `from()`（= セッションの previous url）経由だが、本番で実際に使われるのは
+        // Referer ヘッダーである（`UrlGenerator::previous()` は Referer を優先し、Inertia リクエストは
+        // X-Requested-With を送るため StartSession が現在 URL をセッションに積まない）。
+        // ここでは Referer 経由・かつリバースプロキシ配下を模して「Referer と現在リクエストで
+        // スキーム・ホストが食い違う」状態を作り、パス比較でループを断てることを固定する
+        // （URL 文字列の比較に戻すと一致せず back() になり、自己ループが復活して落ちる）。
+        // 末尾スラッシュ付きの Referer も同じパスとして扱えること（previousPath の正規化）も併せて見る。
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'status' => 'not_proposable',
+        ]);
+        Http::fake();
+
+        $response = $this->actingAs($user)
+            ->withHeaders(['referer' => "http://internal-app:8000/engineers/{$engineer->id}/matching/"])
+            ->get("http://localhost/engineers/{$engineer->id}/matching");
+
+        $response->assertRedirect("/engineers/{$engineer->id}");
+        $response->assertSessionHas('error', '提案不可の人材はマッチングを実行できません。');
         Http::assertNothingSent();
     }
 
@@ -328,8 +515,10 @@ class MatchingControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSessionHas('error');
+        // results は空配列ではなく null（＝スコアを1件も取得できていない・既存表示の据え置き指示）。
+        // [] は「スコアリングは成立したが0件」の意味に限定する（#52）。
         $response->assertInertia(fn ($page) => $page->component('Matching/Show')
-            ->has('results', 0)
+            ->where('results', null)
             ->where('emptyReason', 'engine_error')
             ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
     }
@@ -351,7 +540,8 @@ class MatchingControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSessionHas('error');
-        $response->assertInertia(fn ($page) => $page->has('results', 0)
+        // 上と同じく、上流障害の results は null で返る（#52）。
+        $response->assertInertia(fn ($page) => $page->where('results', null)
             ->where('emptyReason', 'engine_error')
             ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
     }
@@ -371,7 +561,7 @@ class MatchingControllerTest extends TestCase
             ->where('emptyReason', 'no_match'));
     }
 
-    public function test_upstream_error_shows_flash_error_and_empty_results(): void
+    public function test_upstream_error_shows_flash_error_and_returns_null_results(): void
     {
         $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
@@ -382,8 +572,10 @@ class MatchingControllerTest extends TestCase
         $response->assertOk();
         $response->assertSessionHas('error');
         // #3：通信失敗 → emptyReason = engine_error（flash も併発）
+        // results は空配列ではなく null（＝一覧を置き換える中身が無い）。再マッチング時にフロントが
+        // 既存表示を据え置くための指示であり、[] を返すと押した結果として一覧が消えてしまう（#52）。
         // flash.error は Inertia の共有プロップとしても同一リクエストで渡ること（トースト表示の前提）
-        $response->assertInertia(fn ($page) => $page->has('results', 0)
+        $response->assertInertia(fn ($page) => $page->where('results', null)
             ->where('emptyReason', 'engine_error')
             ->where('flash.error', 'マッチングエンジンとの通信に失敗しました。時間をおいて再度お試しください。'));
     }
@@ -391,7 +583,7 @@ class MatchingControllerTest extends TestCase
     public function test_bare_404_without_error_code_is_treated_as_upstream_not_404(): void
     {
         // エンジン実体が未デプロイでパスが存在しない場合の裸の 404（error_code 無し）。
-        // 「人材が存在しない」404 と区別し、上流障害として空状態＋エラー表示にする（404 にしない）。
+        // 「人材が存在しない」404 と区別し、上流障害（results=null＋エラー表示）として扱う（404 にしない）。
         $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
         Http::fake(['*/api/v1/matching/calculate' => Http::response(['detail' => 'Not Found'], 404)]);
@@ -400,12 +592,12 @@ class MatchingControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSessionHas('error');
-        $response->assertInertia(fn ($page) => $page->has('results', 0));
+        $response->assertInertia(fn ($page) => $page->where('results', null));
     }
 
     public function test_connection_failure_is_treated_as_upstream(): void
     {
-        // エンジン未起動（接続拒否/タイムアウト）→ 上流障害として空状態＋エラー表示（404 にしない）。
+        // エンジン未起動（接続拒否/タイムアウト）→ 上流障害（results=null＋エラー表示）として扱う（404 にしない）。
         $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
         Http::fake(fn () => throw new ConnectionException('Connection refused'));
@@ -414,12 +606,14 @@ class MatchingControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSessionHas('error');
+        $response->assertInertia(fn ($page) => $page->where('results', null)
+            ->where('emptyReason', 'engine_error'));
     }
 
     public function test_malformed_engine_response_is_treated_as_upstream(): void
     {
         // 200 だが matches[] の必須キー（project_id）が欠落した不正応答。(int) キャストで 0 に潰して
-        // 突合で静かに脱落させず、上流障害として空状態＋flash.error にする（Silent Rejection 回避）。
+        // 突合で静かに脱落させず、上流障害（results=null＋flash.error）にする（Silent Rejection 回避）。
         $user = User::factory()->create();
         $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
         Http::fake(['*/api/v1/matching/calculate' => Http::response([
@@ -434,7 +628,7 @@ class MatchingControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSessionHas('error');
-        $response->assertInertia(fn ($page) => $page->has('results', 0)
+        $response->assertInertia(fn ($page) => $page->where('results', null)
             ->where('emptyReason', 'engine_error'));
     }
 
