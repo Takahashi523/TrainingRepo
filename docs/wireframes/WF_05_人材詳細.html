@@ -111,6 +111,8 @@
   .btn.btn-primary { background: #333; color: #fff; border-color: #333; }
   .btn.btn-ghost   { border-color: #bbb; color: #777; font-weight: 400; }
   .btn.btn-danger  { border-color: #c00; color: #c00; }
+  .btn.btn-sm      { height: 28px; padding: 0 10px; font-size: 11px; }
+  .btn.btn-sm[disabled] { opacity: .45; cursor: not-allowed; }
 
   .tbd-label {
     display: inline-flex; align-items: center;
@@ -206,6 +208,7 @@
   .ai-date { font-size: 11px; color: #bbb; }
 
   .ai-body { font-size: 12px; color: #333; line-height: 1.8; }
+  .ai-body.muted { color: #999; }
 
   .ai-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
@@ -216,6 +219,26 @@
   }
 
   .ai-hint { font-size: 10px; color: #bbb; margin-top: 10px; line-height: 1.5; }
+
+  /* issue #61：AI要約の状態バナー（失敗・陳腐化） */
+  .ai-status-banner {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 3px;
+    font-size: 11px; margin-bottom: 10px; line-height: 1.6;
+  }
+  .ai-status-banner.failed {
+    border: 1.5px solid #e0a0a0; background: #fdf2f2; color: #b02a2a;
+  }
+  .ai-status-banner.stale {
+    border: 1.5px solid #e0c98a; background: #fdf7e8; color: #8a6d1a;
+  }
+  .ai-status-icon { font-size: 12px; flex-shrink: 0; }
+
+  /* AIブロック下部：ヒント文＋再生成ボタンの行 */
+  .ai-block-footer {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 12px; margin-top: 10px;
+  }
 
   /* ===== セクションカード（C案：全セクションカード型） ===== */
   .section-card {
@@ -313,6 +336,10 @@
     border: 1.5px solid #bbb; border-radius: 3px;
     padding: 4px 10px; background: #fafafa; cursor: pointer;
   }
+
+  /* ===== 状態バリエーション例（説明用。実画面には同時表示されない） ===== */
+  .variation-caption { font-size: 10px; color: #aaa; margin: 20px 0 6px; }
+  .variation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 </style>
 </head>
 <body>
@@ -339,7 +366,7 @@
     <div class="sidebar-bottom">
       <div class="sidebar-footer">
         田中 営業（ログイン中）<br>
-        
+
       </div>
       <div class="nav-item logout"><span class="nav-icon">→</span><span>ログアウト</span></div>
     </div>
@@ -388,13 +415,18 @@
         </div>
       </div>
 
-      <!-- AI職務要約 -->
+      <!-- AI職務要約（issue #61：状態管理・再生成に対応） -->
       <div class="ai-block">
         <div class="ai-block-header">
           <span class="ai-badge">AI</span>
           <span class="ai-section-title">職務要約</span>
-          <span class="ai-date" style="margin-left:auto;">最終生成：2025-01-15</span>
+          <span class="ai-date" style="margin-left:auto;">最終生成：2026/08/07</span>
         </div>
+
+        <!-- issue #61：恒久的な失敗表示。一過性トーストだけでなく、後から画面を開いても分かるようにする。
+             ここでは「生成成功・要約表示中」を基本例として表示するため両バナーは非表示。
+             失敗／陳腐化それぞれの表示例は下部「状態バリエーション例」を参照。 -->
+
         <div class="ai-body">
           <strong>強み：</strong>Java・Spring Bootを中心とした金融系システムの開発経験が豊富。基本設計〜テストまで一貫して担当。チームリードの経験もあり、顧客折衝にも対応可能。
         </div>
@@ -407,7 +439,13 @@
           <span class="ai-tag">チームリード</span>
           <span class="ai-tag">顧客折衝</span>
         </div>
-        <div class="ai-hint">※ AIがアピールポイントをもとに自動生成した要約です。内容は参考情報としてご確認ください。</div>
+
+        <div class="ai-block-footer">
+          <div class="ai-hint" style="margin-top:0;">※ AIがアピールポイントをもとに自動生成した要約です。内容は参考情報としてご確認ください。</div>
+          <!-- issue #61 課題2：appeal_note の変更有無に依存しない明示的な再生成手段。
+               アピールポイントが未入力の人材はボタンを非活性にし、ホバーでその理由をツールチップ表示する。 -->
+          <button class="btn btn-sm" title="">🔄 再生成</button>
+        </div>
       </div>
 
       <!-- 基本情報 -->
@@ -537,6 +575,75 @@
         </div>
       </div>
 
+      <!-- issue #61：AI要約の状態バリエーション例（実画面では ai_summary_status に応じて1つだけ表示される） -->
+      <div class="variation-caption">── AI職務要約ブロックの状態バリエーション（実画面ではいずれか1つのみ表示）──</div>
+      <div class="variation-grid">
+
+        <!-- ① 生成失敗（ai_summary_status = failed） -->
+        <div class="ai-block" style="margin-bottom:0;">
+          <div class="ai-block-header">
+            <span class="ai-badge">AI</span>
+            <span class="ai-section-title">職務要約</span>
+            <span class="ai-date" style="margin-left:auto;">最終生成：2026/07/20</span>
+          </div>
+          <div class="ai-status-banner failed">
+            <span class="ai-status-icon">⚠</span>
+            AI要約の生成に失敗しました。「再生成」からもう一度お試しください。
+          </div>
+          <div class="ai-body">直近の生成成功時点の要約が残っていればそのまま表示（内容は直前の値のまま据え置き）。</div>
+          <div class="ai-block-footer">
+            <div class="ai-hint" style="margin-top:0;">※ 失敗時もアピールポイント等の保存自体は成功している（要約は付加情報のため）。</div>
+            <button class="btn btn-sm">🔄 再生成</button>
+          </div>
+        </div>
+
+        <!-- ② 陳腐化（is_ai_summary_stale = true。failed 中は失敗バナーを優先し二重表示しない） -->
+        <div class="ai-block" style="margin-bottom:0;">
+          <div class="ai-block-header">
+            <span class="ai-badge">AI</span>
+            <span class="ai-section-title">職務要約</span>
+            <span class="ai-date" style="margin-left:auto;">最終生成：2026/06/02</span>
+          </div>
+          <div class="ai-status-banner stale">
+            <span class="ai-status-icon">ⓘ</span>
+            アピールポイントの変更後、要約が更新されていません。内容が古い可能性があります。
+          </div>
+          <div class="ai-body">（アピールポイント変更前に生成された古い要約テキストがそのまま表示される）</div>
+          <div class="ai-block-footer">
+            <div class="ai-hint" style="margin-top:0;">※ 生成成功→appeal_note変更→再生成失敗、のケースで発生。「再生成」で解消可能。</div>
+            <button class="btn btn-sm">🔄 再生成</button>
+          </div>
+        </div>
+
+        <!-- ③ 空出力（ai_summary_status = empty。失敗ではなく正常応答だが要約対象なし） -->
+        <div class="ai-block" style="margin-bottom:0;">
+          <div class="ai-block-header">
+            <span class="ai-badge">AI</span>
+            <span class="ai-section-title">職務要約</span>
+            <span class="ai-date" style="margin-left:auto;">最終生成：2026/08/10</span>
+          </div>
+          <div class="ai-body muted">AIが要約可能な内容を検出できませんでした</div>
+          <div class="ai-block-footer">
+            <div class="ai-hint" style="margin-top:0;">※ 通信・処理は成功したがアピールポイントから要約すべき内容が無かった場合。失敗扱いにしない。</div>
+            <button class="btn btn-sm">🔄 再生成</button>
+          </div>
+        </div>
+
+        <!-- ④ 未生成（ai_summary_status = none。新規登録直後・appeal_note 未入力など） -->
+        <div class="ai-block" style="margin-bottom:0;">
+          <div class="ai-block-header">
+            <span class="ai-badge">AI</span>
+            <span class="ai-section-title">職務要約</span>
+            <!-- 未生成のため最終生成日時は非表示 -->
+          </div>
+          <div class="ai-body muted">AI要約は未生成です</div>
+          <div class="ai-block-footer">
+            <div class="ai-hint" style="margin-top:0;">※ アピールポイント未入力の場合、再生成ボタンは非活性＋ホバーで理由をツールチップ表示。</div>
+            <button class="btn btn-sm" disabled title="アピールポイントが未入力のため再生成できません">🔄 再生成</button>
+          </div>
+        </div>
+
+      </div>
 
     </div><!-- /detail-area -->
   </div><!-- /main-content -->
@@ -545,10 +652,20 @@
 <!-- ===== ANNOTATION ===== -->
 <div style="width:1440px;margin:24px auto 0;padding:0 24px 48px;">
   <div style="border:1.5px solid #ddd;border-radius:4px;padding:16px 20px;background:#fafafa;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_05_人材詳細（v2.0）</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#333;">📋 ワイヤーフレーム注記　WF_05_人材詳細（v2.1）</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v2.0 変更点（仕様変更適用）</div>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-bottom:4px;">✅ v2.1 変更点（issue #61 AI要約の状態管理 適用）</div>
+        <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
+          <li>AI職務要約ブロックに「再生成」ボタンを追加（右下・ヒント文と同じ行）。appeal_note の変更有無に依存せず、いつでも明示的に再生成できる</li>
+          <li>アピールポイントが未入力の人材は再生成ボタンを非活性にし、ホバー時にツールチップで理由を表示する（disabled 要素は Chromium 系でホバーイベントを受け取らないため、実装は外側要素に title を持たせて対応）</li>
+          <li>生成失敗（ai_summary_status = failed）の恒久バナーを追加：「AI要約の生成に失敗しました。「再生成」からもう一度お試しください。」。一過性のトーストだけでなく、後から詳細画面を開いても失敗状態が分かるようにする</li>
+          <li>陳腐化（is_ai_summary_stale）バナーを追加：「アピールポイントの変更後、要約が更新されていません。内容が古い可能性があります。」。appeal_note 変更後に再生成が失敗し、古い要約が残ってしまうケースの救済表示。failed 中は失敗バナーを優先し二重表示しない</li>
+          <li>空出力（ai_summary_status = empty）は失敗ではなく「AIが要約可能な内容を検出できませんでした」と案内（要約対象なしという正常応答のため）</li>
+          <li>未生成（ai_summary_status = none）は従来通り「AI要約は未生成です」のグレー表示</li>
+          <li>状態バリエーション（失敗／陳腐化／空／未生成）の表示例を詳細本体の下部に追加（実画面では ai_summary_status に応じていずれか1つのみ表示される）</li>
+        </ul>
+        <div style="font-size:11px;font-weight:700;color:#2a7a2a;margin-top:8px;margin-bottom:4px;">✅ v2.0 変更点（仕様変更適用）</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
           <li>職務経歴ファイルダウンロードリンク削除（アップロード機能廃止）</li>
           <li>AI職務要約ヒント文更新：「職務経歴書」→「アピールポイント」（<strong>【2026-08-07 訂正】</strong> 旧記述「プロフィール情報（スキル・工程経験・アピールポイント等）」は誤り。スコアリングロジック設計書/AIプロンプト設計書 §4.3・第2章のとおり、要約の入力源は appeal_note（アピールポイント）のみで、スキル・工程経験・案件側パラメータは要約に使用しない。上部の実表示ヒント文も「AIがアピールポイントをもとに…」で本項に一致）</li>
@@ -571,6 +688,7 @@
           <li>担当営業：担当＋サブの2名体制で表示（確定済み）</li>
           <li>削除ボタン：管理者のみ表示・物理削除（確定済み）</li>
           <li>AI職務要約：登録・編集の保存時に同期処理で自動生成（QA #47）。プロフィール項目参照に変更</li>
+          <li>【issue #61】AI要約は ai_summary_status（none/generated/failed/empty）で状態管理。失敗しても人材本体の保存は成功扱い（要約は付加情報）。手動の「再生成」・CSVインポート更新行での自動再トリガーの両方に対応</li>
         </ul>
         <div style="font-size:11px;font-weight:700;color:#555;margin-top:8px;margin-bottom:4px;">⚠️ レイアウト設計メモ</div>
         <ul style="font-size:11px;color:#555;line-height:1.8;padding-left:16px;">
@@ -581,6 +699,7 @@
             　未入力 → <strong>⏱ 未定</strong><br>
             　日付あり → <strong>⏱ YYYY/MM/DD〜</strong>（入力された日付をそのまま表示）
           </li>
+          <li>【issue #61】失敗バナーと陳腐化バナーは同時表示しない（failed の間は失敗バナーのみ）。再生成中は画面全体にAIローディングオーバーレイを表示し、キャンセル不可（保存を伴う処理のため）</li>
         </ul>
       </div>
     </div>
@@ -589,9 +708,15 @@
 
 <!--
   WF_05_人材詳細.html
-  バージョン: v1.1
-  更新日: 2026-04-30
+  バージョン: v2.1
+  更新日: 2026-08-28
   変更履歴:
+    v2.1 (2026-08-28)
+      - [issue #61] AI要約の状態管理・再生成ボタンをワイヤーフレームに反映
+        - AI職務要約ブロックに「再生成」ボタンを追加（appeal_note 未入力時は非活性＋ツールチップ）
+        - 生成失敗の恒久バナー、陳腐化（stale）バナーを追加
+        - 空出力（empty）と未生成（none）の文言を明確化
+        - 状態バリエーション例（失敗／陳腐化／空／未生成）を追加
     v1.1 (2026-04-30)
       - [QA #77] システム名を「Nexus（ネクサス）」に統一
       - [QA #76] サイドナビのロゴマーク削除・「Nexus」テキストのみ表示
