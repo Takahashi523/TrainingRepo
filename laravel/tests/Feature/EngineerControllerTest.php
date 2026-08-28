@@ -775,6 +775,193 @@ class EngineerControllerTest extends TestCase
     // show: GET /engineers/{id}
     // -------------------------------------------------------
 
+    // -------------------------------------------------------
+    // AI サマリ状態管理（issue #61）
+    // -------------------------------------------------------
+
+    public function test_ai_summary_status_is_generated_and_hash_set_when_engine_returns_text(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'engineer_id' => 1,
+                'ai_summary' => 'AI生成要約テキスト',
+                'ai_summary_generated_at' => '2026-08-07T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $this->actingAs($user)->post(
+            '/engineers',
+            $this->validPayload($user->id) + ['appeal_note' => 'アピールポイント']
+        );
+
+        $engineer = Engineer::where('name', '山田太郎')->first();
+        $this->assertSame('generated', $engineer->ai_summary_status);
+        $this->assertSame(hash('sha256', 'アピールポイント'), $engineer->ai_summary_source_hash);
+        $this->assertFalse($engineer->is_ai_summary_stale);
+    }
+
+    public function test_ai_summary_status_is_failed_when_engine_fails(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+
+        Http::fake(['*/api/v1/ai/profile-summary' => Http::response('gateway timeout', 504)]);
+
+        $this->actingAs($user)->post(
+            '/engineers',
+            $this->validPayload($user->id) + ['appeal_note' => 'アピールポイント']
+        );
+
+        $engineer = Engineer::where('name', '山田太郎')->first();
+        $this->assertSame('failed', $engineer->ai_summary_status);
+        $this->assertNull($engineer->ai_summary_source_hash);
+    }
+
+    public function test_ai_summary_status_is_empty_when_engine_returns_empty(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'engineer_id' => 1,
+                'ai_summary' => '',
+                'ai_summary_generated_at' => '2026-08-07T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $this->actingAs($user)->post(
+            '/engineers',
+            $this->validPayload($user->id) + ['appeal_note' => 'アピールポイント']
+        );
+
+        $engineer = Engineer::where('name', '山田太郎')->first();
+        $this->assertSame('empty', $engineer->ai_summary_status);
+        $this->assertNull($engineer->ai_summary);
+    }
+
+    public function test_update_clears_ai_summary_and_resets_status_to_none_when_appeal_note_cleared(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note' => '元のアピール',
+            'ai_summary' => '既存の要約',
+            'ai_summary_generated_at' => now(),
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '元のアピール'),
+        ]);
+
+        Http::fake();
+
+        $payload = array_merge($this->validPayload($user->id), ['appeal_note' => '']);
+        $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        Http::assertNothingSent();
+        $engineer = $engineer->fresh();
+        $this->assertNull($engineer->ai_summary);
+        $this->assertNull($engineer->ai_summary_generated_at);
+        $this->assertSame('none', $engineer->ai_summary_status);
+        $this->assertNull($engineer->ai_summary_source_hash);
+    }
+
+    public function test_regenerate_ai_summary_updates_status_and_hash_on_success(): void
+    {
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note' => '再生成対象のアピール',
+            'ai_summary_status' => 'failed',
+        ]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'engineer_id' => $engineer->id,
+                'ai_summary' => '再生成成功後の要約',
+                'ai_summary_generated_at' => '2026-08-10T09:00:00+09:00',
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->post("/engineers/{$engineer->id}/ai-summary/regenerate");
+
+        $response->assertRedirect(route('engineers.show', $engineer));
+        $response->assertSessionHas('success');
+        $response->assertSessionMissing('error');
+
+        $engineer = $engineer->fresh();
+        $this->assertSame('再生成成功後の要約', $engineer->ai_summary);
+        $this->assertSame('generated', $engineer->ai_summary_status);
+        $this->assertSame(hash('sha256', '再生成対象のアピール'), $engineer->ai_summary_source_hash);
+    }
+
+    public function test_regenerate_ai_summary_sets_failed_status_and_error_flash_on_failure(): void
+    {
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note' => '再生成対象のアピール',
+        ]);
+
+        Http::fake(['*/api/v1/ai/profile-summary' => Http::response('gateway timeout', 504)]);
+
+        $response = $this->actingAs($user)->post("/engineers/{$engineer->id}/ai-summary/regenerate");
+
+        $response->assertRedirect(route('engineers.show', $engineer));
+        $response->assertSessionHas('error');
+        $this->assertSame('failed', $engineer->fresh()->ai_summary_status);
+    }
+
+    public function test_regenerate_ai_summary_does_not_call_engine_when_appeal_note_is_blank(): void
+    {
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note' => null,
+        ]);
+
+        Http::fake();
+
+        $this->actingAs($user)->post("/engineers/{$engineer->id}/ai-summary/regenerate");
+
+        Http::assertNothingSent();
+        $this->assertSame('none', $engineer->fresh()->ai_summary_status);
+    }
+
+    public function test_show_props_report_stale_ai_summary_after_failed_regeneration_following_appeal_note_change(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'appeal_note' => '元のアピール',
+            'ai_summary' => '元のアピールに基づく要約',
+            'ai_summary_generated_at' => now(),
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '元のアピール'),
+        ]);
+
+        // appeal_note を変更して保存 → 再生成がトリガーされるが上流障害で失敗 → 古い要約が残ったまま stale になる。
+        Http::fake(['*/api/v1/ai/profile-summary' => Http::response('gateway timeout', 504)]);
+        $payload = array_merge($this->validPayload($user->id), ['appeal_note' => '変更後のアピール']);
+        $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response = $this->actingAs($user)->get("/engineers/{$engineer->id}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('engineer.ai_summary', '元のアピールに基づく要約')
+            ->where('engineer.ai_summary_status', 'failed')
+            ->where('engineer.is_ai_summary_stale', true)
+        );
+    }
+
+    // -------------------------------------------------------
+    // show: GET /engineers/{id}
+    // -------------------------------------------------------
+
     public function test_guest_is_redirected_to_login_from_show_page(): void
     {
         $engineer = Engineer::factory()->create();

@@ -239,6 +239,7 @@ Content-Disposition: attachment; filename="engineers_YYYYMMDD_HHmmss.csv"
 > 0件の場合もヘッダー行のみのCSVをレスポンスする（WF_11確定）。
 > **実装注意（TEXT除外不可）**：エクスポートはすべてのカラムを出力対象とするため、一覧表示時のTEXT除外ルールは適用しない。`appeal_note` / `ai_summary` / `remarks` も出力する。
 > **実装注意（ai_summary）**：`ai_summary` はエクスポートに含めるが、インポート時は無視する（上書き不可）。AI生成値のため手動更新は不可とする。
+> **実装注意（issue #61：インポート後のAI要約生成トリガー）**：`ai_summary` 自体はインポート時に無視するが、`appeal_note` が入っている人材でまだ生成を試みていない（`ai_summary_status = none`）ものについては、インポート成功後に `EngineerService::triggerAiSummaryForCsvImport()` が生成をトリガーする（同期・直列）。対象は**今回のインポートで書き込まれた行のみ**（`CsvImportService::write()` が返す `updated_ids` / `written_at` で限定）で、インポートと無関係な既存の未試行データは対象にならない（それらは各人材の詳細画面から個別に再生成する）。打ち切りは固定件数ではなく**経過時間ベース**：インポート処理開始時刻からの経過時間が `config('services.ai_summary.csv_trigger_budget_seconds')`（既定20秒）を超えたら以降は新規のAI呼び出しを行わない（CSV読込・検証・バッチ書き込み自体が最大十数秒を使う想定のため、書き込みに使った時間を差し引いた残り時間で判断する）。超過分はスキップして件数を `flash.error` で通知する（`importResult`＝`{resource, summary}` 自体の形は変わらない）。詳細はデータモデル・DB設計書 §1-10 参照。
 > **実装注意（担当者名列）**：`主担当名` / `サブ担当名`（`main_user.name` / `sub_user.name`）を参照用に出力する。担当者未設定（`sub_user_id` が null 等）の場合は空セルとする。N+1 回避のため `main_user` / `sub_user` は Eager Loading すること。インポート時はこの2列を無視する。
 > **実装注意（ファイル名）**：ダウンロードファイル名はサーバー側で生成する。例：`engineers_20260522_143022.csv`
 

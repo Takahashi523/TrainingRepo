@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\Csv\CsvExportService;
 use App\Services\Csv\CsvImportService;
+use App\Services\EngineerService;
 use App\Support\Csv\CsvSchema;
 use App\Support\Csv\EngineerCsvSchema;
 use App\Support\Csv\ProjectCsvSchema;
@@ -30,6 +31,7 @@ class CsvController extends Controller
     public function __construct(
         private readonly CsvImportService $importService,
         private readonly CsvExportService $exportService,
+        private readonly EngineerService $engineerService,
     ) {}
 
     /**
@@ -73,7 +75,30 @@ class CsvController extends Controller
     {
         Gate::authorize('access-csv');
 
-        return $this->handleImport($request, new EngineerCsvSchema);
+        // 生成トリガーの経過時間予算（issue #61 課題4）の起点。import() 自体（検証・バッチ書き込み）に
+        // 使った時間も含めて計測するため、import() 呼び出し前に取得する。
+        $importStartedAt = microtime(true);
+        $result = $this->importService->import($request->file('file'), new EngineerCsvSchema);
+
+        // 生成トリガーの全経路適用（issue #61 課題4）。対象は今回のインポートで書き込まれた行のみ
+        // （updated_ids / written_at で限定。テーブル全体はスイープしない）。importResult（フロント契約）
+        // には影響させず、超過分があれば別途 flash.error で通知する。
+        $trigger = $this->engineerService->triggerAiSummaryForCsvImport(
+            $result['updated_ids'],
+            $result['written_at'],
+            $importStartedAt,
+        );
+
+        $redirect = redirect()->route('csv.index')->with('importResult', $this->importResultPayload($result));
+
+        if ($trigger['skipped'] > 0) {
+            $redirect->with(
+                'error',
+                "AI要約の生成は{$trigger['triggered']}件実行しました。処理時間の上限に達したため、残り{$trigger['skipped']}件はスキップしました。対象の人材詳細画面から個別に再生成してください。"
+            );
+        }
+
+        return $redirect;
     }
 
     public function importProjects(CsvImportRequest $request): RedirectResponse
@@ -106,6 +131,22 @@ class CsvController extends Controller
     {
         $result = $this->importService->import($request->file('file'), $schema);
 
-        return redirect()->route('csv.index')->with('importResult', $result);
+        return redirect()->route('csv.index')->with('importResult', $this->importResultPayload($result));
+    }
+
+    /**
+     * フロント契約（resources/js/types/csv.ts の ImportResult）は { resource, summary } のみ。
+     * import() の戻り値には updated_ids / written_at など後続処理向けの補助情報も含まれるため、
+     * flash に載せる前にここで絞り込む。
+     *
+     * @param  array{resource: string, summary: array{total_rows: int, created: int, updated: int}, updated_ids: array<int, int>, written_at: \Illuminate\Support\Carbon}  $result
+     * @return array{resource: string, summary: array{total_rows: int, created: int, updated: int}}
+     */
+    private function importResultPayload(array $result): array
+    {
+        return [
+            'resource' => $result['resource'],
+            'summary' => $result['summary'],
+        ];
     }
 }
