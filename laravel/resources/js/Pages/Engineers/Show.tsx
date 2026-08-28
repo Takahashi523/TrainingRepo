@@ -263,22 +263,28 @@ export default function Show({ engineer }: Props) {
                             ※ AIがアピールポイントをもとに自動生成した要約です。内容は参考情報としてご確認ください。
                         </p>
                         {/* issue #61 課題2：appeal_note の変更有無に依存しない明示的な再生成手段。
-                            appeal_note が空の人材は生成対象がないため無効化する。 */}
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0"
-                            disabled={!engineer.appeal_note || isRegeneratingAiSummary}
+                            appeal_note が空の人材は生成対象がないため無効化する。
+                            disabled なボタンは Chromium 系ブラウザではホバー時のポインタイベントを
+                            受け取らず、ボタン自身に title を付けてもツールチップが表示されないため、
+                            外側の span 側で title を保持してホバー判定を行う（手動確認で判明）。 */}
+                        <span
+                            className="inline-block shrink-0"
                             title={
                                 !engineer.appeal_note
                                     ? 'アピールポイントが未入力のため再生成できません'
                                     : undefined
                             }
-                            onClick={handleRegenerateAiSummary}
                         >
-                            <RefreshCw className="mr-1.5 h-3 w-3" />
-                            再生成
-                        </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!engineer.appeal_note || isRegeneratingAiSummary}
+                                onClick={handleRegenerateAiSummary}
+                            >
+                                <RefreshCw className="mr-1.5 h-3 w-3" />
+                                再生成
+                            </Button>
+                        </span>
                     </div>
                 </div>
 

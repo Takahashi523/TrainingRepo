@@ -88,7 +88,7 @@ class CsvController extends Controller
 
         // 生成トリガーの全経路適用（issue #61 課題4）。対象は今回のインポートで書き込まれた行のみ
         // （updated_ids / written_at / maxIdBeforeImport で限定。テーブル全体はスイープしない）。
-        // importResult（フロント契約）には影響させず、超過分があれば別途 flash.error で通知する。
+        // importResult（フロント契約）には影響させず、超過分があれば別途 flash.aiSummarySkipped で通知する。
         $trigger = $this->engineerService->triggerAiSummaryForCsvImport(
             $result['updated_ids'],
             $result['written_at'],
@@ -99,10 +99,15 @@ class CsvController extends Controller
         $redirect = redirect()->route('csv.index')->with('importResult', $this->importResultPayload($result));
 
         if ($trigger['skipped'] > 0) {
-            $redirect->with(
-                'error',
-                "AI要約の生成は{$trigger['triggered']}件実行しました。処理時間の上限に達したため、残り{$trigger['skipped']}件はスキップしました。対象の人材詳細画面から個別に再生成してください。"
-            );
+            // 手動確認で発覚：flash.error は AuthenticatedLayout の全体トーストと、このセクション自身が
+            // 出す成功トースト（CsvImportSection::onSuccess）が同一レスポンスで同時に発火し、トースト実装が
+            // 1件しか同時表示しない（use-toast.ts の TOAST_LIMIT=1）ため、この警告だけが黙って
+            // 上書き消去されてしまっていた。トーストに頼らず、成功バナーと同じ「常設バナー」として
+            // 確実に表示されるよう、専用の flash キーに構造化データを載せる（文言の組み立てはフロント側）。
+            $redirect->with('aiSummarySkipped', [
+                'triggered' => $trigger['triggered'],
+                'skipped' => $trigger['skipped'],
+            ]);
         }
 
         return $redirect;

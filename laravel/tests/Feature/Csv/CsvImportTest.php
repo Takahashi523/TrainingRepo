@@ -150,6 +150,47 @@ class CsvImportTest extends CsvTestCase
         Http::assertNothingSent();
     }
 
+    public function test_engineer_import_retriggers_ai_summary_when_appeal_note_changes_on_update(): void
+    {
+        // 手動確認で発覚した不具合の回帰テスト：更新行に ai_summary_status='none' を課すと、
+        // 一度生成済み（generated 等）の行を CSV 経由で appeal_note ごと更新しても再生成されず、
+        // 陳腐化バナーだけが出て要約本文が古いまま取り残されてしまっていた。
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer([
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新前のアピール',
+            'ai_summary' => '更新前の要約',
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '更新前のアピール'),
+        ]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => '更新後の要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => $engineer->name,
+            'name_kana' => $engineer->name_kana,
+            'status' => 'proposable',
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新後のアピール',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // appeal_note が変わった更新行は、現在の ai_summary_status を問わず再生成される。
+        Http::assertSentCount(1);
+        $engineer->refresh();
+        $this->assertSame('generated', $engineer->ai_summary_status);
+        $this->assertSame('更新後の要約', $engineer->ai_summary);
+        $this->assertSame(hash('sha256', '更新後のアピール'), $engineer->ai_summary_source_hash);
+    }
+
     public function test_engineer_import_does_not_trigger_ai_summary_for_unrelated_existing_rows(): void
     {
         $user = $this->makeUser('admin');
@@ -238,9 +279,13 @@ class CsvImportTest extends CsvTestCase
         // 実際に生成された件数だけ HTTP 呼び出しが発生している（スキップ分は呼び出さない）。
         Http::assertSentCount($generatedCount);
 
-        // 超過分はスキップとして flash.error で通知する（importResult とは別チャンネル）。
+        // 超過分はスキップとして flash.aiSummarySkipped で通知する（importResult とは別チャンネル）。
+        // 手動確認で発覚した不具合の回帰テスト：以前は flash.error で通知していたが、成功トースト
+        // （CsvImportSection::onSuccess）と同時に発火し、トースト実装の TOAST_LIMIT=1 により
+        // 黙って上書き消去されてしまっていた。常設バナー用の構造化データとして通知する。
         $skipped = 5 - $generatedCount;
-        $response->assertSessionHas('error', fn ($message) => str_contains($message, "{$skipped}件"));
+        $response->assertSessionHas('aiSummarySkipped', fn ($value) => $value['triggered'] === $generatedCount
+            && $value['skipped'] === $skipped);
     }
 
     public function test_engineer_import_updates_existing_row_and_ignores_ai_summary(): void

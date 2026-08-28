@@ -100,8 +100,11 @@ class EngineerService
     }
 
     /**
-     * CSV インポート1回分（PR #58）に限定して、appeal_note が入った人材のうち AI 要約が未試行（none）
-     * のものへ生成をトリガーする（issue #61 課題4：生成トリガーの全経路適用）。
+     * CSV インポート1回分（PR #58）に限定して、appeal_note が入った人材へ生成をトリガーする
+     * （issue #61 課題4：生成トリガーの全経路適用）。新規行は AI 要約が未試行（none）のものが対象、
+     * 更新行は appeal_note が変わった可能性があるため現在の ai_summary_status を問わず対象にする
+     * （手動確認で発覚：更新行にも status=none を課すと、既に一度生成済みの行を CSV 経由で更新しても
+     * 再生成されず、陳腐化バナーだけが出て要約本文が古いまま取り残される不具合があった）。
      *
      * CsvImportService は upsert によるバッチ書き込みのため Eloquent イベントを通らない。そこで
      * CsvImportService::write() が返す「更新行の id 一覧」と「このバッチの created_at/updated_at 基準
@@ -140,24 +143,42 @@ class EngineerService
     public function triggerAiSummaryForCsvImport(array $updatedIds, Carbon $writtenAt, float $importStartedAt, int $maxIdBeforeImport): array
     {
         $pending = Engineer::query()
-            ->where('ai_summary_status', 'none')
             ->whereNotNull('appeal_note')
             ->where('appeal_note', '!=', '')
             ->where(function ($query) use ($updatedIds, $writtenAt, $maxIdBeforeImport): void {
-                // 新規行：created_at（このバッチの基準時刻）に加え、インポート前の最大 id を超える
+                // 新規行：ai_summary_status が未試行（none。バルク insert 直後の DB デフォルト）で
+                // あることに加え、created_at（このバッチの基準時刻）・インポート前の最大 id を超える
                 // ことも条件にする（同一秒に作成された無関係な既存行を誤って含めないため）。
                 $query->where(function ($newRowQuery) use ($writtenAt, $maxIdBeforeImport): void {
-                    $newRowQuery->where('created_at', $writtenAt->format('Y-m-d H:i:s'))
+                    $newRowQuery->where('ai_summary_status', 'none')
+                        ->where('created_at', $writtenAt->format('Y-m-d H:i:s'))
                         ->where('id', '>', $maxIdBeforeImport);
                 });
 
-                // 更新行：id が判明しているのでそのまま絞り込む。
+                // 更新行：id が判明しているのでそのまま絞り込む。appeal_note が変わった可能性がある
+                // ため、現在の ai_summary_status（generated/failed/empty のいずれでも）を問わない。
+                // ただし実際に appeal_note が変わったかどうかは SQL では判定せず、後段の filter() で
+                // ai_summary_source_hash と比較する（appeal_note 未変更の更新行を誤って再生成しないため。
+                // 手動確認 5-... で「generated 済み・内容未変更」の更新行が誤って再トリガーされる不具合が
+                // 見つかり修正した）。
                 if ($updatedIds !== []) {
                     $query->orWhereIn('id', $updatedIds);
                 }
             })
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->filter(function (Engineer $engineer) use ($updatedIds): bool {
+                if (! in_array($engineer->id, $updatedIds, true)) {
+                    // 新規行：上の WHERE 条件（ai_summary_status=none 等）で既に絞り込み済み。
+                    return true;
+                }
+
+                // 更新行：ai_summary_source_hash が未設定（一度も generated になっていない）か、
+                // 現在の appeal_note のハッシュと一致しない（＝内容が変わった）場合のみ対象にする。
+                return $engineer->ai_summary_source_hash === null
+                    || $engineer->ai_summary_source_hash !== hash('sha256', (string) $engineer->appeal_note);
+            })
+            ->values();
 
         $budgetSeconds = (float) config('services.ai_summary.csv_trigger_budget_seconds', 20);
         $triggered = 0;

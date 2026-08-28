@@ -42,6 +42,15 @@ export type ImportResult = {
     summary: ImportSummary;
 };
 
+/**
+ * 人材CSVインポートで AI要約の一括生成が時間予算超過により一部スキップされたときに
+ * flash.aiSummarySkipped へ載る値（issue #61 課題4）。人材のみ・skipped > 0 のときだけ存在する。
+ */
+export type AiSummarySkipped = {
+    triggered: number;
+    skipped: number;
+};
+
 /** GET /csv が返す画面 Props（CsvController@index）。 */
 export type CsvIndexPageProps = {
     engineer_filter_options: CsvFilterOptions;
