@@ -6,6 +6,7 @@ import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import Rate from '@/Components/Common/Rate';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
+import TruncatedText from '@/Components/Common/TruncatedText';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -147,22 +148,47 @@ export default function Show({ engineer }: Props) {
                     <div className="min-w-0 flex-1">
                         {/* ステータスは氏名の右に置く（マッチングサマリーと同じ構成）。 */}
                         <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-2xl font-bold text-foreground">{engineer.name}</p>
+                            {/* 氏名・カナ（各100文字）は1行省略し、省略時のみホバーで全文を出す。
+                                氏名が長くても隣のステータスバッジ（shrink-0）を押し出さない。 */}
+                            <TruncatedText
+                                as="p"
+                                text={engineer.name}
+                                className="min-w-0 text-2xl font-bold text-foreground"
+                            />
                             <StatusBadge status={engineer.status} className="shrink-0" />
                         </div>
-                        <p className="mt-0.5 text-xs">{engineer.name_kana}</p>
+                        <TruncatedText as="p" text={engineer.name_kana} className="mt-0.5 text-xs" />
                         {/* 属性メタ（型2）と担当／サブ（型3）を1つの流れに並べる。
                             担当・サブは同型の人名が並ぶため型3 のラベルを維持する。
                             サマリーなので値がある項目だけを出す（全項目は下部の項目表に出る）。 */}
-                        <MetaRow className="mt-2.5 text-xs">
+                        {/* サマリーのメタは1行に収める（nowrap）。はみ出し分は data-shrinkable を付けた
+                            可変長項目（最寄駅・路線／担当・サブ）だけが引き受け、年齢・稼働可能時期は縮まない。 */}
+                        <MetaRow nowrap className="mt-2.5 text-xs">
                             {engineer.age != null && (
                                 <MetaItem field="age">{engineer.age}歳</MetaItem>
                             )}
+                            {/* 駅名・路線名（各100文字）は個別に1行省略する。1本の文字列に連結すると
+                                駅名が長いだけで路線が丸ごと消えるため、片方が長くても他方が残るようにする
+                                （一覧カード・マッチング結果画面と同じ組み方）。
+                                サマリーなので値がある項目だけを出す方針は従来どおり。 */}
                             {(engineer.nearest_station || engineer.nearest_line) && (
-                                <MetaItem field="nearestStation">
-                                    {[engineer.nearest_station, engineer.nearest_line]
-                                        .filter(Boolean)
-                                        .join('（') + (engineer.nearest_line ? '）' : '')}
+                                // 上限は「メタ行を1行に収めるため」。flex-wrap は基準サイズで折り返しを
+                                // 先に決めるため、上限が無いと長い駅名が自分の行へ折り返してから縮む。
+                                // 詳細ヘッダは項目が4つ並ぶので行の半分（24rem）を上限にし、
+                                // 後続の稼働可能時期・担当が同じ行に残れるようにする。
+                                <MetaItem field="nearestStation" data-shrinkable>
+                                    {engineer.nearest_station && (
+                                        <TruncatedText
+                                            text={engineer.nearest_station}
+                                            className="min-w-0 max-w-fit flex-1"
+                                        />
+                                    )}
+                                    {engineer.nearest_line && (
+                                        <TruncatedText
+                                            text={`（${engineer.nearest_line}）`}
+                                            className="min-w-0 max-w-fit flex-1"
+                                        />
+                                    )}
                                 </MetaItem>
                             )}
                             {engineer.available_from && (
@@ -170,13 +196,25 @@ export default function Show({ engineer }: Props) {
                                     {engineer.available_label}
                                 </MetaItem>
                             )}
-                            {/* 担当・サブは同型の人名が並ぶため型3 のラベルを維持する。 */}
-                            <span>
-                                担当：{engineer.users.main.name}
+                            {/* 担当・サブは同型の人名が並ぶため型3 のラベルを維持する。
+                                氏名（最大255文字）だけを1行省略し、ラベル語と区切り「／」は shrink-0 で常時表示する
+                                （担当が長いだけで「サブ：」ごと消えるのを防ぐ）。
+                                氏名2つは flex-1 max-w-fit で「取り分は等分・使わない分は相手に返す」にする。
+                                既定の縮小は基準サイズに比例するため、担当だけが長いとサブが1文字まで潰れる。 */}
+                            <span data-shrinkable className="inline-flex min-w-0 items-baseline">
+                                <span className="shrink-0">担当：</span>
+                                <TruncatedText
+                                    text={engineer.users.main.name}
+                                    className="min-w-0 max-w-fit flex-1"
+                                />
                                 {engineer.users.sub && (
                                     <>
-                                        <span className="mx-1 text-border">／</span>
-                                        サブ：{engineer.users.sub.name}
+                                        <span className="mx-1 shrink-0 text-border">／</span>
+                                        <span className="shrink-0">サブ：</span>
+                                        <TruncatedText
+                                            text={engineer.users.sub.name}
+                                            className="min-w-0 max-w-fit flex-1"
+                                        />
                                     </>
                                 )}
                             </span>

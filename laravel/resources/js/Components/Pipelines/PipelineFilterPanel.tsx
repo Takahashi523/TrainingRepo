@@ -1,6 +1,10 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
 import SortSelect from '@/Components/Common/SortSelect';
+import TruncatedSelectValue, {
+    SELECT_CONTENT_MATCH_TRIGGER_CLASS,
+    TRUNCATED_SELECT_TRIGGER_CLASS,
+} from '@/Components/Common/TruncatedSelectValue';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import {
@@ -8,7 +12,6 @@ import {
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
 } from '@/Components/ui/select';
 import { ActiveFilters, RankOption, StatusOption, UserOption } from '@/types/pipeline';
 import { SortOption } from '@/types';
@@ -57,6 +60,15 @@ export default function PipelineFilterPanel({
     const statusLabel = (v: string) => statuses.find((s) => s.value === v)?.label ?? v;
     const userLabel = (v: number ) => users.find((u) => u.id === v)?.name ?? `ID:${v}`;
 
+    // トリガーに出す選択中ラベル。TruncatedSelectValue は SelectValue に children を渡す方式のため、
+    // 「いま何が選ばれているか」の解決は呼び出し側が持つ（Radix による ItemText 複製を止めるのが目的）。
+    const selectedUserLabel =
+        filters.user_id == null
+            ? '自担当（サブ含む）'
+            : filters.user_id === 'all'
+              ? '全担当（絞り込みなし）'
+              : userLabel(filters.user_id);
+
     const hasAnyFilter =
         filters.keyword.length > 0 ||
         filters.user_id != null ||
@@ -86,7 +98,8 @@ export default function PipelineFilterPanel({
                 <label className="flex items-center gap-1.5">
                     <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">担当営業</span>
                     {/* 氏名は最大255文字になり得るため w-[220px] 固定でトリガーの伸長を抑える（レビュー指摘 #9）。
-                        長い氏名はトリガー内で line-clamp-1（shadcn 既定）により省略表示される。 */}
+                        省略は shadcn 既定の line-clamp-1 ではなく TruncatedSelectValue に任せる
+                        （clamp では省略された氏名を確認する手段が無いため。#40） */}
                     <Select
                         value={filters.user_id == null ? 'mine' : String(filters.user_id)}
                         onValueChange={(v) =>
@@ -95,12 +108,17 @@ export default function PipelineFilterPanel({
                             })
                         }
                     >
-                        <SelectTrigger className="h-8 w-[220px] bg-white text-xs">
-                            <SelectValue />
+                        <SelectTrigger
+                            className={`h-8 w-[220px] bg-white text-xs ${TRUNCATED_SELECT_TRIGGER_CLASS}`}
+                        >
+                            <TruncatedSelectValue label={selectedUserLabel} />
                         </SelectTrigger>
-                        {/* 氏名は最大255文字になり得るため、項目側も max-w＋truncate で
-                            ドロップダウンが横に突き抜けないよう制約する（レビュー指摘 #9） */}
-                        <SelectContent className="max-w-[260px]">
+                        {/* 氏名は最大255文字になり得るため、max-w でドロップダウンが横に突き抜けないよう
+                            制約する（レビュー指摘 #9）。項目は省略せず折り返して全文を見せる。
+                            幅の下限はトリガーに合わせる（max-w だけだとトリガーより狭くなり不揃いになる。#40） */}
+                        <SelectContent
+                            className={`max-w-[260px] ${SELECT_CONTENT_MATCH_TRIGGER_CLASS}`}
+                        >
                             <SelectItem value="mine" className="text-xs">
                                 自担当（サブ含む）
                             </SelectItem>

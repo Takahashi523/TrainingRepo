@@ -5,6 +5,7 @@ import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import StatusBadge, { STATUS_STYLES } from '@/Components/Common/StatusBadge';
 import SkillTag from '@/Components/Common/SkillTag';
+import TruncatedText from '@/Components/Common/TruncatedText';
 import UserAvatar from '@/Components/Common/UserAvatar';
 import { Button } from '@/Components/ui/button';
 import { emptyText } from '@/lib/emptyValue';
@@ -46,25 +47,53 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                 <div className="min-w-0 flex-1 p-4">
                     {/* 上段：氏名 + バッジ群 */}
                     <div className="flex flex-wrap items-start gap-3">
-                        <div className="min-w-0">
-                            <p className="text-base font-bold text-foreground">{engineer.name}</p>
+                        {/* flex-1：氏名を1行省略させるため、左ブロックが残り幅を占有し min-w-0 で縮めるようにする
+                            （これが無いと氏名が内容幅のまま伸び、省略が効かない）。マッチング結果カードと同じ組み方。 */}
+                        <div className="min-w-0 flex-1">
+                            {/* 氏名（最大100文字）は1行省略。省略が起きたときだけホバーで全文を出す。 */}
+                            <TruncatedText
+                                as="p"
+                                text={engineer.name}
+                                className="text-base font-bold text-foreground"
+                            />
                             {/* 見出し直下メタ（表示規約の型2）：ラベル語は出さず、項目名は sr-only で支援技術に渡す。
                                 値が無いときもセグメントごと消さず、項目名入りトークンで「未設定である」ことを見せる
                                 （消すと読み落としと区別できないため）。マッチングサマリーと同じ表現。 */}
-                            <MetaRow className="mt-0.5">
+                            {/* メタは1行に収める（nowrap）。はみ出し分は data-shrinkable を付けた
+                                最寄駅・路線だけが引き受け、年齢は縮まない。 */}
+                            <MetaRow nowrap className="mt-0.5">
                                 <MetaItem field="age" valueHasFieldName={engineer.age == null}>
                                     {engineer.age != null ? `${engineer.age}歳` : emptyText('age', true)}
                                 </MetaItem>
                                 {/* 最寄駅が入っていれば値が先頭に来るため sr-only の項目名は必要
                                     （路線だけ欠けている場合も「東京駅（路線未設定）」となり二重読みにならない）。 */}
+                                {/* 駅名・路線名（各100文字）は個別に1行省略する。1本の省略文字列にすると
+                                    駅名が長いだけで路線が丸ごと消えるため、片方が長くても他方が残るようにする
+                                    （マッチング結果画面と同じ組み方）。
+                                    固定の max-w は置かない。行の余りをこの項目が受け取り、足りなくなった
+                                    ぶんだけ縮む（data-shrinkable）ので、空きがある限り全文が出る。
+                                    駅と路線は flex-1 max-w-fit で「取り分は等分・使わない分は相手に返す」。
+                                    既定の縮小は基準サイズに比例するため、駅名だけが長いと路線が数文字まで潰れる。 */}
                                 <MetaItem
                                     field="nearestStation"
                                     valueHasFieldName={!engineer.nearest_station}
+                                    data-shrinkable
                                 >
-                                    {engineer.nearest_station || emptyText('nearestStation', true)}
-                                    {engineer.nearest_line
-                                        ? `（${engineer.nearest_line}）`
-                                        : `（${emptyText('nearestLine', true)}）`}
+                                    <TruncatedText
+                                        text={
+                                            engineer.nearest_station ||
+                                            emptyText('nearestStation', true)
+                                        }
+                                        className="min-w-0 max-w-fit flex-1"
+                                    />
+                                    <TruncatedText
+                                        text={
+                                            engineer.nearest_line
+                                                ? `（${engineer.nearest_line}）`
+                                                : `（${emptyText('nearestLine', true)}）`
+                                        }
+                                        className="min-w-0 max-w-fit flex-1"
+                                    />
                                 </MetaItem>
                             </MetaRow>
                         </div>
