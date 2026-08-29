@@ -10,6 +10,7 @@ import TruncatedText from '@/Components/Common/TruncatedText';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { emptyText } from '@/lib/emptyValue';
 import { EngineerShowPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -170,25 +171,32 @@ export default function Show({ engineer }: Props) {
                             {/* 駅名・路線名（各100文字）は個別に1行省略する。1本の文字列に連結すると
                                 駅名が長いだけで路線が丸ごと消えるため、片方が長くても他方が残るようにする
                                 （一覧カード・マッチング結果画面と同じ組み方）。
-                                サマリーなので値がある項目だけを出す方針は従来どおり。 */}
+                                両方空ならサマリーには出さないが、**片方だけ空のときは結合せず項目ごとに
+                                欠損トークンを描く**（UI表示規約 §3）。片側を単に省くと、路線だけの行が
+                                駅名の抜けた「（山手線）」になり、欠けている側が画面から読み取れなくなる。 */}
                             {(engineer.nearest_station || engineer.nearest_line) && (
-                                // 上限は「メタ行を1行に収めるため」。flex-wrap は基準サイズで折り返しを
-                                // 先に決めるため、上限が無いと長い駅名が自分の行へ折り返してから縮む。
-                                // 詳細ヘッダは項目が4つ並ぶので行の半分（24rem）を上限にし、
-                                // 後続の稼働可能時期・担当が同じ行に残れるようにする。
-                                <MetaItem field="nearestStation" data-shrinkable>
-                                    {engineer.nearest_station && (
-                                        <TruncatedText
-                                            text={engineer.nearest_station}
-                                            className="min-w-0 max-w-fit flex-1"
-                                        />
-                                    )}
-                                    {engineer.nearest_line && (
-                                        <TruncatedText
-                                            text={`（${engineer.nearest_line}）`}
-                                            className="min-w-0 max-w-fit flex-1"
-                                        />
-                                    )}
+                                <MetaItem
+                                    field="nearestStation"
+                                    // 駅名が空のときは値の先頭が欠損トークン「最寄駅未設定」＝項目名を含むため
+                                    // sr-only を出さない（「最寄駅：最寄駅未設定」の二重読みを防ぐ）。
+                                    valueHasFieldName={!engineer.nearest_station}
+                                    data-shrinkable
+                                >
+                                    <TruncatedText
+                                        text={
+                                            engineer.nearest_station ||
+                                            emptyText('nearestStation', true)
+                                        }
+                                        className="min-w-0 max-w-fit flex-1"
+                                    />
+                                    <TruncatedText
+                                        text={
+                                            engineer.nearest_line
+                                                ? `（${engineer.nearest_line}）`
+                                                : `（${emptyText('nearestLine', true)}）`
+                                        }
+                                        className="min-w-0 max-w-fit flex-1"
+                                    />
                                 </MetaItem>
                             )}
                             {engineer.available_from && (
@@ -201,7 +209,17 @@ export default function Show({ engineer }: Props) {
                                 （担当が長いだけで「サブ：」ごと消えるのを防ぐ）。
                                 氏名2つは flex-1 max-w-fit で「取り分は等分・使わない分は相手に返す」にする。
                                 既定の縮小は基準サイズに比例するため、担当だけが長いとサブが1文字まで潰れる。 */}
-                            <span data-shrinkable className="inline-flex min-w-0 items-baseline">
+                            {/* ラベル語を可視で持つ型3 の項目だが、MetaItem を通すことで
+                                data-shrinkable が型で守られる（生の span に直接書くと綴り間違いが
+                                無言で「縮まない項目」に化け、行あふれとしてしか現れない）。
+                                sr-only は valueHasFieldName で抑止（可視の「担当：」と二重に読ませない）。
+                                gap-0：ラベルと氏名の間に MetaItem 既定の隙間を入れない。 */}
+                            <MetaItem
+                                field="mainUser"
+                                valueHasFieldName
+                                data-shrinkable
+                                className="gap-0"
+                            >
                                 <span className="shrink-0">担当：</span>
                                 <TruncatedText
                                     text={engineer.users.main.name}
@@ -217,7 +235,7 @@ export default function Show({ engineer }: Props) {
                                         />
                                     </>
                                 )}
-                            </span>
+                            </MetaItem>
                         </MetaRow>
 
                     </div>

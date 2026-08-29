@@ -157,7 +157,17 @@ export default function Show({ project }: Props) {
                             （担当が長いだけで「サブ：」ごと消えるのを防ぐ）。人材詳細と同じ組み方。
                             氏名2つは flex-1 max-w-fit で「取り分は等分・使わない分は相手に返す」にする。
                             既定の縮小は基準サイズに比例するため、担当だけが長いとサブが1文字まで潰れる。 */}
-                        <span data-shrinkable className="inline-flex min-w-0 items-baseline">
+                        {/* ラベル語を可視で持つ型3 の項目だが、MetaItem を通すことで
+                            data-shrinkable が型で守られる（生の span に直接書くと綴り間違いが
+                            無言で「縮まない項目」に化け、行あふれとしてしか現れない）。
+                            sr-only は valueHasFieldName で抑止（可視の「担当：」と二重に読ませない）。
+                            gap-0：ラベルと氏名の間に MetaItem 既定の隙間を入れない。 */}
+                        <MetaItem
+                            field="mainUser"
+                            valueHasFieldName
+                            data-shrinkable
+                            className="gap-0"
+                        >
                             <span className="shrink-0">担当：</span>
                             <TruncatedText
                                 text={project.users.main.name}
@@ -173,7 +183,7 @@ export default function Show({ project }: Props) {
                                     />
                                 </>
                             )}
-                        </span>
+                        </MetaItem>
                     </MetaRow>
 
                 </div>

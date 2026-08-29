@@ -1,18 +1,12 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
 import SortSelect from '@/Components/Common/SortSelect';
-import TruncatedSelectValue, {
+import TruncatedSelectTrigger, {
     SELECT_CONTENT_MATCH_TRIGGER_CLASS,
-    TRUNCATED_SELECT_TRIGGER_CLASS,
-} from '@/Components/Common/TruncatedSelectValue';
+} from '@/Components/Common/TruncatedSelectTrigger';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-} from '@/Components/ui/select';
+import { Select, SelectContent, SelectItem } from '@/Components/ui/select';
 import { ActiveFilters, RankOption, StatusOption, UserOption } from '@/types/pipeline';
 import { SortOption } from '@/types';
 import { Search, X } from 'lucide-react';
@@ -60,7 +54,7 @@ export default function PipelineFilterPanel({
     const statusLabel = (v: string) => statuses.find((s) => s.value === v)?.label ?? v;
     const userLabel = (v: number ) => users.find((u) => u.id === v)?.name ?? `ID:${v}`;
 
-    // トリガーに出す選択中ラベル。TruncatedSelectValue は SelectValue に children を渡す方式のため、
+    // トリガーに出す選択中ラベル。TruncatedSelectTrigger は SelectValue に children を渡す方式のため、
     // 「いま何が選ばれているか」の解決は呼び出し側が持つ（Radix による ItemText 複製を止めるのが目的）。
     const selectedUserLabel =
         filters.user_id == null
@@ -98,7 +92,7 @@ export default function PipelineFilterPanel({
                 <label className="flex items-center gap-1.5">
                     <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">担当営業</span>
                     {/* 氏名は最大255文字になり得るため w-[220px] 固定でトリガーの伸長を抑える（レビュー指摘 #9）。
-                        省略は shadcn 既定の line-clamp-1 ではなく TruncatedSelectValue に任せる
+                        省略は shadcn 既定の line-clamp-1 ではなく TruncatedSelectTrigger に任せる
                         （clamp では省略された氏名を確認する手段が無いため。#40） */}
                     <Select
                         value={filters.user_id == null ? 'mine' : String(filters.user_id)}
@@ -108,11 +102,10 @@ export default function PipelineFilterPanel({
                             })
                         }
                     >
-                        <SelectTrigger
-                            className={`h-8 w-[220px] bg-white text-xs ${TRUNCATED_SELECT_TRIGGER_CLASS}`}
-                        >
-                            <TruncatedSelectValue label={selectedUserLabel} />
-                        </SelectTrigger>
+                        <TruncatedSelectTrigger
+                            className="h-8 w-[220px] bg-white text-xs"
+                            label={selectedUserLabel}
+                        />
                         {/* 氏名は最大255文字になり得るため、max-w でドロップダウンが横に突き抜けないよう
                             制約する（レビュー指摘 #9）。項目は省略せず折り返して全文を見せる。
                             幅の下限はトリガーに合わせる（max-w だけだとトリガーより狭くなり不揃いになる。#40） */}
