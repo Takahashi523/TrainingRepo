@@ -49,6 +49,20 @@ export default function MetaRow({ children, className, nowrap = false }: MetaRow
     // <MetaRow>担当：{name}</MetaRow> のような書き方が警告なしに空になるため使わない。
     const items = Children.toArray(children);
 
+    // nowrap の行に縮める項目が1つも無いと、折り返しという逃げ道を塞いだまま
+    // 固定長項目の合計が親幅を超えたときに行が横へあふれる（親に overflow の指定は無い）。
+    // 症状が「横あふれ」としてしか出ず data-shrinkable の付け忘れと結びつけにくいこと、
+    // 本リポジトリには JS のテスト基盤が無く契約を自動では守れないことから、開発時だけ警告する。
+    // 併せて注意：isShrinkable は Children.toArray の直接の子しか見ない。
+    // toArray は配列は平坦化するがフラグメントは平坦化しないため、<>...</> で包んだ
+    // MetaItem は data-shrinkable を付けていても「縮まない項目」として扱われる。
+    if (import.meta.env.DEV && nowrap && !items.some(isShrinkable)) {
+        console.warn(
+            'MetaRow: nowrap の行に data-shrinkable の項目がありません。' +
+                '可変長の項目（TruncatedText を持つもの）に data-shrinkable を付けてください（付けないと行が横あふれします）。',
+        );
+    }
+
     return (
         <div
             className={cn(

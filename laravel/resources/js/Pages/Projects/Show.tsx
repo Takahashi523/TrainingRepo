@@ -106,11 +106,16 @@ export default function Show({ project }: Props) {
                     {/* ステータスは案件名の右に置く（マッチングサマリー・人材詳細と同じ構成）。 */}
                     <div className="flex flex-wrap items-center gap-2">
                         {/* 案件名（最大255文字）は1行省略し、省略時のみホバーで全文を出す。
-                            案件名が長くても隣のステータスバッジ（shrink-0）を押し出さない。 */}
+                            flex-1（基準サイズ0）が必須：min-w-0 だけでは「折り返すか」の判定に使う
+                            基準サイズが max-content（truncate により全文1行分）のままなので、
+                            案件名が親幅を超えた時点で案件名が1行目を独占し、ステータスバッジが2行目へ落ちる。
+                            flex は基準サイズで折り返しを先に決め、縮小はその後に行うため。
+                            max-w-fit とセットで使う：flex-1 だけだと案件名が余白まで伸びて
+                            ステータスバッジが右端まで離れるので、内容幅以上には伸ばさない。人材詳細と同じ組み方。 */}
                         <TruncatedText
                             as="p"
                             text={project.name}
-                            className="min-w-0 text-2xl font-bold text-foreground"
+                            className="min-w-0 max-w-fit flex-1 text-2xl font-bold text-foreground"
                         />
                         <StatusBadge
                             status={project.status}

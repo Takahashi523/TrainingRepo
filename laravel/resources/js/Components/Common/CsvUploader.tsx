@@ -1,3 +1,4 @@
+import { TooltipBubble, useHoverTooltip } from '@/Components/Common/HoverTooltip';
 import InputError from '@/Components/InputError';
 import { cn } from '@/lib/utils';
 import { formatFileSize, sanitizeFileName } from '@/types/csv';
@@ -41,6 +42,13 @@ export default function CsvUploader({
     const inputRef = useRef<HTMLInputElement>(null);
     const [dragOver, setDragOver] = useState(false);
 
+    // ファイル名の全文（200文字まで）をホバーで出す。
+    // TruncatedText を使わないのは、ファイル名の省略が CSS の1行省略ではなく
+    // sanitizeFileName による中央省略（head…tail）で、拡張子を残すことに意味があるため。
+    // TruncatedText は scrollWidth > clientWidth でしか省略を検知できず、この中央省略を拾えない。
+    // ネイティブ title を使わない理由は HoverTooltip と同じ（遅延・見た目が OS 依存で揃わない）。
+    const fileNameTooltip = useHoverTooltip<HTMLSpanElement>({ delay: 150 });
+
     // file が null に戻ったら input の値もクリアし、「同じファイルを選び直す」で change が再発火するようにする。
     // （<input type="file"> は value を "" 以外に設定できないため、選択状態は file prop を SSOT にする）
     useEffect(() => {
@@ -65,10 +73,21 @@ export default function CsvUploader({
             <div>
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3.5 py-2 text-sm text-foreground">
                     <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    {/* サニタイズ済みのファイル名を JSX で描画（自動エスケープ）。長い名前は省略。 */}
-                    <span className="min-w-0 truncate font-semibold" title={sanitizeFileName(file.name, 200)}>
+                    {/* サニタイズ済みのファイル名を JSX で描画（自動エスケープ）。長い名前は省略し、
+                        全文はホバーのツールチップで確認できるようにする（省略したら全文手段を必ず添える）。 */}
+                    <span
+                        ref={fileNameTooltip.ref}
+                        className="min-w-0 truncate font-semibold"
+                        {...fileNameTooltip.triggerProps}
+                    >
                         {sanitizeFileName(file.name)}
                     </span>
+                    {fileNameTooltip.anchor && (
+                        <TooltipBubble
+                            text={sanitizeFileName(file.name, 200)}
+                            anchor={fileNameTooltip.anchor}
+                        />
+                    )}
                     <span className="shrink-0 text-xs text-muted-foreground">
                         （{formatFileSize(file.size)}）
                     </span>

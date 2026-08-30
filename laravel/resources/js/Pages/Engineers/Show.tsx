@@ -150,11 +150,17 @@ export default function Show({ engineer }: Props) {
                         {/* ステータスは氏名の右に置く（マッチングサマリーと同じ構成）。 */}
                         <div className="flex flex-wrap items-center gap-2">
                             {/* 氏名・カナ（各100文字）は1行省略し、省略時のみホバーで全文を出す。
-                                氏名が長くても隣のステータスバッジ（shrink-0）を押し出さない。 */}
+                                flex-1（基準サイズ0）が必須：min-w-0 だけでは「折り返すか」の判定に使う
+                                基準サイズが max-content（truncate により全文1行分）のままなので、
+                                氏名が親幅を超えた時点で氏名が1行目を独占し、ステータスバッジが2行目へ落ちる。
+                                flex は基準サイズで折り返しを先に決め、縮小はその後に行うため。
+                                max-w-fit とセットで使う：flex-1 だけだと氏名が余白まで伸びて
+                                ステータスバッジが右端まで離れるので、内容幅以上には伸ばさない
+                                （MetaRow の data-shrinkable 項目と同じ「flex-1 max-w-fit」の組み方）。 */}
                             <TruncatedText
                                 as="p"
                                 text={engineer.name}
-                                className="min-w-0 text-2xl font-bold text-foreground"
+                                className="min-w-0 max-w-fit flex-1 text-2xl font-bold text-foreground"
                             />
                             <StatusBadge status={engineer.status} className="shrink-0" />
                         </div>
@@ -181,6 +187,10 @@ export default function Show({ engineer }: Props) {
                                     // sr-only を出さない（「最寄駅：最寄駅未設定」の二重読みを防ぐ）。
                                     valueHasFieldName={!engineer.nearest_station}
                                     data-shrinkable
+                                    // gap-0：駅名と「（路線）」は1つの値の続きなので、MetaItem 既定の
+                                    // 隙間（gap-1）を入れない（「東京駅 （山手線）」と割れて見えるため）。
+                                    // 担当／サブのラベルと氏名と同じ扱い。
+                                    className="gap-0"
                                 >
                                     <TruncatedText
                                         text={

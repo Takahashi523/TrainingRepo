@@ -78,6 +78,9 @@ export default function EngineerCard({ engineer, onMatch }: Props) {
                                     field="nearestStation"
                                     valueHasFieldName={!engineer.nearest_station}
                                     data-shrinkable
+                                    // gap-0：駅名と「（路線）」は1つの値の続きなので、MetaItem 既定の
+                                    // 隙間（gap-1）を入れない（「東京駅 （山手線）」と割れて見えるため）。
+                                    className="gap-0"
                                 >
                                     <TruncatedText
                                         text={
