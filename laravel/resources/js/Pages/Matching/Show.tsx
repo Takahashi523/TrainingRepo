@@ -246,11 +246,15 @@ export default function Show({
                     {/* 上段：氏名 + ステータスバッジ（最重要属性なので氏名の直後に置き、同一性と状態をまとめて読ませる） */}
                     <div className="flex flex-wrap items-center gap-2">
                         {/* 氏名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（TruncatedText）。
-                            氏名・案件名は同じ行に他項目が無く極端に長くもならない想定のため、max-w は付けない。 */}
+                            固定の max-w は付けず flex-1 max-w-fit で当てる。min-w-0 だけでは
+                            「折り返すか」の判定に使う基準サイズが max-content（truncate により全文1行分）
+                            のままで、氏名が親幅を超えるとステータスバッジが2行目へ落ちるため。
+                            max-w-fit は flex-1 とセット：これが無いと氏名が余白まで伸びて
+                            ステータスバッジが右端まで離れる（人材詳細・案件詳細と同じ組み方）。 */}
                         <TruncatedText
                             as="p"
                             text={engineer.name}
-                            className="min-w-0 text-base font-bold text-foreground"
+                            className="min-w-0 max-w-fit flex-1 text-base font-bold text-foreground"
                         />
                         <StatusBadge status={engineer.status} className="shrink-0" />
                     </div>
@@ -266,7 +270,9 @@ export default function Show({
                         <MetaItem
                             field="nearestStation"
                             valueHasFieldName={!engineer.nearest_station}
-                            className="max-w-[18rem]"
+                            // gap-0：駅名と「（路線）」は1つの値の続きなので、MetaItem 既定の
+                            // 隙間（gap-1）を入れない（「東京駅 （山手線）」と割れて見えるため）。
+                            className="max-w-[18rem] gap-0"
                         >
                             <TruncatedText
                                 text={engineer.nearest_station || emptyText('nearestStation', true)}

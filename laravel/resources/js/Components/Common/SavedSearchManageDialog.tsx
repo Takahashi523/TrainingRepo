@@ -1,3 +1,4 @@
+import TruncatedText from "@/Components/Common/TruncatedText";
 import { Button } from "@/Components/ui/button";
 import {
     Dialog,
@@ -85,9 +86,13 @@ export default function SavedSearchManageDialog<
                                     key={item.id}
                                     className="flex items-center justify-between gap-2 border-b border-border/50 py-2 text-xs last:border-b-0"
                                 >
-                                    <span className="min-w-0 flex-1 truncate">
-                                        {item.name}
-                                    </span>
+                                    {/* 条件名（最大100文字）は行を壊さないよう1行省略する。
+                                        素の truncate だと省略された名前を確認する手段が無くなるため、
+                                        省略時のみホバーで全文を出す TruncatedText を使う。 */}
+                                    <TruncatedText
+                                        text={item.name}
+                                        className="min-w-0 flex-1"
+                                    />
                                     {confirmDeleteId === item.id ? (
                                         <div className="flex shrink-0 items-center gap-1.5">
                                             <span className="text-[11px] text-destructive">

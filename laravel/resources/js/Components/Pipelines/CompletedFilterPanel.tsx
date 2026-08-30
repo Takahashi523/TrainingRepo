@@ -1,15 +1,12 @@
 import ActiveTag from '@/Components/Common/ActiveTag';
 import DateInput from '@/Components/Common/DateInput';
 import MultiSelectDropdown, { MultiSelectOption } from '@/Components/Common/MultiSelectDropdown';
+import TruncatedSelectTrigger, {
+    SELECT_CONTENT_MATCH_TRIGGER_CLASS,
+} from '@/Components/Common/TruncatedSelectTrigger';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/Components/ui/select';
+import { Select, SelectContent, SelectItem } from '@/Components/ui/select';
 import { isValidYmd } from '@/lib/utils';
 import { CompletedFilters, StatusOption, UserOption } from '@/types/pipeline';
 import { usePage } from '@inertiajs/react';
@@ -109,6 +106,11 @@ export default function CompletedFilterPanel({
     const statusLabel = (v: string) => statuses.find((s) => s.value === v)?.label ?? v;
     const userLabel = (id: number) => users.find((u) => u.id === id)?.name ?? `ID:${id}`;
 
+    // トリガーに出す選択中ラベル。TruncatedSelectTrigger は SelectValue に children を渡す方式のため、
+    // 「いま何が選ばれているか」の解決は呼び出し側が持つ（Radix による ItemText 複製を止めるのが目的）。
+    const selectedUserLabel =
+        filters.user_id == null ? '全担当（絞り込みなし）' : userLabel(filters.user_id);
+
     // 実際にサーバーへ適用されている条件があるか。タグ・「適用中の条件はありません」・
     // 「すべてクリア」の表示判定に使う。
     // 反映されていない入力は「すべてクリア」ではなくメッセージ横の「この日付をクリア」で
@@ -150,17 +152,25 @@ export default function CompletedFilterPanel({
                             onFilterChange({ user_id: v === 'all' ? null : Number(v) })
                         }
                     >
-                        <SelectTrigger className="h-8 w-[200px] bg-white text-xs">
-                            <SelectValue />
-                        </SelectTrigger>
-                        {/* 氏名は最大255文字になり得るため max-w＋truncate で突き抜けを防止（レビュー指摘 #9） */}
-                        <SelectContent className="max-w-[260px]">
+                        {/* 選択中の氏名の省略は TruncatedSelectTrigger に任せる（shadcn 既定の
+                            line-clamp-1 では省略された氏名を確認する手段が無いため。#40） */}
+                        <TruncatedSelectTrigger
+                            className="h-8 w-[200px] bg-white text-xs"
+                            label={selectedUserLabel}
+                        />
+                        {/* 氏名は最大255文字になり得るため max-w で突き抜けを防止する（レビュー指摘 #9）。
+                            項目側は省略せず折り返して全文を見せる。開いている間だけの一時表示で、
+                            幅が広がっても他の操作要素を巻き込まないため（保存済み条件メニューと同じ判断。#40）。
+                            幅の下限はトリガーに合わせる（max-w だけだとトリガーより狭くなり不揃いになる）。 */}
+                        <SelectContent
+                            className={`max-w-[260px] ${SELECT_CONTENT_MATCH_TRIGGER_CLASS}`}
+                        >
                             <SelectItem value="all" className="text-xs">
                                 全担当（絞り込みなし）
                             </SelectItem>
                             {users.map((u) => (
                                 <SelectItem key={u.id} value={String(u.id)} className="text-xs">
-                                    <span className="block max-w-[210px] truncate">{u.name}</span>
+                                    {u.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>

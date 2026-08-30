@@ -5,6 +5,7 @@ import MetaRow, { MetaItem } from "@/Components/Common/MetaRow";
 import Rate from "@/Components/Common/Rate";
 import StatusBadge, { STATUS_STYLES } from "@/Components/Common/StatusBadge";
 import SkillTag from "@/Components/Common/SkillTag";
+import TruncatedText from "@/Components/Common/TruncatedText";
 import UserAvatar from "@/Components/Common/UserAvatar";
 import { Button } from "@/Components/ui/button";
 import { emptyText } from "@/lib/emptyValue";
@@ -58,22 +59,39 @@ export default function ProjectCard({ project }: Props) {
                 <div className="min-w-0 flex-1 p-4">
                     {/* 上段：案件名 + バッジ群 */}
                     <div className="flex flex-wrap items-start gap-3">
-                        <div className="min-w-0">
-                            <p className="break-words text-base font-bold text-foreground">
-                                {project.name}
-                            </p>
+                        {/* flex-1：案件名を1行省略させるため、左ブロックが残り幅を占有し min-w-0 で縮めるようにする
+                            （これが無いと案件名が内容幅のまま伸び、省略が効かない）。人材一覧カードと同じ組み方。 */}
+                        <div className="min-w-0 flex-1">
+                            {/* 案件名（最大255文字）は1行省略。省略が起きたときだけホバーで全文を出す
+                                （マッチング結果カードと同じ扱い）。 */}
+                            <TruncatedText
+                                as="p"
+                                text={project.name}
+                                className="text-base font-bold text-foreground"
+                            />
                             {/* 見出し直下メタ（表示規約の型2）：ラベル語は出さず、項目名は sr-only で支援技術に渡す。
                                 マッチング結果カード・マッチングサマリーと同じ表現に揃える。 */}
-                            <MetaRow className="mt-0.5">
+                            {/* メタは1行に収める（nowrap）。はみ出し分は data-shrinkable を付けた
+                                顧客名だけが引き受け、商流は縮まない。 */}
+                            <MetaRow nowrap className="mt-0.5">
                                 {/* 顧客名は nullable かつ空文字もあり得るため || で falsy を一括判定する
                                     （?? だと空文字が素通りしてセグメントが空になり、区切りだけが残る）。
                                     他画面（MatchCard / Pipelines/Completed / Projects/Show）と同じ判定に揃える。 */}
                                 <MetaItem
                                     field="clientName"
                                     valueHasFieldName={!project.client_name}
+                                    data-shrinkable
                                 >
-                                    {project.client_name ||
-                                        emptyText("clientName", true)}
+                                    {/* 顧客名（最大100文字）は1行省略＋省略時のみホバー全文。
+                                        固定の max-w は置かない。行の余りをこの項目が受け取り、
+                                        足りなくなったぶんだけ縮むので、空きがある限り全文が出る。 */}
+                                    <TruncatedText
+                                        text={
+                                            project.client_name ||
+                                            emptyText("clientName", true)
+                                        }
+                                        className="min-w-0 max-w-fit flex-1"
+                                    />
                                 </MetaItem>
                                 <MetaItem
                                     field="commercialFlow"

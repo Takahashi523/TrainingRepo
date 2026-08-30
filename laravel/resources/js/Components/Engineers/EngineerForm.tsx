@@ -2,6 +2,9 @@ import DateInput from '@/Components/Common/DateInput';
 import NumberInput from '@/Components/Common/NumberInput';
 import ProcessCheckboxGroup from '@/Components/Common/ProcessCheckboxGroup';
 import SkillInput from '@/Components/Common/SkillInput';
+import TruncatedSelectTrigger, {
+    SELECT_CONTENT_MATCH_TRIGGER_CLASS,
+} from '@/Components/Common/TruncatedSelectTrigger';
 import WorkStyleCheckboxGroup from '@/Components/Engineers/WorkStyleCheckboxGroup';
 import { Input } from '@/Components/ui/input';
 import {
@@ -109,6 +112,14 @@ export default function EngineerForm({
     users,
 }: Props) {
     const { data, setData, errors } = form;
+
+    // 担当・サブのトリガーに出す選択中ラベル。TruncatedSelectTrigger は SelectValue に children を
+    // 渡す方式のため、値→氏名の解決は呼び出し側が持つ（Radix による ItemText 複製を止めるのが目的）。
+    // 値が入っているのに一致する選択肢が無い場合は null（＝未選択の文言）にせず ID を出す。
+    // null にすると「画面は未選択・送信値は id」という表示と実体の食い違いになるため
+    // （進捗管理・CSV の担当営業フィルタと同じ ID フォールバック）。
+    const userName = (value: string) =>
+        value ? (users.find((u) => String(u.id) === value)?.name ?? `ID:${value}`) : null;
 
     const calculatedAge = useMemo(() => {
         if (!data.birth_date) return null;
@@ -398,10 +409,18 @@ export default function EngineerForm({
                             value={data.main_user_id}
                             onValueChange={(v) => setData('main_user_id', v)}
                         >
-                            <SelectTrigger className="w-40">
-                                <SelectValue placeholder="選択してください" />
-                            </SelectTrigger>
-                            <SelectContent>
+                            {/* 氏名は長くなり得るため、選択中の値を1行省略＋省略時のみホバー全文にする
+                                （shadcn 既定の line-clamp-1 では全文を確認する手段が無い。#40） */}
+                            <TruncatedSelectTrigger
+                                className="w-40"
+                                label={userName(data.main_user_id)}
+                                placeholder="選択してください"
+                            />
+                            {/* 氏名は長くなり得るため max-w で横の伸びを抑えつつ、下限はトリガー幅に合わせる。
+                                項目は省略せず折り返して全文を見せる（一時表示のメニューのため。#40） */}
+                            <SelectContent
+                                className={`max-w-md ${SELECT_CONTENT_MATCH_TRIGGER_CLASS}`}
+                            >
                                 {users.map((u) => (
                                     <SelectItem key={u.id} value={String(u.id)}>
                                         {u.name}
@@ -419,10 +438,14 @@ export default function EngineerForm({
                             value={data.sub_user_id || '__none__'}
                             onValueChange={(v) => setData('sub_user_id', v === '__none__' ? '' : v)}
                         >
-                            <SelectTrigger className="w-40">
-                                <SelectValue placeholder="（なし）" />
-                            </SelectTrigger>
-                            <SelectContent>
+                            <TruncatedSelectTrigger
+                                className="w-40"
+                                label={userName(data.sub_user_id)}
+                                placeholder="（なし）"
+                            />
+                            <SelectContent
+                                className={`max-w-md ${SELECT_CONTENT_MATCH_TRIGGER_CLASS}`}
+                            >
                                 <SelectItem value="__none__">（なし）</SelectItem>
                                 {users.map((u) => (
                                     <SelectItem key={u.id} value={String(u.id)}>
