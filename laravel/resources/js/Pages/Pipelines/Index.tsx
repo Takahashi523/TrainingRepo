@@ -8,13 +8,12 @@ import { Sheet, SheetContent } from '@/Components/ui/sheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { ActiveFilters, PipelineIndexPageProps } from '@/types/pipeline';
+import { useKeywordDebounce } from '@/hooks/use-keyword-debounce';
 import { Head, router } from '@inertiajs/react';
 import { ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 type Props = PageProps<PipelineIndexPageProps>;
-
-const KEYWORD_DEBOUNCE_MS = 300;
 
 type QueryPayload = {
     keyword?: string;
@@ -46,29 +45,15 @@ export default function Index({
     selectedPipeline,
     statusOptions,
 }: Props) {
-    const [keywordInput, setKeywordInput] = useState(filters.keyword);
+    // フリーワード入力（入力欄 state・props 追従・デバウンス）は共通フックに集約している。
+    // 「すべてクリア」と保留デバウンスの競合対策も含む（issue #38）。
+    const { keywordInput, setKeywordInput, applyKeyword } = useKeywordDebounce({
+        appliedKeyword: filters.keyword,
+        onDebounced: (keyword) => visit({ keyword }),
+    });
+
     // WF_10 準拠：表示条件バーは初期状態で畳んでおく（サマリーで現在の絞り込みは把握できる）
     const [filterOpen, setFilterOpen] = useState(false);
-
-    // 戻る/進む等で filters.keyword が変わったら入力欄を再同期
-    useEffect(() => {
-        setKeywordInput(filters.keyword);
-    }, [filters.keyword]);
-
-    // キーワードはデバウンスして visit
-    const isInitialKeywordSync = useRef(true);
-    useEffect(() => {
-        if (isInitialKeywordSync.current) {
-            isInitialKeywordSync.current = false;
-            return;
-        }
-        if (keywordInput === filters.keyword) return;
-        const timer = setTimeout(() => {
-            visit({ keyword: keywordInput });
-        }, KEYWORD_DEBOUNCE_MS);
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [keywordInput]);
 
     // 常に最新の filters を指す ref。
     // キーワードのデバウンス visit はタイマー設定時点の filters をクロージャに閉じ込めるため、
@@ -86,8 +71,20 @@ export default function Index({
         });
     };
 
+    // 条件タグの ✕ など、keyword を明示指定する patch は入力欄の値を合わせつつ保留デバウンスを無効化する。
+    // 無効化しないと、キーワードタグの ✕ が入力欄も空にするため（PipelineFilterPanel）、
+    // ✕ の visit の直後に保留タイマーが発火して同じ条件を二重に送る。
+    // 人材一覧・案件一覧の handleFilterChange と同じ形（issue #38）。
+    const handleFilterChange = (patch: Partial<ActiveFilters>) => {
+        if (patch.keyword !== undefined) {
+            applyKeyword(patch.keyword);
+        }
+        visit(patch);
+    };
+
     const handleClearAll = () => {
-        setKeywordInput('');
+        // 保留中のデバウンスを無効化し、クリアを下の visit 1回に集約する。
+        applyKeyword('');
         visit({ keyword: '', user_id: null, rank: [], status: [] });
     };
 
@@ -197,7 +194,7 @@ export default function Index({
                             sortOptions={sortOptions}
                             keywordInput={keywordInput}
                             onKeywordInput={setKeywordInput}
-                            onFilterChange={(patch) => visit(patch)}
+                            onFilterChange={handleFilterChange}
                             onClearAll={handleClearAll}
                         />
                     )}

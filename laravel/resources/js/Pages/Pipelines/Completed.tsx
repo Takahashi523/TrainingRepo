@@ -19,15 +19,16 @@ import { PageProps } from '@/types';
 import { CompletedFilters, PipelineCompletedPageProps } from '@/types/pipeline';
 import { emptyText } from '@/lib/emptyValue';
 import { isValidYmd } from '@/lib/utils';
+import { useDebouncedEffect } from '@/hooks/use-debounced-effect';
+import { KEYWORD_DEBOUNCE_MS, useKeywordDebounce } from '@/hooks/use-keyword-debounce';
 import { Head, router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type Props = PageProps<PipelineCompletedPageProps>;
 
-const KEYWORD_DEBOUNCE_MS = 300;
-/** 終了日欄も打鍵ごとに発火するため、キーワードと同じ間隔でまとめてから問い合わせる。 */
-const DATE_DEBOUNCE_MS = 300;
+/** 終了日欄も打鍵ごとに発火するため、キーワードと同じ間隔でまとめてから問い合わせる（片方だけ変わらないよう定数を共有する）。 */
+const DATE_DEBOUNCE_MS = KEYWORD_DEBOUNCE_MS;
 
 /**
  * 日付入力欄の生値を絞り込み条件へ変換する。
@@ -81,25 +82,12 @@ function formatEndedAt(value: string | null): string {
 
 export default function Completed({ pipelines, filters, users, statuses, sortOptions, auth }: Props) {
     const isAdmin = auth.user.role === 'admin';
-    const [keywordInput, setKeywordInput] = useState(filters.keyword);
-
-    useEffect(() => {
-        setKeywordInput(filters.keyword);
-    }, [filters.keyword]);
-
-    const isInitialKeywordSync = useRef(true);
-    useEffect(() => {
-        if (isInitialKeywordSync.current) {
-            isInitialKeywordSync.current = false;
-            return;
-        }
-        if (keywordInput === filters.keyword) return;
-        const timer = setTimeout(() => {
-            visit({ keyword: keywordInput }, 1);
-        }, KEYWORD_DEBOUNCE_MS);
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [keywordInput]);
+    // フリーワード入力（入力欄 state・props 追従・デバウンス）は共通フックに集約している。
+    // 「すべてクリア」と保留デバウンスの競合対策も含む（issue #38）。
+    const { keywordInput, setKeywordInput, applyKeyword } = useKeywordDebounce({
+        appliedKeyword: filters.keyword,
+        onDebounced: (keyword) => visit({ keyword }, 1),
+    });
 
     // 終了日範囲もキーワードと同じ「ローカル state で受けてからデバウンス」方式にする。
     // 加えて、日付は入力途中の値が意味を持たないため toFilterDate で完成値・空のみに絞る。
@@ -114,17 +102,15 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
         setEndedToInput(filters.ended_to ?? '');
     }, [filters.ended_to]);
 
-    const isInitialDateSync = useRef(true);
-    useEffect(() => {
-        if (isInitialDateSync.current) {
-            isInitialDateSync.current = false;
-            return;
-        }
-        const from = toFilterDate(endedFromInput);
-        const to = toFilterDate(endedToInput);
-        // 両方とも入力途中なら送るものが無い（422 も出さない）。
-        if (from === undefined && to === undefined) return;
-        const timer = setTimeout(() => {
+    // 日付もキーワードと同じ「抑止できるデバウンス」に載せる。
+    // 「すべてクリア」の即時 visit を保留タイマーが追い越すと、古い filters を基点に
+    // マージされて条件が復活するため（issue #38）。
+    const { suppressNextRun: suppressDateDebounce } = useDebouncedEffect(
+        () => {
+            const from = toFilterDate(endedFromInput);
+            const to = toFilterDate(endedToInput);
+            // 両方とも入力途中なら送るものが無い（422 も出さない）。
+            if (from === undefined && to === undefined) return;
             // 判定は発火時点の filtersRef で行う（条件タグの ✕ や「すべてクリア」が先に
             // visit を済ませている場合の重複リクエスト防止）。
             const applied = filtersRef.current;
@@ -141,10 +127,10 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
             }
             if (Object.keys(patch).length === 0) return;
             visit(patch, 1);
-        }, DATE_DEBOUNCE_MS);
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [endedFromInput, endedToInput]);
+        },
+        [endedFromInput, endedToInput],
+        DATE_DEBOUNCE_MS,
+    );
 
     // 常に最新の filters を指す ref（Index.tsx と同じ stale closure 対策）。
     // キーワードのデバウンス visit が古い filters を再適用し「すべてクリア」で条件が復活する競合を防ぐ。
@@ -160,11 +146,40 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
         });
     };
 
+    // 終了日欄の版 applyKeyword。入力欄の同期と保留デバウンスの無効化をここで一括して行い、
+    // 「これから deps が取る値」の予測と実際の setState を必ず同じ式から作る
+    // （予測だけを呼び出し側に書かせると、片方を直し忘れたとき抑止フラグが残って
+    // 次の1打鍵ぶんのデバウンスが無言で消える）。送信しない点も applyKeyword と同じ。
+    const applyEndedRange = (from: string, to: string) => {
+        suppressDateDebounce([from, to]);
+        setEndedFromInput(from);
+        setEndedToInput(to);
+    };
+
+    // 条件タグの ✕ など、keyword / 終了日を明示指定する patch は入力欄の値を合わせつつ
+    // 保留デバウンスを無効化する。無効化しないと、タグの ✕ が入力欄も空にするため
+    // （CompletedFilterPanel）、✕ の visit の直後に保留タイマーが発火して同じ条件を二重に送る。
+    // キーワード部分は人材一覧・案件一覧の handleFilterChange と同じ形（issue #38）。
+    const handleFilterChange = (patch: Partial<CompletedFilters>) => {
+        if (patch.keyword !== undefined) {
+            applyKeyword(patch.keyword);
+        }
+        // 終了日タグの ✕ もキーワードタグと同型（入力欄クリア＋ patch）なので同じ抑止を通す。
+        // patch に無い側は現在の入力途中の値を維持する（開始・終了は独立した条件のため）。
+        if (patch.ended_from !== undefined || patch.ended_to !== undefined) {
+            applyEndedRange(
+                patch.ended_from !== undefined ? (patch.ended_from ?? '') : endedFromInput,
+                patch.ended_to !== undefined ? (patch.ended_to ?? '') : endedToInput,
+            );
+        }
+        visit(patch, 1);
+    };
+
     const handleClearAll = () => {
-        setKeywordInput('');
+        // 保留中のデバウンス（キーワード・日付）を無効化し、クリアを下の visit 1回に集約する。
+        applyKeyword('');
         // 入力途中の値が残っていると props 追従では消えないため、明示的にクリアする。
-        setEndedFromInput('');
-        setEndedToInput('');
+        applyEndedRange('', '');
         visit({ keyword: '', status: [], user_id: null, ended_from: null, ended_to: null }, 1);
     };
 
@@ -222,7 +237,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                         onEndedFromInput={setEndedFromInput}
                         endedToInput={endedToInput}
                         onEndedToInput={setEndedToInput}
-                        onFilterChange={(patch) => visit(patch, 1)}
+                        onFilterChange={handleFilterChange}
                         onClearAll={handleClearAll}
                     />
                 </div>
