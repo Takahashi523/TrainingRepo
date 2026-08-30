@@ -7,7 +7,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/Components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
 import { ConditionValue, SavedSearchItem } from "@/types/savedSearch";
 import { router } from "@inertiajs/react";
 import { useEffect, useState } from "react";
@@ -28,7 +27,6 @@ export default function SavedSearchManageDialog<
 >({ open, savedSearches, onClose }: Props<TConditions>) {
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
-    const { toast } = useToast();
 
     // 1件でも削除処理中は、リスト内の削除系ボタンをすべて無効化する（他行の削除トリガーも含む）。
     // deletingId は同時に1件しか保持できないため、行ごとの一致判定だけで無効化すると、
@@ -44,6 +42,12 @@ export default function SavedSearchManageDialog<
     }, [open]);
 
     const handleDelete = (id: number) => {
+        // 権限不足時もサーバー側で前画面へのリダイレクト + flash.error に変換される
+        // （issue #94：人材一覧・案件一覧の削除ボタンと同方式）ため、成功扱いの遷移として
+        // 処理すればよく、ここで個別に onError トーストを出す必要はない。
+        // flash.error 自体は AuthenticatedLayout が全画面共通で拾って表示する。
+        // 通信断（サーバーに到達できない失敗）は useConnectionErrorToast()（exception 購読）で
+        // 通知される（#84）ため、ここでは購読しない。
         router.delete(`/saved-searches/${id}`, {
             preserveScroll: true,
             preserveState: true,
@@ -52,13 +56,6 @@ export default function SavedSearchManageDialog<
                 setDeletingId(null);
                 setConfirmDeleteId(null);
             },
-            // flash.error は成功レスポンス時のみ拾えるため、リクエスト失敗はここで明示的にトースト表示する
-            onError: () =>
-                toast({
-                    description: "検索条件の削除に失敗しました。時間をおいて再度お試しください。",
-                    variant: "destructive",
-                    duration: 5000,
-                }),
         });
     };
 
