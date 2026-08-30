@@ -230,9 +230,22 @@ class CsvImportService
             $this->fail($errors);
         }
 
+        $writeResult = $this->write($schema, $writable);
+
         return [
             'resource' => $schema->resourceKey(),
-            'summary' => $this->write($schema, $writable),
+            'summary' => [
+                'total_rows' => $writeResult['total_rows'],
+                'created' => $writeResult['created'],
+                'updated' => $writeResult['updated'],
+            ],
+            // 生成トリガーの全経路適用（issue #61）等、書き込み対象を後から特定したい呼び出し側向けの補助情報。
+            // 汎用（人材・案件で共有）であり AI 固有の概念はここに持ち込まない。
+            //   updated_ids  … 更新（id 指定）行の実 id 一覧。新規（id=null）行はここに含まれない。
+            //   written_at   … このバッチの created_at / updated_at に使われた基準時刻。新規行を
+            //                  `where('created_at', $writtenAt)` で絞り込むのに使う。
+            'updated_ids' => $writeResult['updated_ids'],
+            'written_at' => $writeResult['written_at'],
         ];
     }
 
@@ -248,7 +261,7 @@ class CsvImportService
      * `created_at` は更新列に含めない（既存行の作成日時を保持）。全項目上書き＝O-1 暫定許容。
      *
      * @param  array<int, array{id: ?string, assoc: array<string, mixed>}>  $writable
-     * @return array{total_rows: int, created: int, updated: int}
+     * @return array{total_rows: int, created: int, updated: int, updated_ids: array<int, int>, written_at: \Illuminate\Support\Carbon}
      */
     private function write(CsvSchema $schema, array $writable): array
     {
@@ -257,6 +270,7 @@ class CsvImportService
         $now = now();
 
         $rows = [];
+        $updatedIds = [];
         $created = 0;
         $updated = 0;
         $updateColumns = null;
@@ -268,7 +282,12 @@ class CsvImportService
             $rows[] = ['id' => $row['id'] === null ? null : (int) $row['id']]
                 + $attrs
                 + ['created_at' => $now, 'updated_at' => $now];
-            $row['id'] === null ? $created++ : $updated++;
+            if ($row['id'] === null) {
+                $created++;
+            } else {
+                $updated++;
+                $updatedIds[] = (int) $row['id'];
+            }
         }
 
         DB::transaction(function () use ($model, $rows, $updateColumns): void {
@@ -281,6 +300,8 @@ class CsvImportService
             'total_rows' => $created + $updated,
             'created' => $created,
             'updated' => $updated,
+            'updated_ids' => $updatedIds,
+            'written_at' => $now,
         ];
     }
 

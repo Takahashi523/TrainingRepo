@@ -21,8 +21,10 @@
 | 5 | GET | /engineers/{id}/edit | EngineerController@edit | 管理者 / 一般営業 | WF_04 |
 | 6 | PUT | /engineers/{id} | EngineerController@update | 管理者 / 一般営業 | WF_04 |
 | 7 | DELETE | /engineers/{id} | EngineerController@destroy | **管理者のみ** | WF_05 |
+| 8 | POST | /engineers/{id}/ai-summary/regenerate | EngineerController@regenerateAiSummary | 管理者 / 一般営業 | WF_05 |
 
 > **削除ルール（QA #37確定）**：管理者は物理削除（`DELETE /engineers/{id}`）。一般営業がステータスを変更したい場合は `PUT /engineers/{id}` で `status: "not_proposable"` を送信すること。
+> **#8 は issue #61 で追加**：AI要約の明示的な再生成（appeal_note の変更有無に依存しない失敗後のリカバリ手段）。DB設計書 §1-10 参照。
 
 ---
 
@@ -241,6 +243,12 @@
     "remarks": "string",                           // 特記事項
     "ai_summary": "string",                        // AI職務要約テキスト（未生成時はnull）
     "ai_summary_generated_at": "datetime(ISO8601)", // 最終生成日時（WF_05「最終生成：YYYY-MM-DD」表示用）
+    // 【issue #61 追加】AI要約の生成状態。none=未生成／generated=生成済み／failed=生成失敗／empty=要約対象なし
+    // （DB設計書 §6-9・Engineer::AI_SUMMARY_STATUSES がSSOT）。WF_05 で恒久的な失敗表示に使う。
+    "ai_summary_status": "string",
+    // 【issue #61 追加】表示中の ai_summary が現在の appeal_note に対応していない（陳腐化）かどうか。
+    // ai_summary_source_hash と現在の appeal_note のハッシュ比較で判定する派生値（DB設計書 §1-10）。
+    "is_ai_summary_stale": "bool",
     "updated_at": "datetime(ISO8601)"
   }
 }
@@ -322,6 +330,31 @@
 |---|---|
 | 成功時 | `/engineers` へリダイレクトし SharedProps の `flash.success` を返す |
 | 権限不足時 | 前画面へリダイレクトし SharedProps の `flash.error` を返す |
+| 対象データなし | 404 を返す |
+
+---
+
+### POST /engineers/{id}/ai-summary/regenerate（#8・issue #61）
+
+WF_05（人材詳細）からの明示的なAI要約再生成。`appeal_note` の変更有無に依存せず、いつでも呼び出せる
+（PUT /engineers/{id} の自動トリガーは appeal_note 変更時のみのため、失敗後に appeal_note を変えずに
+やり直す手段としてこのエンドポイントを設ける）。送信データなし。
+
+#### 挙動
+
+| 条件 | 動作 |
+|---|---|
+| appeal_note が空 | AI エンジンを呼ばず、`ai_summary_status` を `none` に据え置く（クリア済みなら実質変化なし） |
+| appeal_note があり、生成成功（空でない要約） | `ai_summary` / `ai_summary_generated_at` を更新し `ai_summary_status` を `generated`、`ai_summary_source_hash` を再計算 |
+| appeal_note があり、生成成功（空出力） | `ai_summary` を NULL にクリアし `ai_summary_status` を `empty` |
+| appeal_note があり、上流障害（接続不可・タイムアウト・4xx/5xx） | 本体データ・`ai_summary` は直前の値のまま据え置き、`ai_summary_status` のみ `failed` |
+
+#### レスポンス
+
+| 条件 | 動作 |
+|---|---|
+| 成功時（生成成功・空出力とも） | `/engineers/{id}` へリダイレクトし SharedProps の `flash.success` を返す |
+| 生成失敗時（上流障害） | `/engineers/{id}` へリダイレクトし SharedProps の `flash.error` を返す（「AI要約の生成に失敗しました。」） |
 | 対象データなし | 404 を返す |
 
 ---

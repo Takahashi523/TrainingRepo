@@ -25,6 +25,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('projects', ProjectController::class);
 
     Route::get('engineers/{engineer}/matching', [MatchingController::class, 'show'])->name('engineers.matching');
+    // AI要約の明示的な再生成（issue #61：失敗後のリカバリ手段）。appeal_note の変更有無に依存しない。
+    Route::post('engineers/{engineer}/ai-summary/regenerate', [EngineerController::class, 'regenerateAiSummary'])->name('engineers.ai-summary.regenerate');
 
     // パイプライン（進捗管理）。completed を {pipeline} より前に定義しルート衝突を避ける
     Route::get('pipelines', [PipelineController::class, 'index'])->name('pipelines.index');

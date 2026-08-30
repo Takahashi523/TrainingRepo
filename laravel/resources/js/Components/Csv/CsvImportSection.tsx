@@ -4,11 +4,12 @@ import CodeLegendPopover from '@/Components/Csv/CodeLegendPopover';
 import ImportResultBanner from '@/Components/Csv/ImportResultBanner';
 import ImportResultModal from '@/Components/Csv/ImportResultModal';
 import ImportSuccessBanner from '@/Components/Csv/ImportSuccessBanner';
+import AiSummarySkippedBanner from '@/Components/Csv/AiSummarySkippedBanner';
 import UserIdLegendPopover from '@/Components/Csv/UserIdLegendPopover';
 import { Button } from '@/Components/ui/button';
 import { Card } from '@/Components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { CsvResource, ImportError, ImportResult, ImportSummary } from '@/types/csv';
+import { AiSummarySkipped, CsvResource, ImportError, ImportResult, ImportSummary } from '@/types/csv';
 import { useForm } from '@inertiajs/react';
 import { Lightbulb, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -40,6 +41,16 @@ function readImportResult(props: unknown): ImportResult | null {
     const result = (flash as { importResult?: unknown }).importResult;
     if (typeof result !== 'object' || result === null) return null;
     return result as ImportResult;
+}
+
+/** flash から aiSummarySkipped を安全に取り出す（人材CSVのみ・skipped > 0 のときだけ存在）。 */
+function readAiSummarySkipped(props: unknown): AiSummarySkipped | null {
+    if (typeof props !== 'object' || props === null) return null;
+    const flash = (props as { flash?: unknown }).flash;
+    if (typeof flash !== 'object' || flash === null) return null;
+    const result = (flash as { aiSummarySkipped?: unknown }).aiSummarySkipped;
+    if (typeof result !== 'object' || result === null) return null;
+    return result as AiSummarySkipped;
 }
 
 /** errors バッグの値（string | string[]）から先頭の文字列を取り出す。 */
@@ -79,6 +90,9 @@ export default function CsvImportSection({
     const [errorResult, setErrorResult] = useState<ImportError[] | null>(null);
     // 成功サマリ（新規/更新件数）。一括書き込みは高影響のため、トーストに加えて欄に常設する。
     const [successResult, setSuccessResult] = useState<ImportSummary | null>(null);
+    // AI要約の一括生成が時間予算超過で一部スキップされたときの警告（人材CSVのみ）。トーストだと
+    // 成功トーストと競合して消えてしまうため（TOAST_LIMIT=1）、こちらも常設バナーで保持する。
+    const [aiSummarySkipped, setAiSummarySkipped] = useState<AiSummarySkipped | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     // ファイルレベルエラー（mime/サイズ/文字コード/行数超過）。アップロード欄直下に出す。
     const [fileError, setFileError] = useState<string | null>(null);
@@ -92,6 +106,7 @@ export default function CsvImportSection({
     const clearResult = () => {
         setErrorResult(null);
         setSuccessResult(null);
+        setAiSummarySkipped(null);
         setModalOpen(false);
         setFileError(null);
     };
@@ -134,6 +149,7 @@ export default function CsvImportSection({
             onStart: () => {
                 setFileError(null);
                 setSuccessResult(null);
+                setAiSummarySkipped(null);
             },
             onSuccess: (page) => {
                 const result = readImportResult(page.props);
@@ -149,6 +165,7 @@ export default function CsvImportSection({
                 setErrorResult(null);
                 setModalOpen(false);
                 setSuccessResult(summary ?? null);
+                setAiSummarySkipped(readAiSummarySkipped(page.props));
             },
             onError: (errors) => {
                 const importErrorsRaw = firstError(
@@ -230,6 +247,12 @@ export default function CsvImportSection({
                     {/* 成功サマリの常設バナー（トーストが消えても件数を確認できる／新ファイル選択・取消でクリア） */}
                     {successResult !== null && (
                         <ImportSuccessBanner summary={successResult} />
+                    )}
+
+                    {/* AI要約の一括生成が時間予算超過で一部スキップされたときの警告（人材CSVのみ）。
+                        トーストと違い成功トーストに上書きされず確実に残る（手動確認で発覚した不具合の修正）。 */}
+                    {aiSummarySkipped !== null && (
+                        <AiSummarySkippedBanner result={aiSummarySkipped} />
                     )}
 
                     {/* 実行ボタン行（WF_11 準拠：注記を左、実行ボタンを右寄せ・上罫線） */}

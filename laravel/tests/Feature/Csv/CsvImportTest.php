@@ -10,6 +10,7 @@ use App\Support\Csv\ProjectCsvSchema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use League\Csv\Writer;
 
 /**
@@ -68,6 +69,266 @@ class CsvImportTest extends CsvTestCase
 
         $this->assertDatabaseHas('engineers', ['name' => '新規一郎', 'work_style_onsite' => 1]);
         $this->assertDatabaseHas('engineers', ['name' => '新規二郎', 'desired_rate' => 80]);
+    }
+
+    // ------------------------------------------------------------------
+    // AI 要約生成トリガーの全経路適用（issue #61 課題4）
+    // ------------------------------------------------------------------
+
+    public function test_engineer_import_triggers_ai_summary_for_appeal_note_rows(): void
+    {
+        $user = $this->makeUser('admin');
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => 'CSV経由で生成された要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            [
+                'name' => 'CSV太郎', 'name_kana' => 'シーエスブイタロウ', 'status' => 'proposable',
+                'main_user_id' => $user->id, 'appeal_note' => 'CSV経由のアピール',
+            ],
+        ]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        $engineer = Engineer::where('name', 'CSV太郎')->first();
+        $this->assertNotNull($engineer);
+        $this->assertSame('generated', $engineer->ai_summary_status);
+        $this->assertSame('CSV経由で生成された要約', $engineer->ai_summary);
+        $this->assertSame(hash('sha256', 'CSV経由のアピール'), $engineer->ai_summary_source_hash);
+    }
+
+    public function test_engineer_import_does_not_call_ai_engine_when_appeal_note_absent(): void
+    {
+        $user = $this->makeUser('admin');
+
+        Http::fake();
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            ['name' => 'CSV次郎', 'name_kana' => 'シーエスブイジロウ', 'status' => 'proposable', 'main_user_id' => $user->id],
+        ]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        Http::assertNothingSent();
+        $this->assertSame('none', Engineer::where('name', 'CSV次郎')->first()->ai_summary_status);
+    }
+
+    public function test_engineer_import_does_not_retrigger_ai_summary_for_already_generated_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer([
+            'main_user_id' => $user->id,
+            'appeal_note' => '既存のアピール',
+            'ai_summary' => '既存の要約',
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '既存のアピール'),
+        ]);
+
+        Http::fake();
+
+        // ai_summary は import 対象外列（無視される）。appeal_note も変更しない更新行。
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => $engineer->name,
+            'name_kana' => $engineer->name_kana,
+            'status' => 'proposable',
+            'main_user_id' => $user->id,
+            'appeal_note' => '既存のアピール',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // ai_summary_status が既に generated（未試行ではない）の行は再スイープの対象にならない。
+        Http::assertNothingSent();
+    }
+
+    public function test_engineer_import_retriggers_ai_summary_when_appeal_note_changes_on_update(): void
+    {
+        // 手動確認で発覚した不具合の回帰テスト：更新行に ai_summary_status='none' を課すと、
+        // 一度生成済み（generated 等）の行を CSV 経由で appeal_note ごと更新しても再生成されず、
+        // 陳腐化バナーだけが出て要約本文が古いまま取り残されてしまっていた。
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer([
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新前のアピール',
+            'ai_summary' => '更新前の要約',
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '更新前のアピール'),
+        ]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => '更新後の要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => $engineer->name,
+            'name_kana' => $engineer->name_kana,
+            'status' => 'proposable',
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新後のアピール',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // appeal_note が変わった更新行は、現在の ai_summary_status を問わず再生成される。
+        Http::assertSentCount(1);
+        $engineer->refresh();
+        $this->assertSame('generated', $engineer->ai_summary_status);
+        $this->assertSame('更新後の要約', $engineer->ai_summary);
+        $this->assertSame(hash('sha256', '更新後のアピール'), $engineer->ai_summary_source_hash);
+    }
+
+    public function test_engineer_import_clears_ai_summary_when_appeal_note_becomes_blank_on_update(): void
+    {
+        // コードレビュー指摘の回帰テスト：通常の編集フロー（EngineerService::update()）は
+        // appeal_note を空欄に変更すると clearAiSummary() で ai_summary_status を none に戻すが、
+        // CSV経由の更新は upsert で直接書き込むためこのロジックを通らず、appeal_note を空欄に
+        // する更新であっても古い ai_summary が残ったまま（陳腐化バナー誤表示）になっていた。
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer([
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新前のアピール',
+            'ai_summary' => '更新前の要約',
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '更新前のアピール'),
+        ]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => '呼ばれてはいけない要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => $engineer->name,
+            'name_kana' => $engineer->name_kana,
+            'status' => 'proposable',
+            'main_user_id' => $user->id,
+            'appeal_note' => '',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // appeal_note が空欄になった更新行はAI要約を呼ばず、他の項目編集フローと同じくクリアされる。
+        Http::assertNothingSent();
+        $engineer->refresh();
+        $this->assertSame('none', $engineer->ai_summary_status);
+        $this->assertNull($engineer->ai_summary);
+        $this->assertNull($engineer->ai_summary_source_hash);
+        $this->assertNull($engineer->ai_summary_generated_at);
+    }
+
+    public function test_engineer_import_does_not_trigger_ai_summary_for_unrelated_existing_rows(): void
+    {
+        $user = $this->makeUser('admin');
+
+        // インポート対象外の既存人材（appeal_note あり・未試行）。100件中1件だけインポートしても
+        // 残り99件が巻き込まれないことの確認（issue #61 課題4：スコープを今回のインポート分に限定）。
+        $untouched = $this->engineer([
+            'main_user_id' => $user->id,
+            'name' => '無関係太郎',
+            'appeal_note' => 'インポート対象外の既存アピール',
+        ]);
+        // create() 直後の $untouched は ai_summary_status を明示的に渡していないため、DB側の
+        // DEFAULT('none') が反映されない（Eloquent は fresh()/refresh() しない限り DB 側の
+        // デフォルト値をモデルに取り込まない）。ここでは fresh() で実際の DB の値を確認する。
+        $this->assertSame('none', $untouched->fresh()->ai_summary_status);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => 'CSV経由で生成された要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            [
+                'name' => 'CSV太郎', 'name_kana' => 'シーエスブイタロウ', 'status' => 'proposable',
+                'main_user_id' => $user->id, 'appeal_note' => 'CSV経由のアピール',
+            ],
+        ]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // 今回インポートした行だけ生成される。
+        Http::assertSentCount(1);
+        $this->assertSame('generated', Engineer::where('name', 'CSV太郎')->first()->ai_summary_status);
+
+        // インポートと無関係な既存行は none のまま（都度スイープされない）。
+        $this->assertSame('none', $untouched->fresh()->ai_summary_status);
+    }
+
+    public function test_engineer_import_stops_ai_summary_generation_once_time_budget_is_exceeded(): void
+    {
+        $user = $this->makeUser('admin');
+
+        // 経過時間予算（issue #61 課題4）を500msにし、AI呼び出し1件ごとに150msの遅延を模擬する。
+        // 5件（150ms×5=750ms）は予算を必ず超えるため全件生成にはならず、CSVパース等の
+        // 基本オーバーヘッド（数ms〜数十ms程度）は500msに対して十分小さいため1件もスキップされない
+        // 事態にもならない。実時間で予算超過を再現するテストのため usleep を使うが、
+        // 150ms/500msという十分な余裕を持たせ、CI環境差によるジッターでの flaky 化を避ける。
+        config(['services.ai_summary.csv_trigger_budget_seconds' => 0.5]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => function () {
+                usleep(150_000);
+
+                return Http::response([
+                    'ai_summary' => 'CSV経由で生成された要約',
+                    'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+                ], 200);
+            },
+        ]);
+
+        $rows = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $rows[] = [
+                'name' => "CSV時間太郎{$i}", 'name_kana' => 'シーエスブイジカンタロウ', 'status' => 'proposable',
+                'main_user_id' => $user->id, 'appeal_note' => "予算確認用アピール{$i}",
+            ];
+        }
+        $csv = $this->buildCsv(new EngineerCsvSchema, $rows);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false);
+        $response->assertRedirect(route('csv.index'));
+
+        $generatedCount = Engineer::where('name_kana', 'シーエスブイジカンタロウ')
+            ->where('ai_summary_status', 'generated')->count();
+        $noneCount = Engineer::where('name_kana', 'シーエスブイジカンタロウ')
+            ->where('ai_summary_status', 'none')->count();
+
+        // 全件が生成されるわけでも、全件スキップされるわけでもない（予算内で打ち切られる）。
+        $this->assertGreaterThanOrEqual(1, $generatedCount);
+        $this->assertLessThan(5, $generatedCount);
+        $this->assertSame(5, $generatedCount + $noneCount);
+
+        // 実際に生成された件数だけ HTTP 呼び出しが発生している（スキップ分は呼び出さない）。
+        Http::assertSentCount($generatedCount);
+
+        // 超過分はスキップとして flash.aiSummarySkipped で通知する（importResult とは別チャンネル）。
+        // 手動確認で発覚した不具合の回帰テスト：以前は flash.error で通知していたが、成功トースト
+        // （CsvImportSection::onSuccess）と同時に発火し、トースト実装の TOAST_LIMIT=1 により
+        // 黙って上書き消去されてしまっていた。常設バナー用の構造化データとして通知する。
+        $skipped = 5 - $generatedCount;
+        $response->assertSessionHas('aiSummarySkipped', fn ($value) => $value['triggered'] === $generatedCount
+            && $value['skipped'] === $skipped);
     }
 
     public function test_engineer_import_updates_existing_row_and_ignores_ai_summary(): void

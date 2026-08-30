@@ -47,6 +47,12 @@ class HandleInertiaRequests extends Middleware
                 // 失敗（ファイル/行エラー）は flash では返さない（onSuccess 誤発火防止）＝422 の
                 // errors.importErrors（JSON 文字列）で返す。
                 'importResult' => fn () => session('importResult'),
+                // issue #61 課題4：CSVインポート経由のAI要約一括生成が時間予算超過で一部スキップ
+                // されたときの警告（{triggered, skipped}）。skipped > 0 のときのみ flash される。
+                // 【不具合修正】コントローラで session()->flash('aiSummarySkipped', ...) していたが、
+                // ここの 'flash' 配列にキーを追加し忘れておりフロントに渡っていなかった（画面上は
+                // 成功バナーのみでスキップ警告が一切出ない不具合として手動確認で発覚）。
+                'aiSummarySkipped' => fn () => session('aiSummarySkipped'),
             ],
         ];
     }

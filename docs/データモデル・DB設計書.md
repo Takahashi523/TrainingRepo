@@ -2,7 +2,7 @@
 
 **システム名：** Nexus  
 **作成日：** 2026-05-10  
-**最終更新：** 2026-08-05  
+**最終更新：** 2026-08-26  
 **作成者：** 岡大貴  
 **ステータス：** 基本設計中
 
@@ -119,6 +119,46 @@ WF_03（人材一覧）ではこれらの TEXT カラムは表示されない。
 - **詳細エンドポイント**（`GET /api/engineers/{id}`）：全カラムを返してよい。
 - 同様のルールを `projects` テーブルの `description TEXT` / `work_env TEXT` / `remarks TEXT` / `billing_range VARCHAR` にも適用する。
 
+### 1-10.【v1.8 新規】AI要約の状態管理（issue #61）
+
+`ai_summary`（有無）だけでは「未生成／生成失敗／AIが空出力を返した／appeal_note 変更後に未更新（陳腐化＝stale）」を区別できず、
+生成失敗時の恒久表示・失敗後の再生成・stale検知・CSVインポート経由の生成トリガー未対応、という課題があった（issue #61）。
+これを解消するため、`engineers` に以下の2カラムを追加する（→ §4 engineers・§6-9）。
+
+- **`ai_summary_status` ENUM**：直近の生成トリガーの結果（`none` / `generated` / `failed` / `empty`）を保持する。
+- **`ai_summary_source_hash` VARCHAR(64)**：`generated` 確定時点の `appeal_note` の SHA-256 ハッシュ。
+
+**stale（陳腐化）はカラムを持たず、都度算出する**：「現在の `appeal_note` のハッシュ」と `ai_summary_source_hash` が
+一致しない場合、表示中の `ai_summary` は古い `appeal_note` に基づく内容だと判定できる（`Engineer::isAiSummaryStale`
+アクセサ）。状態そのものに `stale` という値を持たせず、`failed`（直近の試行結果）と組み合わせて判定する2軸構成にすることで、
+「生成に失敗した」という事実と「表示内容が古い」という事実を別々に、かつ後から追加のマイグレーションなしで表現できる。
+
+**CSVインポート（PR #58）への適用方針**：CSVインポートは `upsert` によるバッチ書き込みのため、Eloquent イベントを
+通らない。`CsvImportService::write()` が「更新行の id 一覧（`updated_ids`）」と「このバッチの `created_at`/`updated_at`
+基準時刻（`written_at`）」を返し、`EngineerService::triggerAiSummaryForCsvImport($updatedIds, $writtenAt, $importStartedAt, $maxIdBeforeImport)`
+がこの2つ（＋ `$maxIdBeforeImport`）で対象を**今回のインポートで書き込まれた行だけ**に絞り込んだうえで、
+`appeal_note` はあるのに `ai_summary_status` が `none`（未試行）の行にのみ生成を試みる。テーブル全体を都度スイープ
+する方式ではないため、インポートと無関係な既存の未試行データが巻き込まれることはない（それらは各人材の詳細画面
+から個別に再生成する）。
+
+**新規行の特定に `created_at` だけでなく `id` の下限も併用する**：`created_at` は秒精度のため、無関係な既存行が
+たまたま同じ秒に作成されていた場合、`created_at` の一致だけでは誤って対象に含めてしまう（実際にテストで発生を
+確認した）。オートインクリメントの `id` はインポートで新規挿入された行が、それ以前に存在した行の `id` を超える
+性質を利用し、`CsvController` が `import()` 呼び出し前に取得した最大 `id`（`$maxIdBeforeImport`）より大きい、
+かつ `created_at` が一致する行だけを新規行とみなす。二重の条件にすることで、同一秒に無関係な行が作成されていても
+`id` 側で弾ける。
+
+**打ち切り方式は経過時間ベース（固定件数ではない）**：AI呼び出しは同期・直列（1件あたり最大30秒）で、キュー実行
+基盤（ワーカー）が現状の環境（`docker-compose.yml`）に無い。CSV読込・検証・バッチ書き込み自体で最大十数秒を
+使う想定（`08_CSV入出力_APIエンドポイント一覧.md` O-13）のため、PHPの `max_execution_time`（既定30秒。
+docker/php・nginx設定に上書きなし）に対する残り時間はインポートごとの書き込み時間次第で大きく変わる。固定件数の
+上限ではこの変動に対応できない（小規模インポートでは残り時間があるのに早く打ち切りすぎ、大規模インポートでは
+書き込みで時間を使い切った後もタイムアウトの危険が残ったまま同じ件数を回そうとしてしまう）ため、インポート処理
+開始時刻からの経過時間を都度計測し、`config('services.ai_summary.csv_trigger_budget_seconds')`（既定20秒＝30秒から
+フレームワークのオーバーヘッドや安全マージンとして10秒を差し引いた値）を超えたら以降は新規のAI呼び出しを行わず
+スキップする。超過分は件数のみ `flash.error` で通知する（`importResult` とは別チャンネル。flash.error の扱いは
+`バリデーション・エラー表示設計書.md` 参照）。
+
 -----
 
 ## 2. テーブル一覧
@@ -181,6 +221,8 @@ erDiagram
 | ステータス | status | ENUM | NOT NULL | | `proposable` | 提案可 / 面談中 / 提案不可。QA #69 確定。→ §6-1 |
 | AI職歴要約テキスト | ai_summary | TEXT | NULL | | NULL | `appeal_note` を入力元としてAI生成。再生成可能なためNULL許容。**一覧クエリでは取得しないこと（§1-9 参照）** |
 | **AI要約最終生成日時** | **ai_summary_generated_at** | **DATETIME** | **NULL** | | **NULL** | **【v1.7 追加】WF_05「最終生成：YYYY-MM-DD」表示対応。AI要約生成時のみ更新。updated_at と分離することで要約の鮮度を管理できる** |
+| **AI要約の生成状態** | **ai_summary_status** | **ENUM** | **NOT NULL** | | **`none`** | **【v1.8 追加】issue #61。未生成／生成成功／生成失敗／空出力を区別する。→ §6-9** |
+| **AI要約の生成元ハッシュ** | **ai_summary_source_hash** | **VARCHAR(64)** | **NULL** | | **NULL** | **【v1.8 追加】issue #61。`generated` 確定時点の appeal_note の SHA-256 ハッシュ。現在の appeal_note との不一致で stale（陳腐化）を判定する（→ §1-10）** |
 | メイン担当営業 | main_user_id | BIGINT UNSIGNED | NOT NULL | FK | なし（要指定） | → users.id。ON DELETE RESTRICT |
 | サブ担当営業 | sub_user_id | BIGINT UNSIGNED | NULL | FK | NULL | → users.id。ON DELETE SET NULL |
 | 要件定義経験 | proc_requirements | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
@@ -503,6 +545,15 @@ QA #78 にて固定確定。将来の追加なし。
 |---|---|---|
 | `required` | 必須スキル | AIマッチング入力パラメータ（必須スキル） |
 | `preferred` | 尚可スキル | AIマッチング入力パラメータ（尚可スキル） |
+
+### 6-9.【v1.8 新規】engineers.ai_summary_status（issue #61）
+
+| 値 | 意味 | 備考 |
+|---|---|---|
+| `none` | 未生成 | appeal_note が空、または一度も生成トリガーが発生していない（DEFAULT） |
+| `generated` | 生成成功 | ai_summary が最新の appeal_note に対応している。ai_summary_source_hash も同時に更新 |
+| `failed` | 生成失敗 | 直近の生成が上流障害（接続不可・タイムアウト・4xx/5xx）で失敗。ai_summary は直前の値のまま据え置く |
+| `empty` | 空出力（要約対象なし） | AI が空出力を返した。失敗ではないが ai_summary は NULL にクリアする |
 
 -----
 

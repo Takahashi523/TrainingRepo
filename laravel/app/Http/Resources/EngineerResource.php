@@ -51,6 +51,10 @@ class EngineerResource extends JsonResource
             'remarks' => $this->remarks,
             'ai_summary' => $this->ai_summary,
             'ai_summary_generated_at' => $this->ai_summary_generated_at,
+            // issue #61：状態管理。none/generated/failed/empty（Engineer::AI_SUMMARY_STATUSES）。
+            'ai_summary_status' => $this->ai_summary_status,
+            // 表示中の ai_summary が現在の appeal_note に対応していない（陳腐化）かどうか。
+            'is_ai_summary_stale' => $this->is_ai_summary_stale,
             'updated_at' => $this->updated_at,
             // 削除確認ダイアログの件数警告用。show() の loadCount('pipelines') で付与される。
             'pipelines_count' => (int) ($this->pipelines_count ?? 0),

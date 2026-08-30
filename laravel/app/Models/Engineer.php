@@ -56,10 +56,26 @@ class Engineer extends Model
         ['value' => 'not_proposable', 'label' => '提案不可'],
     ];
 
+    /**
+     * AI 要約（ai_summary）の生成状態の許容値（SSOT）。value => label。
+     * issue #61：未生成／生成済み／失敗／空出力（要約対象なし）を区別するための状態。
+     *   none      … 未生成（appeal_note が空、または一度も生成トリガーが発生していない）
+     *   generated … 直近の生成が成功し、ai_summary が最新の appeal_note に対応している
+     *   failed    … 直近の生成が上流障害で失敗した（ai_summary は直前の値のまま据え置き）
+     *   empty     … 直近の生成は実行されたが、AI が空出力（要約対象なし）を返した
+     */
+    public const AI_SUMMARY_STATUSES = [
+        ['value' => 'none',      'label' => '未生成'],
+        ['value' => 'generated', 'label' => '生成済み'],
+        ['value' => 'failed',    'label' => '生成失敗'],
+        ['value' => 'empty',     'label' => '要約対象なし'],
+    ];
+
     protected $fillable = [
         'name', 'name_kana', 'birth_date', 'nearest_station', 'nearest_line',
         'available_from', 'has_negotiation_exp', 'desired_rate', 'appeal_note',
         'remarks', 'status', 'ai_summary', 'ai_summary_generated_at',
+        'ai_summary_status', 'ai_summary_source_hash',
         'main_user_id', 'sub_user_id',
         'proc_requirements', 'proc_basic_design', 'proc_detail_design',
         'proc_development', 'proc_testing', 'proc_maintenance',
@@ -112,6 +128,23 @@ class Engineer extends Model
             get: fn (): string => $this->available_from
                 ? Carbon::parse($this->available_from)->format('Y/m/d').'〜'
                 : '未定',
+        );
+    }
+
+    /**
+     * 表示中の ai_summary が現在の appeal_note に対応していない（stale＝陳腐化）かどうか（issue #61）。
+     *
+     * ai_summary_source_hash（generated 確定時点の appeal_note のハッシュ）と、現在の appeal_note の
+     * ハッシュを比較する。ai_summary が無い、または一度も generated になっていない場合は対象外（false）。
+     * 典型例：初回生成成功 → appeal_note 変更 → 再生成失敗（failed）。この場合 ai_summary は書き換えられ
+     * ないため、古い appeal_note に基づく要約が新しい appeal_note と矛盾したまま残ってしまう。
+     */
+    protected function isAiSummaryStale(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): bool => $this->ai_summary !== null
+                && $this->ai_summary_source_hash !== null
+                && $this->ai_summary_source_hash !== hash('sha256', (string) $this->appeal_note),
         );
     }
 

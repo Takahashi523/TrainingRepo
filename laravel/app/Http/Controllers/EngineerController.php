@@ -213,6 +213,33 @@ class EngineerController extends Controller
     }
 
     /**
+     * AI 要約の明示的な再生成（issue #61 課題2）。
+     *
+     * appeal_note の変更有無に依存せず、詳細画面（WF_05）から任意のタイミングで呼べる。
+     * 失敗時も本体データには影響がないため、redirect 先は常に engineers.show（詳細画面）。
+     */
+    public function regenerateAiSummary(Engineer $engineer): RedirectResponse
+    {
+        $failed = $this->engineerService->regenerateAiSummary($engineer);
+
+        $redirect = redirect()->route('engineers.show', $engineer);
+
+        if ($failed) {
+            return $redirect->with('error', 'AI要約の生成に失敗しました。');
+        }
+
+        // issue #61 レビュー指摘：アピールポイントが空欄の場合、regenerateAiSummary() は実際には
+        // AI要約を「再生成」しておらず、clearAiSummary() で ai_summary_status を none に戻して
+        // いるだけ（$failed も false で返る）。そのまま「再生成しました」と表示すると実態と
+        // 合わないため、空欄時は専用の文言に分ける。
+        if (blank($engineer->appeal_note)) {
+            return $redirect->with('success', 'アピールポイントが未入力のため、AI要約をクリアしました。');
+        }
+
+        return $redirect->with('success', 'AI要約を再生成しました。');
+    }
+
+    /**
      * create / edit 画面が共通で使うフォーム関連 Props を組み立てる
      */
     private function commonFormProps(): array

@@ -62,6 +62,14 @@ return [
         'url' => env('AI_SUMMARY_URL', env('MATCHING_ENGINE_URL', 'http://python:8001')),
         'timeout' => (int) env('AI_SUMMARY_TIMEOUT', 30),
         'connect_timeout' => (int) env('AI_SUMMARY_CONNECT_TIMEOUT', 5),
+
+        // CSVインポート由来の一括生成トリガー（issue #61 課題4）の経過時間予算。
+        // PHP の max_execution_time（既定30秒・docker/php・nginx 設定に上書きなし）に対し、
+        // CSV読込・検証・バッチ書き込み自体で最大十数秒を使う想定（08_CSV入出力_APIエンドポイント一覧.md
+        // O-13）のため、30秒からフレームワークのオーバーヘッド・レスポンス生成・安全マージンとして
+        // 10秒を差し引いた20秒を既定値とする。EngineerService::triggerAiSummaryForCsvImport() が
+        // インポート開始時刻からの経過時間としてこの値と比較し、超過後は新規のAI呼び出しを行わない。
+        'csv_trigger_budget_seconds' => (float) env('AI_SUMMARY_CSV_TRIGGER_BUDGET_SECONDS', 20),
     ],
 
 ];

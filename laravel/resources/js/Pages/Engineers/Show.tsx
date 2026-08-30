@@ -10,11 +10,12 @@ import TruncatedText from '@/Components/Common/TruncatedText';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { useToast } from '@/hooks/use-toast';
 import { emptyText } from '@/lib/emptyValue';
 import { EngineerShowPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { ArrowLeftRight, Clock, Pencil, Trash2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowLeftRight, Clock, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 type Props = PageProps<EngineerShowPageProps>;
@@ -35,6 +36,12 @@ function SectionCard({ title, children }: { title: string; children: React.React
 export default function Show({ engineer }: Props) {
     const { auth } = usePage<Props>().props;
     const isAdmin = auth.user.role === 'admin';
+    // handleRegenerateAiSummary の onError で使う。CsvImportSection 等、他コンポーネントと同じ
+    // useToast() 経由の呼び出し規約に合わせる（コードレビューとは別に、npm run build（tsc）を
+    // ローカルで実行したところ toast が未importで型エラーになりビルドが通らないことが判明したため
+    // 追加で修正。実際の手動QAでは onError（通信エラー時のみ）を踏むケースがなかったため
+    // 気付かれていなかった）。
+    const { toast } = useToast();
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -47,6 +54,11 @@ export default function Show({ engineer }: Props) {
     // Inertia visit の cancel トークンを保持し、オーバーレイのキャンセルボタンから中断する。
     const matchingCancel = useRef<(() => void) | null>(null);
 
+    // AI要約の再生成（issue #61）は保存を伴う書き込み処理のため、AiLoadingOverlay に onCancel は渡さない
+    // （クライアント側でキャンセルしてもサーバー側の保存は止まらず、UIと実データが不整合になるため。
+    //  コンポーネント側のドキュメント参照）。
+    const [isRegeneratingAiSummary, setIsRegeneratingAiSummary] = useState(false);
+
     // 経験工程を共通 ProcessCheckboxGroup で表示する（人材は has_experience フラグ）。
     const { phaseList, phaseValues } = buildProcessPhaseProps(engineer.phases, 'has_experience');
 
@@ -56,6 +68,24 @@ export default function Show({ engineer }: Props) {
             onFinish:  () => setIsDeleting(false),
             onSuccess: () => setShowDeleteConfirm(false),
         });
+    };
+
+    const handleRegenerateAiSummary = () => {
+        router.post(
+            `/engineers/${engineer.id}/ai-summary/regenerate`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setIsRegeneratingAiSummary(true),
+                onFinish: () => setIsRegeneratingAiSummary(false),
+                onError: () =>
+                    toast({
+                        description:
+                            'AI要約の再生成に失敗しました。通信環境をご確認のうえ、再度お試しください。',
+                        variant: 'destructive',
+                    }),
+            },
+        );
     };
 
     const aiGeneratedAt = engineer.ai_summary_generated_at
@@ -76,6 +106,12 @@ export default function Show({ engineer }: Props) {
                 show={isMatching}
                 message="AIがマッチングを計算しています…"
                 onCancel={() => matchingCancel.current?.()}
+            />
+
+            {/* AI要約の再生成中オーバーレイ（issue #61）。保存を伴うため onCancel は渡さない。 */}
+            <AiLoadingOverlay
+                show={isRegeneratingAiSummary}
+                message="AIが職務要約を生成しています…"
             />
 
             {/* Sticky page header */}
@@ -265,16 +301,64 @@ export default function Show({ engineer }: Props) {
                             </span>
                         )}
                     </div>
+
+                    {/* issue #61：恒久的な失敗表示。submit直後の一過性トーストだけでなく、後から詳細画面を
+                        開いても失敗状態が分かるようにする。 */}
+                    {engineer.ai_summary_status === 'failed' && (
+                        <div className="mb-2.5 flex items-center gap-1.5 rounded border border-destructive/20 bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                            AI要約の生成に失敗しました。「再生成」からもう一度お試しください。
+                        </div>
+                    )}
+
+                    {/* stale（陳腐化）：failed のときは失敗バナーで案内済みのため、二重表示を避けて出し分ける。 */}
+                    {engineer.ai_summary_status !== 'failed' && engineer.is_ai_summary_stale && (
+                        <div className="mb-2.5 flex items-center gap-1.5 rounded border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                            アピールポイントの変更後、要約が更新されていません。内容が古い可能性があります。
+                        </div>
+                    )}
+
                     {engineer.ai_summary ? (
                         <p className="text-sm leading-relaxed text-foreground">
                             {engineer.ai_summary}
                         </p>
+                    ) : engineer.ai_summary_status === 'empty' ? (
+                        <p className="text-sm text-muted-foreground">
+                            AIが要約可能な内容を検出できませんでした
+                        </p>
                     ) : (
                         <p className="text-sm text-muted-foreground">AI要約は未生成です</p>
                     )}
-                    <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-                        ※ AIがアピールポイントをもとに自動生成した要約です。内容は参考情報としてご確認ください。
-                    </p>
+
+                    <div className="mt-2.5 flex items-end justify-between gap-3">
+                        <p className="text-[10px] leading-relaxed text-muted-foreground">
+                            ※ AIがアピールポイントをもとに自動生成した要約です。内容は参考情報としてご確認ください。
+                        </p>
+                        {/* issue #61 課題2：appeal_note の変更有無に依存しない明示的な再生成手段。
+                            appeal_note が空の人材は生成対象がないため無効化する。
+                            disabled なボタンは Chromium 系ブラウザではホバー時のポインタイベントを
+                            受け取らず、ボタン自身に title を付けてもツールチップが表示されないため、
+                            外側の span 側で title を保持してホバー判定を行う（手動確認で判明）。 */}
+                        <span
+                            className="inline-block shrink-0"
+                            title={
+                                !engineer.appeal_note
+                                    ? 'アピールポイントが未入力のため再生成できません'
+                                    : undefined
+                            }
+                        >
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!engineer.appeal_note || isRegeneratingAiSummary}
+                                onClick={handleRegenerateAiSummary}
+                            >
+                                <RefreshCw className="mr-1.5 h-3 w-3" />
+                                再生成
+                            </Button>
+                        </span>
+                    </div>
                 </div>
 
                 {/* 基本情報 */}
