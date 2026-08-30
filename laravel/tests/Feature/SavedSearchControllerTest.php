@@ -378,13 +378,38 @@ class SavedSearchControllerTest extends TestCase
 
     public function test_user_cannot_delete_other_users_saved_search(): void
     {
+        // 削除は人材一覧・案件一覧のモーダルから実行されるため、referer は一覧URL自身になる
+        // （EngineerControllerTest::test_general_user_cannot_delete_engineer と同粒度）。
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $savedSearch = $this->createSavedSearch(['user_id' => $owner->id]);
+
+        $response = $this->actingAs($other)->delete(
+            "/saved-searches/{$savedSearch->id}",
+            [],
+            ['X-Inertia' => 'true', 'referer' => '/engineers']
+        );
+
+        // issue #94：権限不足は 403 を素で投げず、前画面へ戻し flash.error を返す
+        // （人材・案件・パイプライン削除と同方式に統一）。
+        $response->assertStatus(303);
+        $response->assertRedirect('/engineers');
+        $response->assertSessionHas('error', '削除権限がありません。');
+        $this->assertDatabaseHas('saved_searches', ['id' => $savedSearch->id]);
+    }
+
+    public function test_delete_other_users_saved_search_without_referer_falls_back_to_dashboard(): void
+    {
+        // referer が無い場合（直接リクエスト等）でも flash.error を失わずダッシュボードへ戻る
+        // （EngineerControllerTest::test_general_user_delete_engineer_without_referer_falls_back_to_dashboard と同粒度）。
         $owner = User::factory()->create();
         $other = User::factory()->create();
         $savedSearch = $this->createSavedSearch(['user_id' => $owner->id]);
 
         $response = $this->actingAs($other)->delete("/saved-searches/{$savedSearch->id}");
 
-        $response->assertForbidden();
+        $response->assertRedirect('/dashboard');
+        $response->assertSessionHas('error', '削除権限がありません。');
         $this->assertDatabaseHas('saved_searches', ['id' => $savedSearch->id]);
     }
 

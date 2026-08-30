@@ -70,7 +70,7 @@ Props           → JSONツリー形式（jsonc）
 | `302 Found` | GET リクエスト後の Inertia リダイレクト |
 | `303 See Other` | POST・PUT・DELETE 後の Inertia リダイレクト。Inertiaは非GET（PUT/PATCH/DELETE）への302リダイレクトを追えない（ブラウザがメソッドを保持したまま追ってしまう）ため、非安全メソッドへの応答は302ではなく303を返す（issue #44 / #63） |
 | `401 Unauthorized` | 未ログイン状態でのアクセス。JSONを期待する非Inertiaリクエスト（APIコール等）の場合 |
-| `403 Forbidden` | ロール・所有権チェックで弾かれた場合（例：一般営業がマスタ管理にアクセスした場合、他ユーザーの保存済み検索条件を削除しようとした場合）。人材・案件・パイプラインの削除は権限不足時に403を素で返さず、前画面へ戻し `flash.error` を返す（issue #65） |
+| `403 Forbidden` | ①ルート単位のアクセス制御（例：一般営業がマスタ管理にアクセスした場合。`EnsureUserIsAdmin` ミドルウェアの `abort(403)`）→ 案内ページ（`ErrorPageResponder`、issue #70 / PR #77）を表示する。②人材・案件・パイプライン・保存済み検索条件の削除で、操作対象への所有権・権限が無い場合 → 403を素で返さず、前画面へ戻し `flash.error` を返す（issue #65 / #94）。**切り分け基準**：そもそもその画面へ遷移させるべきでないルート単位の制御は①（案内ページ）、ユーザーがすでに見えている画面上のアクション（削除ボタン等）に対する認可失敗は②（`back()` + `flash.error` で文脈を保つ）とする |
 | `404 Not Found` | 存在しない ID を指定 |
 | `409 Conflict` | ①未ログイン状態でのInertiaリクエスト。ログイン画面への強制的なフルページ遷移を指示する `X-Inertia-Location` ヘッダーを付与する（`UnauthenticatedInertiaRedirector`、issue #63）。②Inertiaのアセットバージョン不一致時（`HandleInertiaRequests::version()`由来、フロント資材更新後の強制リロード）にも同じ形（409 + `X-Inertia-Location`）で返る。「未ログイン時のみ」ではない点に注意 |
 | `419 Page Expired` | CSRFトークン不一致。ただしLaravel 13の`PreventRequestForgery`は`Sec-Fetch-Site: same-origin`をトークン検証より先に通すため、**同一オリジンのブラウザ操作では通常発生しない**（画面操作でのセッション期限切れは`UnauthenticatedInertiaRedirector`による409 + `X-Inertia-Location`でのログイン画面遷移経由。issue #63）。到達するのは主にクロスサイト送信・`Sec-Fetch-Site`を送らないクライアント向け。issue #70（PR #77）の`ErrorPageResponder`が一本化して対応：ログイン済みなら元画面へ（自ホスト内に限定して）リダイレクト + `flash.error`、未ログインならログイン画面へ`status`を渡して復帰導線を出す |
