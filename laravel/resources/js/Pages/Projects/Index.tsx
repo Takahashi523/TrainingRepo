@@ -73,7 +73,7 @@ export default function Index({
     };
 
     const handleFilterChange = (patch: Partial<ProjectFilters>) => {
-        // keyword を明示指定する patch（＝保存済み条件の適用）は、入力欄の値を保存条件に合わせつつ
+        // keyword を明示指定する patch（保存済み条件の適用・キーワード条件タグの ✕ など）は、入力欄の値を合わせつつ
         // 保留中のデバウンスを無効化する。無効化しないと、打鍵から 300ms 以内に条件を呼び出したとき
         // 保留タイマーが適用を追い越して発火し、「保存条件＋打鍵途中の語」になる。
         if (patch.keyword !== undefined) {

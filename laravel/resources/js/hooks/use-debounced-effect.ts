@@ -36,7 +36,7 @@ export type DebouncedEffectControls = {
  *
  * @param effect 遅延実行する処理。呼び出し側のインライン関数でよい
  * @param deps 変化を監視する値（デバウンス対象の入力欄 state）
- * @param delayMs 待機時間
+ * @param delayMs 待機時間。依存に含めないため、実行中に変えても次に deps が変わるまで反映されない（定数を渡す前提）
  */
 export function useDebouncedEffect(
     effect: () => void,

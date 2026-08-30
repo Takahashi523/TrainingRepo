@@ -20,15 +20,15 @@ import { CompletedFilters, PipelineCompletedPageProps } from '@/types/pipeline';
 import { emptyText } from '@/lib/emptyValue';
 import { isValidYmd } from '@/lib/utils';
 import { useDebouncedEffect } from '@/hooks/use-debounced-effect';
-import { useKeywordDebounce } from '@/hooks/use-keyword-debounce';
+import { KEYWORD_DEBOUNCE_MS, useKeywordDebounce } from '@/hooks/use-keyword-debounce';
 import { Head, router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type Props = PageProps<PipelineCompletedPageProps>;
 
-/** 終了日欄も打鍵ごとに発火するため、キーワード（KEYWORD_DEBOUNCE_MS）と同じ間隔でまとめてから問い合わせる。 */
-const DATE_DEBOUNCE_MS = 300;
+/** 終了日欄も打鍵ごとに発火するため、キーワードと同じ間隔でまとめてから問い合わせる（片方だけ変わらないよう定数を共有する）。 */
+const DATE_DEBOUNCE_MS = KEYWORD_DEBOUNCE_MS;
 
 /**
  * 日付入力欄の生値を絞り込み条件へ変換する。
@@ -146,6 +146,17 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
         });
     };
 
+    // 条件タグの ✕ など、keyword を明示指定する patch は入力欄の値を合わせつつ保留デバウンスを無効化する。
+    // 無効化しないと、キーワードタグの ✕ が入力欄も空にするため（CompletedFilterPanel）、
+    // ✕ の visit の直後に保留タイマーが発火して同じ条件を二重に送る。
+    // 人材一覧・案件一覧の handleFilterChange と同じ形（issue #38）。
+    const handleFilterChange = (patch: Partial<CompletedFilters>) => {
+        if (patch.keyword !== undefined) {
+            applyKeyword(patch.keyword);
+        }
+        visit(patch, 1);
+    };
+
     const handleClearAll = () => {
         // 保留中のデバウンス（キーワード・日付）を無効化し、クリアを下の visit 1回に集約する。
         applyKeyword('');
@@ -212,7 +223,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                         onEndedFromInput={setEndedFromInput}
                         endedToInput={endedToInput}
                         onEndedToInput={setEndedToInput}
-                        onFilterChange={(patch) => visit(patch, 1)}
+                        onFilterChange={handleFilterChange}
                         onClearAll={handleClearAll}
                     />
                 </div>

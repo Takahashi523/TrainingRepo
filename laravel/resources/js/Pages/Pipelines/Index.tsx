@@ -71,6 +71,17 @@ export default function Index({
         });
     };
 
+    // 条件タグの ✕ など、keyword を明示指定する patch は入力欄の値を合わせつつ保留デバウンスを無効化する。
+    // 無効化しないと、キーワードタグの ✕ が入力欄も空にするため（PipelineFilterPanel）、
+    // ✕ の visit の直後に保留タイマーが発火して同じ条件を二重に送る。
+    // 人材一覧・案件一覧の handleFilterChange と同じ形（issue #38）。
+    const handleFilterChange = (patch: Partial<ActiveFilters>) => {
+        if (patch.keyword !== undefined) {
+            applyKeyword(patch.keyword);
+        }
+        visit(patch);
+    };
+
     const handleClearAll = () => {
         // 保留中のデバウンスを無効化し、クリアを下の visit 1回に集約する。
         applyKeyword('');
@@ -183,7 +194,7 @@ export default function Index({
                             sortOptions={sortOptions}
                             keywordInput={keywordInput}
                             onKeywordInput={setKeywordInput}
-                            onFilterChange={(patch) => visit(patch)}
+                            onFilterChange={handleFilterChange}
                             onClearAll={handleClearAll}
                         />
                     )}
