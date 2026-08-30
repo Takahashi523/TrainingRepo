@@ -191,6 +191,49 @@ class CsvImportTest extends CsvTestCase
         $this->assertSame(hash('sha256', '更新後のアピール'), $engineer->ai_summary_source_hash);
     }
 
+    public function test_engineer_import_clears_ai_summary_when_appeal_note_becomes_blank_on_update(): void
+    {
+        // コードレビュー指摘の回帰テスト：通常の編集フロー（EngineerService::update()）は
+        // appeal_note を空欄に変更すると clearAiSummary() で ai_summary_status を none に戻すが、
+        // CSV経由の更新は upsert で直接書き込むためこのロジックを通らず、appeal_note を空欄に
+        // する更新であっても古い ai_summary が残ったまま（陳腐化バナー誤表示）になっていた。
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer([
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新前のアピール',
+            'ai_summary' => '更新前の要約',
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '更新前のアピール'),
+        ]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => '呼ばれてはいけない要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => $engineer->name,
+            'name_kana' => $engineer->name_kana,
+            'status' => 'proposable',
+            'main_user_id' => $user->id,
+            'appeal_note' => '',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // appeal_note が空欄になった更新行はAI要約を呼ばず、他の項目編集フローと同じくクリアされる。
+        Http::assertNothingSent();
+        $engineer->refresh();
+        $this->assertSame('none', $engineer->ai_summary_status);
+        $this->assertNull($engineer->ai_summary);
+        $this->assertNull($engineer->ai_summary_source_hash);
+        $this->assertNull($engineer->ai_summary_generated_at);
+    }
+
     public function test_engineer_import_does_not_trigger_ai_summary_for_unrelated_existing_rows(): void
     {
         $user = $this->makeUser('admin');

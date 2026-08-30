@@ -925,10 +925,13 @@ class EngineerControllerTest extends TestCase
 
         Http::fake();
 
-        $this->actingAs($user)->post("/engineers/{$engineer->id}/ai-summary/regenerate");
+        $response = $this->actingAs($user)->post("/engineers/{$engineer->id}/ai-summary/regenerate");
 
         Http::assertNothingSent();
         $this->assertSame('none', $engineer->fresh()->ai_summary_status);
+        // レビュー指摘の回帰テスト：appeal_note空欄時は「再生成」ではなく「クリア」した旨の
+        // メッセージを返す（EngineerController::regenerateAiSummary()）。
+        $response->assertSessionHas('success', 'アピールポイントが未入力のため、AI要約をクリアしました。');
     }
 
     public function test_show_props_report_stale_ai_summary_after_failed_regeneration_following_appeal_note_change(): void

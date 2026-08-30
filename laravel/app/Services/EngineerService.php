@@ -142,6 +142,38 @@ class EngineerService
      */
     public function triggerAiSummaryForCsvImport(array $updatedIds, Carbon $writtenAt, float $importStartedAt, int $maxIdBeforeImport): array
     {
+        // issue #61 レビュー指摘：通常の編集フロー（update()）は appeal_note が空欄になると
+        // clearAiSummary() で ai_summary_status を none に戻すが、CSV経由の更新行は
+        // CsvImportService::write() が upsert で直接書き込むため Eloquent イベント／このサービスの
+        // ロジックを一切通らない。かつ下の $pending クエリは appeal_note が空の行を対象から除外して
+        // いるため、CSVで appeal_note を空欄に更新しても古い ai_summary が残ったままになり、
+        // is_ai_summary_stale が true になって「陳腐化」バナーが誤表示されてしまう
+        // （編集画面経由の「未生成」表示と食い違う）。ここで先に、更新行のうち appeal_note が空欄に
+        // なった行の AI 要約をまとめてクリアしておく（AI 呼び出しを伴わないため時間予算の対象外）。
+        if ($updatedIds !== []) {
+            Engineer::query()
+                ->whereIn('id', $updatedIds)
+                ->where(function ($blankQuery): void {
+                    $blankQuery->whereNull('appeal_note')->orWhere('appeal_note', '');
+                })
+                // 「none」以外（generated/failed/empty＝何らかの生成トリガーが実際に走った状態）の
+                // 行だけを対象にする。ai_summary_status は refreshAiSummary()/clearAiSummary() が
+                // 必ず ai_summary・source_hash と一緒に更新するため、通常運用ではこれらの有無は
+                // 常に同期している。status が既に none の行は「未生成」表示として正しく、
+                // CSVはそもそも ai_summary 列を書き込まない（export_only）ため触れてはいけない。
+                // ※当初 whereNotNull('ai_summary') も条件に含めていたが、テスト用に ai_summary だけを
+                // 直接セットして status は既定値 none のままにしたフィクスチャ（CSVがai_summaryを
+                // 上書きしないことを確認する既存テスト）まで誤って対象にしてしまい、回帰テストで
+                // 発覚したため ai_summary_status のみで判定するよう修正した。
+                ->where('ai_summary_status', '!=', 'none')
+                ->update([
+                    'ai_summary' => null,
+                    'ai_summary_generated_at' => null,
+                    'ai_summary_status' => 'none',
+                    'ai_summary_source_hash' => null,
+                ]);
+        }
+
         $pending = Engineer::query()
             ->whereNotNull('appeal_note')
             ->where('appeal_note', '!=', '')

@@ -9,6 +9,7 @@ import StatusBadge from '@/Components/Common/StatusBadge';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { useToast } from '@/hooks/use-toast';
 import { EngineerShowPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -33,6 +34,12 @@ function SectionCard({ title, children }: { title: string; children: React.React
 export default function Show({ engineer }: Props) {
     const { auth } = usePage<Props>().props;
     const isAdmin = auth.user.role === 'admin';
+    // handleRegenerateAiSummary の onError で使う。CsvImportSection 等、他コンポーネントと同じ
+    // useToast() 経由の呼び出し規約に合わせる（コードレビューとは別に、npm run build（tsc）を
+    // ローカルで実行したところ toast が未importで型エラーになりビルドが通らないことが判明したため
+    // 追加で修正。実際の手動QAでは onError（通信エラー時のみ）を踏むケースがなかったため
+    // 気付かれていなかった）。
+    const { toast } = useToast();
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
