@@ -6,10 +6,12 @@ import MetaRow, { MetaItem } from '@/Components/Common/MetaRow';
 import Rate from '@/Components/Common/Rate';
 import SkillTagDetail from '@/Components/Common/SkillTagDetail';
 import StatusBadge from '@/Components/Common/StatusBadge';
+import TruncatedText from '@/Components/Common/TruncatedText';
 import ProcessCheckboxGroup, { buildProcessPhaseProps } from '@/Components/Common/ProcessCheckboxGroup';
 import { Button } from '@/Components/ui/button';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useToast } from '@/hooks/use-toast';
+import { emptyText } from '@/lib/emptyValue';
 import { EngineerShowPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -183,22 +185,64 @@ export default function Show({ engineer }: Props) {
                     <div className="min-w-0 flex-1">
                         {/* ステータスは氏名の右に置く（マッチングサマリーと同じ構成）。 */}
                         <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-2xl font-bold text-foreground">{engineer.name}</p>
+                            {/* 氏名・カナ（各100文字）は1行省略し、省略時のみホバーで全文を出す。
+                                flex-1（基準サイズ0）が必須：min-w-0 だけでは「折り返すか」の判定に使う
+                                基準サイズが max-content（truncate により全文1行分）のままなので、
+                                氏名が親幅を超えた時点で氏名が1行目を独占し、ステータスバッジが2行目へ落ちる。
+                                flex は基準サイズで折り返しを先に決め、縮小はその後に行うため。
+                                max-w-fit とセットで使う：flex-1 だけだと氏名が余白まで伸びて
+                                ステータスバッジが右端まで離れるので、内容幅以上には伸ばさない
+                                （MetaRow の data-shrinkable 項目と同じ「flex-1 max-w-fit」の組み方）。 */}
+                            <TruncatedText
+                                as="p"
+                                text={engineer.name}
+                                className="min-w-0 max-w-fit flex-1 text-2xl font-bold text-foreground"
+                            />
                             <StatusBadge status={engineer.status} className="shrink-0" />
                         </div>
-                        <p className="mt-0.5 text-xs">{engineer.name_kana}</p>
+                        <TruncatedText as="p" text={engineer.name_kana} className="mt-0.5 text-xs" />
                         {/* 属性メタ（型2）と担当／サブ（型3）を1つの流れに並べる。
                             担当・サブは同型の人名が並ぶため型3 のラベルを維持する。
                             サマリーなので値がある項目だけを出す（全項目は下部の項目表に出る）。 */}
-                        <MetaRow className="mt-2.5 text-xs">
+                        {/* サマリーのメタは1行に収める（nowrap）。はみ出し分は data-shrinkable を付けた
+                            可変長項目（最寄駅・路線／担当・サブ）だけが引き受け、年齢・稼働可能時期は縮まない。 */}
+                        <MetaRow nowrap className="mt-2.5 text-xs">
                             {engineer.age != null && (
                                 <MetaItem field="age">{engineer.age}歳</MetaItem>
                             )}
+                            {/* 駅名・路線名（各100文字）は個別に1行省略する。1本の文字列に連結すると
+                                駅名が長いだけで路線が丸ごと消えるため、片方が長くても他方が残るようにする
+                                （一覧カード・マッチング結果画面と同じ組み方）。
+                                両方空ならサマリーには出さないが、**片方だけ空のときは結合せず項目ごとに
+                                欠損トークンを描く**（UI表示規約 §3）。片側を単に省くと、路線だけの行が
+                                駅名の抜けた「（山手線）」になり、欠けている側が画面から読み取れなくなる。 */}
                             {(engineer.nearest_station || engineer.nearest_line) && (
-                                <MetaItem field="nearestStation">
-                                    {[engineer.nearest_station, engineer.nearest_line]
-                                        .filter(Boolean)
-                                        .join('（') + (engineer.nearest_line ? '）' : '')}
+                                <MetaItem
+                                    field="nearestStation"
+                                    // 駅名が空のときは値の先頭が欠損トークン「最寄駅未設定」＝項目名を含むため
+                                    // sr-only を出さない（「最寄駅：最寄駅未設定」の二重読みを防ぐ）。
+                                    valueHasFieldName={!engineer.nearest_station}
+                                    data-shrinkable
+                                    // gap-0：駅名と「（路線）」は1つの値の続きなので、MetaItem 既定の
+                                    // 隙間（gap-1）を入れない（「東京駅 （山手線）」と割れて見えるため）。
+                                    // 担当／サブのラベルと氏名と同じ扱い。
+                                    className="gap-0"
+                                >
+                                    <TruncatedText
+                                        text={
+                                            engineer.nearest_station ||
+                                            emptyText('nearestStation', true)
+                                        }
+                                        className="min-w-0 max-w-fit flex-1"
+                                    />
+                                    <TruncatedText
+                                        text={
+                                            engineer.nearest_line
+                                                ? `（${engineer.nearest_line}）`
+                                                : `（${emptyText('nearestLine', true)}）`
+                                        }
+                                        className="min-w-0 max-w-fit flex-1"
+                                    />
                                 </MetaItem>
                             )}
                             {engineer.available_from && (
@@ -206,16 +250,38 @@ export default function Show({ engineer }: Props) {
                                     {engineer.available_label}
                                 </MetaItem>
                             )}
-                            {/* 担当・サブは同型の人名が並ぶため型3 のラベルを維持する。 */}
-                            <span>
-                                担当：{engineer.users.main.name}
+                            {/* 担当・サブは同型の人名が並ぶため型3 のラベルを維持する。
+                                氏名（最大255文字）だけを1行省略し、ラベル語と区切り「／」は shrink-0 で常時表示する
+                                （担当が長いだけで「サブ：」ごと消えるのを防ぐ）。
+                                氏名2つは flex-1 max-w-fit で「取り分は等分・使わない分は相手に返す」にする。
+                                既定の縮小は基準サイズに比例するため、担当だけが長いとサブが1文字まで潰れる。 */}
+                            {/* ラベル語を可視で持つ型3 の項目だが、MetaItem を通すことで
+                                data-shrinkable が型で守られる（生の span に直接書くと綴り間違いが
+                                無言で「縮まない項目」に化け、行あふれとしてしか現れない）。
+                                sr-only は valueHasFieldName で抑止（可視の「担当：」と二重に読ませない）。
+                                gap-0：ラベルと氏名の間に MetaItem 既定の隙間を入れない。 */}
+                            <MetaItem
+                                field="mainUser"
+                                valueHasFieldName
+                                data-shrinkable
+                                className="gap-0"
+                            >
+                                <span className="shrink-0">担当：</span>
+                                <TruncatedText
+                                    text={engineer.users.main.name}
+                                    className="min-w-0 max-w-fit flex-1"
+                                />
                                 {engineer.users.sub && (
                                     <>
-                                        <span className="mx-1 text-border">／</span>
-                                        サブ：{engineer.users.sub.name}
+                                        <span className="mx-1 shrink-0 text-border">／</span>
+                                        <span className="shrink-0">サブ：</span>
+                                        <TruncatedText
+                                            text={engineer.users.sub.name}
+                                            className="min-w-0 max-w-fit flex-1"
+                                        />
                                     </>
                                 )}
-                            </span>
+                            </MetaItem>
                         </MetaRow>
 
                     </div>

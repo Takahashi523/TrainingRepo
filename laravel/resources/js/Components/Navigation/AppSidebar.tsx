@@ -1,3 +1,4 @@
+import TruncatedText from '@/Components/Common/TruncatedText';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -154,8 +155,13 @@ export default function AppSidebar() {
             {/* ユーザー情報・ログアウト */}
             <div className="shrink-0 border-t border-white/30">
                 <div className="px-[14px] py-3">
-                    <p className="truncate text-[12px] text-sidebar-foreground/100">
-                        {auth.user.name}（{roleLabel}）
+                    {/* サイドバーは 220px 固定のため氏名（最大100文字）はしばしば省略される。
+                        氏名と（役割）を1つの truncate に同居させると末尾から削られ、
+                        最初に消えるのが役割ラベル＝自分の権限表示になる。氏名だけを省略し、
+                        役割は shrink-0 で常時表示する。省略時は氏名にホバーで全文を出す。 */}
+                    <p className="flex items-baseline text-[12px] text-sidebar-foreground/100">
+                        <TruncatedText text={auth.user.name} className="min-w-0" />
+                        <span className="shrink-0">（{roleLabel}）</span>
                     </p>
                     {/* <p className="text-[10px] text-sidebar-foreground/50">{roleLabel}</p> */}
                 </div>

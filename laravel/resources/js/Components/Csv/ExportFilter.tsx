@@ -1,4 +1,7 @@
 import DateInput from '@/Components/Common/DateInput';
+import TruncatedSelectTrigger, {
+    SELECT_CONTENT_MATCH_TRIGGER_CLASS,
+} from '@/Components/Common/TruncatedSelectTrigger';
 import { Button } from '@/Components/ui/button';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Input } from '@/Components/ui/input';
@@ -156,6 +159,13 @@ export default function ExportFilter({ options, config }: Props) {
         }
     };
 
+    // トリガーに出す選択中の担当営業ラベル。TruncatedSelectTrigger は SelectValue に children を渡す方式のため、
+    // 「いま何が選ばれているか」の解決は呼び出し側が持つ（Radix による ItemText 複製を止めるのが目的）。
+    const selectedUserLabel =
+        userId === null
+            ? '全担当'
+            : (options.users.find((u) => u.id === userId)?.name ?? `ID:${userId}`);
+
     return (
         <div className="space-y-4">
             <p className="text-xs leading-relaxed text-muted-foreground">
@@ -203,16 +213,24 @@ export default function ExportFilter({ options, config }: Props) {
                         value={userId === null ? ALL_USERS : String(userId)}
                         onValueChange={(v) => setUserId(v === ALL_USERS ? null : Number(v))}
                     >
-                        <SelectTrigger className="h-8 bg-white text-xs">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="max-w-[280px]">
+                        {/* 選択中の氏名の省略は TruncatedSelectTrigger に任せる（shadcn 既定の
+                            line-clamp-1 では省略された氏名を確認する手段が無いため。#40） */}
+                        <TruncatedSelectTrigger
+                            className="h-8 bg-white text-xs"
+                            label={selectedUserLabel}
+                        />
+                        {/* 項目側は max-w で突き抜けを抑えるだけにし、省略せず折り返して全文を見せる。
+                            開いている間だけの一時表示で他の操作要素を巻き込まないため（#40）。
+                            幅の下限はトリガーに合わせる（max-w だけだとトリガーより狭くなり不揃いになる）。 */}
+                        <SelectContent
+                            className={`max-w-[280px] ${SELECT_CONTENT_MATCH_TRIGGER_CLASS}`}
+                        >
                             <SelectItem value={ALL_USERS} className="text-xs">
                                 全担当
                             </SelectItem>
                             {options.users.map((u) => (
                                 <SelectItem key={u.id} value={String(u.id)} className="text-xs">
-                                    <span className="block max-w-[240px] truncate">{u.name}</span>
+                                    {u.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>
