@@ -4,9 +4,13 @@ export type DebouncedEffectControls = {
     /**
      * 別経路で同じ条件を確定送信する直前に呼び、保留中のデバウンスを無効化する。
      *
-     * @param depsWillChange この呼び出しの直後に deps（＝入力欄の state）を変更するか
+     * 受け取るのは「変わるか否か」ではなく**この直後に deps が取る値**。
+     * 変化の有無の判定（＝無効化の手段の選択）は本フックが行うため、
+     * 呼び出し側は deps の並びと同じ順で次の値を並べるだけでよい。
+     *
+     * @param nextDeps この呼び出しの直後に deps（＝入力欄の state）が取る値
      */
-    suppressNextRun: (depsWillChange: boolean) => void;
+    suppressNextRun: (nextDeps: DependencyList) => void;
 };
 
 /**
@@ -27,7 +31,8 @@ export type DebouncedEffectControls = {
  *   （例：適用済みキーワードがある状態で入力欄を空にし、300ms 以内に「すべてクリア」を押す）
  *
  * この規則を呼び出し側に書かせると片方だけの対処になりやすいので、
- * `suppressNextRun(depsWillChange)` として本フックに閉じ込める。
+ * `suppressNextRun(nextDeps)` として本フックに閉じ込める。呼び出し側は
+ * 「これから deps がどの値になるか」だけを答え、どちらの手段を使うかは判定しない。
  *
  * 挙動：
  * - 初回マウントでは実行しない（マウント直後に検索リクエストを飛ばさない）
@@ -48,6 +53,11 @@ export function useDebouncedEffect(
     // レンダリングのたびにタイマーが張り直されてデバウンスが効かなくなる。
     const effectRef = useRef(effect);
     effectRef.current = effect;
+
+    // 常に最新の deps を指す ref。suppressNextRun は event handler から呼ばれるため、
+    // 「直前のコミット時点の deps」と引数の nextDeps を突き合わせて変化の有無を判定する。
+    const depsRef = useRef(deps);
+    depsRef.current = deps;
 
     const isInitialRun = useRef(true);
     const skipNextRun = useRef(false);
@@ -78,12 +88,16 @@ export function useDebouncedEffect(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, deps);
 
-    const suppressNextRun = (depsWillChange: boolean) => {
+    const suppressNextRun = (nextDeps: DependencyList) => {
+        // useEffect の依存比較と同じ規則（要素ごとの Object.is）で変化の有無を判定する。
+        const currentDeps = depsRef.current;
+        const depsWillChange =
+            nextDeps.length !== currentDeps.length ||
+            nextDeps.some((next, i) => !Object.is(next, currentDeps[i]));
+
         if (depsWillChange) {
             // 保留タイマーは effect 再実行時の cleanup が破棄する。
             // 新しく張られるタイマーだけを1回抑止する。
-            // ⚠️ deps が実際には変わらないのに true を渡すと、このフラグが残って
-            // 次の入力変化を1回食う。呼び出し側は「値が変わるか」を必ず比較して渡すこと。
             skipNextRun.current = true;
             return;
         }

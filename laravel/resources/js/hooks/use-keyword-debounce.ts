@@ -70,10 +70,10 @@ export function useKeywordDebounce({
     );
 
     const applyKeyword = (keyword: string) => {
-        // 入力欄の値が変わるかどうかで保留タイマーの消し方が変わる（詳細は useDebouncedEffect）。
-        const willChange = keyword !== keywordInput;
-        suppressNextRun(willChange);
-        if (willChange) {
+        // 「入力欄がこの後どの値になるか」だけを渡す。値が変わるか否かで保留タイマーの
+        // 消し方が変わる規則は useDebouncedEffect 側に閉じている。
+        suppressNextRun([keyword]);
+        if (keyword !== keywordInput) {
             setKeywordInput(keyword);
         }
     };

@@ -146,13 +146,31 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
         });
     };
 
-    // 条件タグの ✕ など、keyword を明示指定する patch は入力欄の値を合わせつつ保留デバウンスを無効化する。
-    // 無効化しないと、キーワードタグの ✕ が入力欄も空にするため（CompletedFilterPanel）、
-    // ✕ の visit の直後に保留タイマーが発火して同じ条件を二重に送る。
-    // 人材一覧・案件一覧の handleFilterChange と同じ形（issue #38）。
+    // 終了日欄の版 applyKeyword。入力欄の同期と保留デバウンスの無効化をここで一括して行い、
+    // 「これから deps が取る値」の予測と実際の setState を必ず同じ式から作る
+    // （予測だけを呼び出し側に書かせると、片方を直し忘れたとき抑止フラグが残って
+    // 次の1打鍵ぶんのデバウンスが無言で消える）。送信しない点も applyKeyword と同じ。
+    const applyEndedRange = (from: string, to: string) => {
+        suppressDateDebounce([from, to]);
+        setEndedFromInput(from);
+        setEndedToInput(to);
+    };
+
+    // 条件タグの ✕ など、keyword / 終了日を明示指定する patch は入力欄の値を合わせつつ
+    // 保留デバウンスを無効化する。無効化しないと、タグの ✕ が入力欄も空にするため
+    // （CompletedFilterPanel）、✕ の visit の直後に保留タイマーが発火して同じ条件を二重に送る。
+    // キーワード部分は人材一覧・案件一覧の handleFilterChange と同じ形（issue #38）。
     const handleFilterChange = (patch: Partial<CompletedFilters>) => {
         if (patch.keyword !== undefined) {
             applyKeyword(patch.keyword);
+        }
+        // 終了日タグの ✕ もキーワードタグと同型（入力欄クリア＋ patch）なので同じ抑止を通す。
+        // patch に無い側は現在の入力途中の値を維持する（開始・終了は独立した条件のため）。
+        if (patch.ended_from !== undefined || patch.ended_to !== undefined) {
+            applyEndedRange(
+                patch.ended_from !== undefined ? (patch.ended_from ?? '') : endedFromInput,
+                patch.ended_to !== undefined ? (patch.ended_to ?? '') : endedToInput,
+            );
         }
         visit(patch, 1);
     };
@@ -161,11 +179,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
         // 保留中のデバウンス（キーワード・日付）を無効化し、クリアを下の visit 1回に集約する。
         applyKeyword('');
         // 入力途中の値が残っていると props 追従では消えないため、明示的にクリアする。
-        // 日付は入力欄が既に空なら effect が再実行されない（＝cleanup が走らない）ので、
-        // 「これから値が変わるか」を渡して抑止の手段をフック側に選ばせる。
-        suppressDateDebounce(endedFromInput !== '' || endedToInput !== '');
-        setEndedFromInput('');
-        setEndedToInput('');
+        applyEndedRange('', '');
         visit({ keyword: '', status: [], user_id: null, ended_from: null, ended_to: null }, 1);
     };
 
