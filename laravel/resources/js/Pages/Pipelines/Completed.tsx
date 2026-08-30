@@ -19,14 +19,15 @@ import { PageProps } from '@/types';
 import { CompletedFilters, PipelineCompletedPageProps } from '@/types/pipeline';
 import { emptyText } from '@/lib/emptyValue';
 import { isValidYmd } from '@/lib/utils';
+import { useDebouncedEffect } from '@/hooks/use-debounced-effect';
+import { useKeywordDebounce } from '@/hooks/use-keyword-debounce';
 import { Head, router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type Props = PageProps<PipelineCompletedPageProps>;
 
-const KEYWORD_DEBOUNCE_MS = 300;
-/** 終了日欄も打鍵ごとに発火するため、キーワードと同じ間隔でまとめてから問い合わせる。 */
+/** 終了日欄も打鍵ごとに発火するため、キーワード（KEYWORD_DEBOUNCE_MS）と同じ間隔でまとめてから問い合わせる。 */
 const DATE_DEBOUNCE_MS = 300;
 
 /**
@@ -81,25 +82,12 @@ function formatEndedAt(value: string | null): string {
 
 export default function Completed({ pipelines, filters, users, statuses, sortOptions, auth }: Props) {
     const isAdmin = auth.user.role === 'admin';
-    const [keywordInput, setKeywordInput] = useState(filters.keyword);
-
-    useEffect(() => {
-        setKeywordInput(filters.keyword);
-    }, [filters.keyword]);
-
-    const isInitialKeywordSync = useRef(true);
-    useEffect(() => {
-        if (isInitialKeywordSync.current) {
-            isInitialKeywordSync.current = false;
-            return;
-        }
-        if (keywordInput === filters.keyword) return;
-        const timer = setTimeout(() => {
-            visit({ keyword: keywordInput }, 1);
-        }, KEYWORD_DEBOUNCE_MS);
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [keywordInput]);
+    // フリーワード入力（入力欄 state・props 追従・デバウンス）は共通フックに集約している。
+    // 「すべてクリア」と保留デバウンスの競合対策も含む（issue #38）。
+    const { keywordInput, setKeywordInput, applyKeyword } = useKeywordDebounce({
+        appliedKeyword: filters.keyword,
+        onDebounced: (keyword) => visit({ keyword }, 1),
+    });
 
     // 終了日範囲もキーワードと同じ「ローカル state で受けてからデバウンス」方式にする。
     // 加えて、日付は入力途中の値が意味を持たないため toFilterDate で完成値・空のみに絞る。
@@ -114,17 +102,15 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
         setEndedToInput(filters.ended_to ?? '');
     }, [filters.ended_to]);
 
-    const isInitialDateSync = useRef(true);
-    useEffect(() => {
-        if (isInitialDateSync.current) {
-            isInitialDateSync.current = false;
-            return;
-        }
-        const from = toFilterDate(endedFromInput);
-        const to = toFilterDate(endedToInput);
-        // 両方とも入力途中なら送るものが無い（422 も出さない）。
-        if (from === undefined && to === undefined) return;
-        const timer = setTimeout(() => {
+    // 日付もキーワードと同じ「抑止できるデバウンス」に載せる。
+    // 「すべてクリア」の即時 visit を保留タイマーが追い越すと、古い filters を基点に
+    // マージされて条件が復活するため（issue #38）。
+    const { suppressNextRun: suppressDateDebounce } = useDebouncedEffect(
+        () => {
+            const from = toFilterDate(endedFromInput);
+            const to = toFilterDate(endedToInput);
+            // 両方とも入力途中なら送るものが無い（422 も出さない）。
+            if (from === undefined && to === undefined) return;
             // 判定は発火時点の filtersRef で行う（条件タグの ✕ や「すべてクリア」が先に
             // visit を済ませている場合の重複リクエスト防止）。
             const applied = filtersRef.current;
@@ -141,10 +127,10 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
             }
             if (Object.keys(patch).length === 0) return;
             visit(patch, 1);
-        }, DATE_DEBOUNCE_MS);
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [endedFromInput, endedToInput]);
+        },
+        [endedFromInput, endedToInput],
+        DATE_DEBOUNCE_MS,
+    );
 
     // 常に最新の filters を指す ref（Index.tsx と同じ stale closure 対策）。
     // キーワードのデバウンス visit が古い filters を再適用し「すべてクリア」で条件が復活する競合を防ぐ。
@@ -161,8 +147,12 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
     };
 
     const handleClearAll = () => {
-        setKeywordInput('');
+        // 保留中のデバウンス（キーワード・日付）を無効化し、クリアを下の visit 1回に集約する。
+        applyKeyword('');
         // 入力途中の値が残っていると props 追従では消えないため、明示的にクリアする。
+        // 日付は入力欄が既に空なら effect が再実行されない（＝cleanup が走らない）ので、
+        // 「これから値が変わるか」を渡して抑止の手段をフック側に選ばせる。
+        suppressDateDebounce(endedFromInput !== '' || endedToInput !== '');
         setEndedFromInput('');
         setEndedToInput('');
         visit({ keyword: '', status: [], user_id: null, ended_from: null, ended_to: null }, 1);
