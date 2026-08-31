@@ -101,8 +101,8 @@ export default function Authenticated({
                  * 触らないため、ここは自前で戻す必要がある。
                  *
                  * ⚠️ ここに scroll-region 属性を足さないこと。属性を足すと preserveScroll: true の
-                 *    visit（一覧のフィルタ・ページ送り）で Inertia が swap 後の rAF に元の位置を
-                 *    復元するようになり、ページ送りの先頭復帰が巻き戻される。
+                 *    visit（一覧の絞り込み・ページ送り）で Inertia が swap 後の rAF に元の位置を
+                 *    復元するようになり、一覧の先頭復帰が巻き戻される。
                  */}
                 <main ref={mainRef} className={cn('flex-1 overflow-y-auto', mainClassName)}>
                     {/*

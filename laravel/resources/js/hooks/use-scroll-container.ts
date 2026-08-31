@@ -10,14 +10,15 @@ type UseScrollContainerResult = {
 /**
  * スクロール境界（`AuthenticatedLayout` の `<main>`）を掴み、先頭へ戻す手段を返すフック（issue #107）。
  *
- * 一覧のページ送りのように**コンテンツが総入れ替わりになる操作**で使う。
- * フィルタ変更・キーワードのデバウンスのように「同じ内容の一部だけが変わる」操作では
- * 呼ばない（スクロール位置を保つのが正しい挙動のため）。
+ * **結果セットが総入れ替わりになる操作**で使う。一覧画面ではページ送り・絞り込み・キーワードの
+ * デバウンス・ソート・すべてクリアがこれに当たる（＝一覧の visit 経路すべて）。保たれた位置は
+ * 「もう存在しない結果セットの中の位置」であって意味を持たないため、位置は保たない。
+ * 逆に、同じ一覧の中で1件だけが変わる操作（行の削除など）では呼ばない（位置を保つのが正しい）。
  *
  * ```tsx
  * const { scrollContainerRef, scrollToTop } = useScrollContainer();
  *
- * const handlePageChange = (page: number) => visit({ page }, scrollToTop);
+ * const visit = (patch) => router.get(url, buildQuery(patch), { onSuccess: scrollToTop, … });
  *
  * return <AuthenticatedLayout mainRef={scrollContainerRef}>…</AuthenticatedLayout>;
  * ```
@@ -29,7 +30,8 @@ type UseScrollContainerResult = {
  *
  * ※ 対象は `AuthenticatedLayout` の `<main>` だけ。進捗管理（進行中／カンバン）と
  *   マッチング結果は自前の全高コンテナで実スクロールしており（issue #82 の例外）、
- *   `mainRef` に渡しても実際のスクロール箱は動かない。どちらもページ送りを持たないため現状は問題ない。
+ *   `mainRef` に渡しても実際のスクロール箱は動かない。どちらも一覧の絞り込み・ページ送りを
+ *   持たないため現状は問題ない。
  */
 export function useScrollContainer(): UseScrollContainerResult {
     const scrollContainerRef = useRef<HTMLElement>(null);

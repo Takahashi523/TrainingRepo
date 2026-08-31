@@ -138,30 +138,19 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
-    // テーブルのスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴み、
-    // ページ送りのときだけ scrollToTop で先頭へ戻す。
+    // テーブルのスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴む。
+    // 結果セットが総入れ替わる visit の成功時に先頭へ戻す（issue #107）。
+    // 人材一覧 Index.tsx と同じ配線（ページ送りだけを対象にしない理由もそちらのコメントを参照）。
     const { scrollContainerRef, scrollToTop } = useScrollContainer();
 
-    // onSuccess は「ページ送りのときだけ先頭へ戻す」ために渡す任意引数。
-    // 省略時（フィルタ変更・キーワード／終了日のデバウンス・ソート・すべてクリア）は
-    // preserveScroll がそのまま効き、条件パネルの位置を保ったまま結果だけが差し替わる。
-    const visit = (patch: Partial<CompletedFilters>, page: number, onSuccess?: () => void) => {
+    const visit = (patch: Partial<CompletedFilters>, page: number) => {
         const next: CompletedFilters = { ...filtersRef.current, ...patch };
         router.get(route('pipelines.completed'), buildQuery(next, page), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
-            onSuccess,
+            onSuccess: scrollToTop,
         });
-    };
-
-    // ページ送りはテーブルの中身が総入れ替わりになる操作なので、先頭へ戻す（issue #107）。
-    // 人材一覧 Index.tsx と同じ配線（理由の詳細はそちらのコメントを参照）。
-    // 条件は現状維持なので patch は空、ページだけを差し替える。
-    const handlePageChange = (page: number) => {
-        // 現在ページの再クリックで「同じ内容のまま視点だけ飛ぶ」のを防ぐ（人材一覧と同じ）。
-        if (page === pipelines.meta.current_page) return;
-        visit({}, page, scrollToTop);
     };
 
     // 終了日欄の版 applyKeyword。入力欄の同期と保留デバウンスの無効化をここで一括して行い、
@@ -368,9 +357,11 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                     </div>
                 )}
 
+                    {/* 現在ページの再クリックは Pagination 側で握り潰される（人材一覧と同じ）。
+                        条件は現状維持なので patch は空、ページだけを差し替える。 */}
                     <Pagination
                         meta={pipelines.meta}
-                        onChange={handlePageChange}
+                        onChange={(page) => visit({}, page)}
                     />
                 </div>
             </div>

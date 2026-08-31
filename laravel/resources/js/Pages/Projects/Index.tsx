@@ -64,29 +64,19 @@ export default function Index({
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
-    // 一覧のスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴み、
-    // ページ送りのときだけ scrollToTop で先頭へ戻す。
+    // 一覧のスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴む。
+    // 結果セットが総入れ替わる visit の成功時に先頭へ戻す（issue #107）。
+    // 人材一覧 Index.tsx と同じ配線（ページ送りだけを対象にしない理由もそちらのコメントを参照）。
     const { scrollContainerRef, scrollToTop } = useScrollContainer();
 
-    // onSuccess は「ページ送りのときだけ先頭へ戻す」ために渡す任意引数。
-    // 省略時（フィルタ変更・デバウンス・ソート・すべてクリア）は preserveScroll がそのまま効き、
-    // 条件パネルの位置を保ったまま結果だけが差し替わる。
-    const visit = (patch: Partial<ProjectFilters>, onSuccess?: () => void) => {
+    const visit = (patch: Partial<ProjectFilters>) => {
         const next: ProjectFilters = { ...filtersRef.current, ...patch };
         router.get("/projects", buildQuery(next), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
-            onSuccess,
+            onSuccess: scrollToTop,
         });
-    };
-
-    // ページ送りはカード一覧が総入れ替わりになる操作なので、先頭へ戻す（issue #107）。
-    // 人材一覧 Index.tsx と同じ配線（理由の詳細はそちらのコメントを参照）。
-    const handlePageChange = (page: number) => {
-        // 現在ページの再クリックで「同じ内容のまま視点だけ飛ぶ」のを防ぐ（人材一覧と同じ）。
-        if (page === projects.meta.current_page) return;
-        visit({ page }, scrollToTop);
     };
 
     const handleFilterChange = (patch: Partial<ProjectFilters>) => {
@@ -201,9 +191,10 @@ export default function Index({
                         ))
                     )}
 
+                    {/* 現在ページの再クリックは Pagination 側で握り潰される（人材一覧と同じ）。 */}
                     <Pagination
                         meta={projects.meta}
-                        onChange={handlePageChange}
+                        onChange={(page) => visit({ page })}
                     />
                 </div>
             </div>

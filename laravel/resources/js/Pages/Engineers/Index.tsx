@@ -62,35 +62,28 @@ export default function Index({
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
-    // 一覧のスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴み、
-    // ページ送りのときだけ scrollToTop で先頭へ戻す。
+    // 一覧のスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴む。
     const { scrollContainerRef, scrollToTop } = useScrollContainer();
 
-    // onSuccess は「ページ送りのときだけ先頭へ戻す」ために渡す任意引数。
-    // 省略時（フィルタ変更・デバウンス・ソート・すべてクリア）は preserveScroll がそのまま効き、
-    // 条件パネルの位置を保ったまま結果だけが差し替わる。
-    const visit = (patch: Partial<EngineerFilters>, onSuccess?: () => void) => {
+    // visit は「結果セットが総入れ替わる操作」専用の経路（ページ送り・絞り込み・デバウンス・
+    // ソート・すべてクリア）なので、成功時は必ず一覧の先頭へ戻す（issue #107）。
+    // ページ送りだけを対象にしない理由：検索条件パネルは sticky top-0 で常に画面上に留まるため、
+    // 一覧の途中までスクロールした状態でも条件を変更できる。そのとき位置を保つと「別の結果セットの
+    // 途中から表示される」＝ページ送りで直したのと同じ症状になる。保たれた位置は、消えた結果
+    // セットの中の位置であって意味を持たない。
+    //
+    // preserveScroll: true は外さない。スクロール境界が <main> 側にあり、Inertia のリセットは
+    // window と scroll-region 属性の要素しか対象にしないため、付けても外しても <main> は動かない
+    // （＝位置を決めているのは下の scrollToTop だけ）。
+    // 成功時のみ戻す（onFinish だと失敗・キャンセルでも画面が飛ぶ）。
+    const visit = (patch: Partial<EngineerFilters>) => {
         const next: EngineerFilters = { ...filtersRef.current, ...patch };
         router.get('/engineers', buildQuery(next), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
-            onSuccess,
+            onSuccess: scrollToTop,
         });
-    };
-
-    // ページ送りはカード一覧が総入れ替わりになる操作なので、先頭へ戻す（issue #107）。
-    // ページ送りボタンは一覧の最下部にあるため、戻さないと「新しいページの末尾付近」が表示される。
-    //
-    // preserveScroll: true は外さない。スクロール境界が <main> 側にあり、Inertia のリセットは
-    // window と scroll-region 属性の要素しか対象にしないため、外しても <main> は動かないため。
-    // 成功時のみ戻す（onFinish だと失敗・キャンセルでも画面が飛ぶ）。
-    const handlePageChange = (page: number) => {
-        // 現在ページのボタンは disabled ではないため再クリックできる（Pagination.tsx）。
-        // 素通しすると「同じ内容のまま視点だけ先頭へ飛ぶ」不可解な動きになるので、ここで止める
-        // （ついでに同じページを取り直す無駄なリクエストも消える）。
-        if (page === engineers.meta.current_page) return;
-        visit({ page }, scrollToTop);
     };
 
     const handleFilterChange = (patch: Partial<EngineerFilters>) => {
@@ -233,9 +226,11 @@ export default function Index({
                         ))
                     )}
 
+                    {/* 現在ページの再クリックは Pagination 側で握り潰される（同じ内容の取り直し・
+                        視点だけのジャンプを防ぐ）。ここは素直にページを差し替えるだけでよい。 */}
                     <Pagination
                         meta={engineers.meta}
-                        onChange={handlePageChange}
+                        onChange={(page) => visit({ page })}
                     />
                 </div>
             </div>
