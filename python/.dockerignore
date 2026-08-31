@@ -1,0 +1,26 @@
+# ビルドコンテキストから除外するもの（Issue #90 #2）
+#
+# Dockerfile が `COPY . .` のため、除外しないとビルド時の .env が
+# イメージに焼き込まれ、DB_PASSWORD 等が固定化される。
+# 実行時は docker-compose.prod.yml のバインドマウントで .env を渡す。
+
+# --- 秘匿情報 ---
+.env
+.env.*
+!.env.example
+
+# --- キャッシュ・実行時生成物 ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+
+# --- 本番イメージに不要 ---
+tests/
+.git
+.gitignore
+docker-compose.yml
+Dockerfile.dev
