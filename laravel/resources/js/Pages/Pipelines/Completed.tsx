@@ -218,7 +218,8 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
              * 同じスクロール箱の中に入れて sticky で留めることで、4者がバー幅を等しく負担し4辺が揃う。
              *
              * ※ 進行中タブ（Index.tsx）はカンバンの列内スクロールが flex-1 の確定高さに依存するため
-             *   この形にできない。あちらは固定＋スクロールの構造を維持している（design.md 1-4）。
+             *   この形にできない。あちらは固定＋スクロールの構造を維持している（理由は Index.tsx の
+             *   同位置のコメントを参照）。
              */}
             <div className="-m-6">
                 {/* ヘッダ・タブ・フィルタ（常時固定）。
