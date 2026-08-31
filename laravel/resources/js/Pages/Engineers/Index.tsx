@@ -123,8 +123,10 @@ export default function Index({
         );
     };
 
+    // 地色（bg-muted/30）は <main> に載せる。カード一覧側に置くと少件数・0件のときに
+    // 画面下部が <main> の白背景のまま残るため。人材詳細・案件詳細と同じ使い方（issue #82）。
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="人材一覧" />
             {/* マッチング実行の遷移中（Python AI 同期計算）に全画面で計算中を表示する。
                 共通部品の既定は汎用文言のため、ここではマッチング用途の具体文言を渡す。
@@ -135,12 +137,18 @@ export default function Index({
                 onCancel={() => matchingCancel.current?.()}
             />
             {/*
-             * 進捗管理・完了済みタブと同様に -m-6 で <main> の p-6 を打ち消し、画面全高の flex カラムにする。
-             * ヘッダ＋フィルタパネルを shrink-0 で固定し、カード一覧領域だけを flex-1 でスクロールさせる。
+             * スクロール境界は AuthenticatedLayout の <main> 1か所に一本化する（自前のスクロール箱は作らない）。
+             * -m-6 は <main> 内側 div の p-6 を打ち消してフルブリードにするためだけに残す。
+             *
+             * ヘッダ・フィルタ行を「固定領域（スクロール箱の外）」に置くと、スクロールバー幅（約15px）を
+             * カード一覧だけが内側で負担し、左右端が構造的に一致しなくなる（issue #82）。
+             * 同じスクロール箱の中に入れて sticky で留めることで、3者がバー幅を等しく負担し4辺が揃う。
              */}
-            <div className="-m-6 flex h-screen flex-col overflow-hidden">
-                {/* 固定領域：ページヘッダ＋検索条件フィルタパネル */}
-                <div className="shrink-0 bg-white">
+            <div className="-m-6">
+                {/* 固定領域：ページヘッダ＋検索条件フィルタパネル。
+                    bg-white は必須。フィルタパネルの外枠は bg-muted/40＝半透明で、単独では
+                    背後を通過するカードが透ける（受け入れ条件「カードが背後に透けない」）。 */}
+                <div className="sticky top-0 z-10 bg-white">
                     <div className="flex items-center justify-between border-b border-border px-10 py-4">
                         <div>
                             <h1 className="text-lg font-bold text-foreground">人材一覧</h1>
@@ -170,8 +178,9 @@ export default function Index({
                     />
                 </div>
 
-                {/* スクロール領域：件数＋ソート / カード一覧 / ページネーション */}
-                <div className="flex-1 overflow-y-auto bg-muted/30 px-6 py-4">
+                {/* 本文：件数＋ソート / カード一覧 / ページネーション。
+                    左右ガターは固定領域（px-10）と揃える。 */}
+                <div className="px-10 py-4">
                     <div className="mb-3 flex items-center text-xs text-muted-foreground">
                         <span>
                             <strong className="text-foreground">{engineers.meta.total}</strong> 件の人材が見つかりました

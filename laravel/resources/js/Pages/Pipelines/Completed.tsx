@@ -203,18 +203,29 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
         ? [12, 15, 17, 11, 12, 9, 16, 8]
         : [13, 16, 19, 12, 13, 9, 18];
 
+    // 地色（bg-muted/30）は <main> に載せる。テーブル領域側に置くと少件数・0件のときに
+    // 画面下部が <main> の白背景（bg-background）のまま残るため（issue #82）。
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="進捗管理" />
 
             {/*
-             * 進行中タブ（Index.tsx）と同様に -m-6 で <main> の p-6 を打ち消し、画面全高の flex カラムにする。
-             * これがないとテーブル領域の flex-1 が効かず、下部が <main> の白背景（bg-background）のまま
-             * 残ってしまう（muted 背景が最下部まで伸びない）。
+             * スクロール境界は AuthenticatedLayout の <main> 1か所に一本化する（自前のスクロール箱は作らない）。
+             * -m-6 は <main> 内側 div の p-6 を打ち消してフルブリードにするためだけに残す。
+             *
+             * ヘッダ・タブ・フィルタを「固定領域（スクロール箱の外）」に置くと、スクロールバー幅（約15px）を
+             * テーブル領域だけが内側で負担し、左右端が構造的に一致しなくなる（issue #82）。
+             * 同じスクロール箱の中に入れて sticky で留めることで、4者がバー幅を等しく負担し4辺が揃う。
+             *
+             * ※ 進行中タブ（Index.tsx）はカンバンの列内スクロールが flex-1 の確定高さに依存するため
+             *   この形にできない。あちらは固定＋スクロールの構造を維持している（理由は Index.tsx の
+             *   同位置のコメントを参照）。
              */}
-            <div className="-m-6 flex h-screen flex-col overflow-hidden">
-                {/* ヘッダ・タブ・フィルタ（常時固定） */}
-                <div className="shrink-0 bg-white">
+            <div className="-m-6">
+                {/* ヘッダ・タブ・フィルタ（常時固定）。
+                    bg-white は必須。フィルタパネルの外枠は bg-muted/40＝半透明で、単独では
+                    背後を通過するテーブルが透ける。 */}
+                <div className="sticky top-0 z-10 bg-white">
                     {/* ページヘッダ */}
                     <div className="border-b border-border px-10 py-4">
                         <h1 className="text-lg font-bold text-foreground">進捗管理</h1>
@@ -242,8 +253,8 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                     />
                 </div>
 
-                {/* テーブル本体（残り高さを占有・内部スクロール・muted 背景を最下部まで） */}
-                <div className="flex-1 overflow-y-auto bg-muted/30 px-6 py-5">
+                {/* テーブル本体。左右ガターは固定領域（px-10）と揃える。 */}
+                <div className="px-10 py-5">
                 {/* テーブル上部：件数（左）＋ソート（右）を同一行に配置（WF_10 準拠） */}
                 <div className="mb-3 flex items-center">
                     <span className="text-xs text-muted-foreground">
