@@ -162,8 +162,11 @@ export default function Index({
                 tabIndex={-1}
                 className="relative -m-6 flex h-screen flex-col overflow-hidden outline-none"
             >
-                {/* ヘッダ・タブ・フィルタ（常時固定） */}
-                <div className="z-10 shrink-0 bg-white">
+                {/* ヘッダ・タブ・フィルタ（常時固定）。
+                    他の一覧系のような sticky top-0 z-10 は付けない。この画面の固定はフレックス
+                    （shrink-0）で成立しており、カンバンと重なり合わないため z-index も不要。
+                    ＝ position: static のこの div に z-10 を書いても効かない。 */}
+                <div className="shrink-0 bg-white">
                     {/* ページヘッダ */}
                     <div className="border-b border-border px-10 py-4">
                         <h1 className="text-lg font-bold text-foreground">進捗管理</h1>

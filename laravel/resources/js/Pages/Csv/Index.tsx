@@ -47,7 +47,7 @@ export default function CsvIndex({
                     </div>
 
                     {/* アンダーライン型タブ（マスタ管理／進捗管理と統一・件数バッジなし）。
-                        左右パディングは画面共通のガター（px-10）に合わせる（issue #82）。 */}
+                        左右パディングは一覧系共通のガター（px-10）に合わせる（issue #82）。 */}
                     <div className="flex items-end border-b-2 border-border bg-white px-10">
                         <TabItem
                             label="人材CSV"

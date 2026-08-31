@@ -18,7 +18,7 @@ interface Props {
  * 件数は取得できるタブ側でのみ算出できるため、値がある場合のみバッジ表示する。
  */
 export default function PipelineTabHeader({ active, activeCount, completedCount }: Props) {
-    // 左右パディングは画面共通のガター（px-10）に合わせる。ページヘッダ・フィルタ行・本文と
+    // 左右パディングは一覧系共通のガター（px-10）に合わせる。ページヘッダ・フィルタ行・本文と
     // 同じ左右端に揃えるため（issue #82）。タブ文字がヘッダ見出しより内側に入るのは
     // タブ項目自身の px-4 によるもので、WF_10（.tab-bar 24px ＋ .tab-item 18px）と同じ関係。
     return (

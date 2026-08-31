@@ -84,6 +84,14 @@ export default function Authenticated({
                  * sticky top-0 の吸着位置が正しく top:0 になる。
                  */}
                 <main className={cn('flex-1 overflow-y-auto', mainClassName)}>
+                    {/*
+                     * この p-6（24px）が既定の左右ガター。詳細・登録・編集はこれをそのまま使い、
+                     * sticky ページヘッダだけが -mx-6 でフルブリード化したうえで px-10 を当てている
+                     * （＝ヘッダ 40px / 本文 24px）。
+                     * 一方、一覧系は -m-6 で p-6 を打ち消し、ヘッダ・フィルタ・本文をすべて px-10 に
+                     * 揃えている（issue #82）。ガター値が一覧系と詳細系で異なるのは #82 のスコープが
+                     * 一覧系だったためで、統一の是非は別途判断する。
+                     */}
                     <div className="p-6">{children}</div>
                 </main>
             </div>

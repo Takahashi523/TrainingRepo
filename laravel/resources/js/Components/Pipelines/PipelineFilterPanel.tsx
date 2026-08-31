@@ -69,7 +69,7 @@ export default function PipelineFilterPanel({
         filters.rank.length > 0 ||
         filters.status.length > 0;
 
-    // 左右パディングは画面共通のガター（px-10）に合わせる（issue #82）。
+    // 左右パディングは一覧系共通のガター（px-10）に合わせる（issue #82）。
     return (
         <div className="border-b border-border bg-muted/40 px-10 py-3">
             <div className="flex flex-wrap items-center gap-2.5">

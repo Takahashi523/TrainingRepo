@@ -131,7 +131,7 @@ export default function ProjectFilterPanel({
         filters.interview_count.length > 0 ||
         filters.keyword.length > 0;
 
-    // 左右パディングは画面共通のガター（px-10）。ページヘッダ・カード一覧と同じ左右端に揃える。
+    // 左右パディングは一覧系共通のガター（px-10）。ページヘッダ・カード一覧と同じ左右端に揃える。
     // 3者は同じスクロール箱の中にあり、スクロールバー幅を等しく負担する（issue #82）。
     return (
         <div className="border-b border-border bg-muted/40 px-10 py-3">

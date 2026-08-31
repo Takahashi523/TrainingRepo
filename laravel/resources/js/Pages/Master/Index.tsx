@@ -84,7 +84,7 @@ export default function Index({
                     </div>
 
                     {/* アンダーライン型タブ（WF_10＝進捗管理準拠）。
-                        左右パディングは画面共通のガター（px-10）に合わせる（issue #82）。 */}
+                        左右パディングは一覧系共通のガター（px-10）に合わせる（issue #82）。 */}
                     <div className="flex items-end border-b-2 border-border bg-white px-10">
                         <TabItem
                             label="ユーザー管理"

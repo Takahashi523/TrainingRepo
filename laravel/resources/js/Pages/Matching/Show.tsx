@@ -131,6 +131,38 @@ export default function Show({
     // キーボード操作では一覧の先頭から辿り直しになる）。開いた瞬間の activeElement を自前で覚えておく。
     const openerRef = useRef<HTMLElement | null>(null);
 
+    // 固定領域（ページヘッダー＋対象人材サマリー）。フォーカス復帰時に「起点カードがこの帯の裏に
+    // 隠れていないか」を実測するために参照する。高さは表示条件によって変わるため定数化しない。
+    const stickyHeaderRef = useRef<HTMLDivElement | null>(null);
+
+    /**
+     * ドロワーを閉じたときのフォーカス復帰。
+     *
+     * 固定領域を sticky 化した（issue #82）ことで、スクロールポートの上端が固定領域の「裏」になった。
+     * focus() 既定のスクロール（最寄りの端に寄せる）は、対象が上方向にあるとき上端に寄せるため、
+     * 起点カードがヘッダーの裏に入りフォーカスリングが見えなくなる。
+     * そこで focus 自体のスクロールは抑止し、実際に隠れている / 画面外のときだけ中央へ寄せる
+     * （登録・編集画面の scrollIntoView({ block: 'center' }) と同じ考え方）。
+     * 見えているときは動かさない：ドロワーを閉じるたびに一覧がスクロールする方が体験として悪いため。
+     */
+    const restoreFocusAfterClose = () => {
+        const opener = openerRef.current;
+        // 起点が残っていればそこへ、消えていれば一覧コンテナへ戻す。
+        const target = opener?.isConnected ? opener : drawerContainer;
+        if (!target) return;
+
+        target.focus({ preventScroll: true });
+
+        // 一覧コンテナ（シェル）自体は全高なのでスクロール調整は不要。
+        if (target === drawerContainer) return;
+
+        const headerBottom = stickyHeaderRef.current?.getBoundingClientRect().bottom ?? 0;
+        const rect = target.getBoundingClientRect();
+        if (rect.top < headerBottom || rect.bottom > window.innerHeight) {
+            target.scrollIntoView({ block: 'center' });
+        }
+    };
+
     const openDrawer = (index: number) => {
         openerRef.current = document.activeElement as HTMLElement | null;
         setSelected(index);
@@ -202,7 +234,11 @@ export default function Show({
     };
 
     return (
-        <AuthenticatedLayout>
+        // 地色（bg-muted/30）は他の参照系画面と同じく <main> に載せる。この画面のスクロール箱は
+        // h-full＝シェルの h-screen と同高なので見た目は同じだが、地色を <main> に預けておけば
+        // 「h-screen が <main> の高さと一致する」前提が崩れたときにも白背景が露出しない。
+        // ※ bg-muted/30 は半透明のため、スクロール箱側と二重に指定しないこと（濃度が変わる）。
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="マッチング結果" />
 
             {/* AI 再実行中（Python 同期計算・数秒）に全画面で計算中を表示する。文言・見た目は遷移元
@@ -230,12 +266,13 @@ export default function Show({
                 tabIndex={-1}
                 className="relative -m-6 h-screen overflow-hidden outline-none"
             >
-                {/* スクロール箱。地色（bg-muted/30）はここに置き、結果が少ないときも画面最下部まで伸ばす。 */}
-                <div className="h-full overflow-y-auto bg-muted/30">
+                {/* スクロール箱。地色は <main>（mainClassName）側で指定するためここには置かない。 */}
+                <div className="h-full overflow-y-auto">
                     {/* 固定領域：ページヘッダー＋対象人材サマリー。
                         bg-white は必須。サマリー帯は bg-muted/40＝半透明で、単独では背後を通過する
-                        結果カードが透ける。 */}
-                    <div className="sticky top-0 z-10 bg-white">
+                        結果カードが透ける。
+                        ref はフォーカス復帰時の遮蔽判定（restoreFocusAfterClose）に使う。 */}
+                    <div ref={stickyHeaderRef} className="sticky top-0 z-10 bg-white">
                         {/* ページヘッダー（WF_09：タイトル＋サブタイトル。#52 で右側に再マッチングを追加） */}
                         <div className="flex items-center justify-between border-b border-border bg-white px-10 py-4">
                             <div>
@@ -337,7 +374,7 @@ export default function Show({
                         </div>
                     </div>
 
-                    {/* 結果一覧（WF_09 の list-area）。地色はスクロール箱側の bg-muted/30。
+                    {/* 結果一覧（WF_09 の list-area）。地色は <main> 側の bg-muted/30。
                         左右ガターは固定領域（px-10）と揃える。 */}
                     <div className="px-10 py-4">
                         {results.length === 0 ? (
@@ -404,10 +441,10 @@ export default function Show({
                     }}
                     onCloseAutoFocus={(event) => {
                         // Radix は SheetTrigger 経由で開いていないと復帰先を知らず、既定のまま抜けると
-                        // フォーカスが body に落ちる。起点が残っていればそこへ、消えていれば一覧コンテナへ戻す。
+                        // フォーカスが body に落ちる。復帰先の決定と、sticky ヘッダーに隠れないための
+                        // スクロール調整は restoreFocusAfterClose に集約している。
                         event.preventDefault();
-                        const opener = openerRef.current;
-                        (opener?.isConnected ? opener : drawerContainer)?.focus();
+                        restoreFocusAfterClose();
                     }}
                 >
                     {/* 別カードを選び直したときにフォーム状態を持ち越さないため、案件IDで再マウントする */}
