@@ -147,6 +147,14 @@ export default function Index({
              * - ヘッダ・タブ・フィルタは shrink-0 で常時固定（フレックスにより上部に固定）
              * - カンバンは flex-1 で残り高さを占有し内部スクロール
              * - ドロワー（Sheet）はこのコンテナへ Portal し、ヘッダーを含む画面トップから全高でオーバーレイする
+             *
+             * この画面だけは他の一覧系（人材一覧・完了済みタブ等）のように <main> のスクロールへ載せ替えない。
+             * カンバンの列内スクロール（KanbanColumn の overflow-y-auto）は flex-1 から与えられる確定高さに
+             * 依存しており、ページスクロールに載せると高さが auto になって列が内容分だけ伸び、
+             * 「ボードが画面に収まる」という前提そのものが失われるため。
+             * またカンバンの縦スクロールは列の内側で完結しページレベルの縦バーが出ないため、
+             * 固定領域と本文の間にスクロールバー幅の非対称（issue #82）はそもそも発生しない。
+             * 残っていたガター不一致（ヘッダ px-10 に対しタブ・条件バーが px-6）だけを px-10 に揃えている。
              */}
             <div
                 ref={setDrawerContainer}
@@ -172,7 +180,7 @@ export default function Index({
                         type="button"
                         variant="ghost"
                         onClick={() => setFilterOpen((v) => !v)}
-                        className="flex h-auto w-full items-center justify-start gap-2.5 rounded-none border-b border-border bg-muted/60 px-6 py-2 text-left hover:bg-muted [&_svg]:size-3.5"
+                        className="flex h-auto w-full items-center justify-start gap-2.5 rounded-none border-b border-border bg-muted/60 px-10 py-2 text-left hover:bg-muted [&_svg]:size-3.5"
                     >
                         {/* WF_10 準拠：ラベル左の表示条件アイコン */}
                         <SlidersHorizontal className="shrink-0 text-muted-foreground" />

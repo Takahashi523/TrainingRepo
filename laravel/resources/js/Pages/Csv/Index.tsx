@@ -25,14 +25,20 @@ export default function CsvIndex({
 }: Props) {
     const [tab, setTab] = useState<CsvTab>('engineers');
 
+    // 地色（bg-muted/30）は <main> に載せる。本文側に置くと内容が短いときに
+    // 画面下部が <main> の白背景のまま残るため（issue #82）。
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="CSV入出力" />
 
-            {/* マスタ管理／進捗管理と同構造：フルブリードの固定ヘッダー＋タブ＋スクロール領域 */}
-            <div className="-m-6 flex h-screen flex-col overflow-hidden">
-                {/* 固定ヘッダー（ページ見出し＋タブ）。コンテンツをスクロールしても常時表示。 */}
-                <div className="shrink-0 bg-white">
+            {/* マスタ管理／進捗管理と同構造：フルブリードのヘッダー＋タブ＋本文。
+                スクロール境界は AuthenticatedLayout の <main> 1か所に一本化し、ヘッダー＋タブは同じ
+                スクロール箱の中で sticky 固定する。固定領域をスクロール箱の外に置くとスクロールバー幅
+                （約15px）を本文だけが内側で負担し、左右端が一致しない（issue #82）。
+                -m-6 は <main> 内側 div の p-6 を打ち消してフルブリードにするためだけに残す。 */}
+            <div className="-m-6">
+                {/* ヘッダー（ページ見出し＋タブ）。コンテンツをスクロールしても常時表示。 */}
+                <div className="sticky top-0 z-10 bg-white">
                     <div className="border-b border-border px-10 py-4">
                         <h1 className="text-lg font-bold text-foreground">CSV入出力</h1>
                         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -40,8 +46,9 @@ export default function CsvIndex({
                         </p>
                     </div>
 
-                    {/* アンダーライン型タブ（マスタ管理／進捗管理と統一・件数バッジなし） */}
-                    <div className="flex items-end border-b-2 border-border bg-white px-6">
+                    {/* アンダーライン型タブ（マスタ管理／進捗管理と統一・件数バッジなし）。
+                        左右パディングは画面共通のガター（px-10）に合わせる（issue #82）。 */}
+                    <div className="flex items-end border-b-2 border-border bg-white px-10">
                         <TabItem
                             label="人材CSV"
                             isActive={tab === 'engineers'}
@@ -55,8 +62,9 @@ export default function CsvIndex({
                     </div>
                 </div>
 
-                {/* コンテンツエリア（スクロール）。両パネルを常時マウントし、非アクティブ側は hidden で隠す（結果 state を独立保持）。 */}
-                <div className="flex-1 overflow-y-auto bg-muted/30 px-10 py-8">
+                {/* コンテンツエリア。両パネルを常時マウントし、非アクティブ側は hidden で隠す（結果 state を独立保持）。
+                    左右ガターは固定領域（px-10）と揃える。 */}
+                <div className="px-10 py-8">
                     <div className={cn(tab !== 'engineers' && 'hidden')}>
                         <EngineerCsvPanel
                             options={engineer_filter_options}

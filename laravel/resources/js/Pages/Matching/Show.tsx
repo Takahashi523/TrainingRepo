@@ -215,147 +215,164 @@ export default function Show({
             />
 
             {/* WF_09：ヘッダ・対象人材サマリーは上部固定、下の結果一覧のみスクロール。
-                進捗管理・人材一覧と同じく p-6 を -m-6 で打ち消し、画面全高（h-screen）の flex カラムにする。 */}
+
+                位置決めシェル（この div）とスクロール箱（内側の div）を分けているのが要点。
+                ドロワーはこのシェルへ Portal され absolute inset-y-0 で配置されるため、シェル自身を
+                スクロール箱にすると包含ブロックがスクロール全高になり、ドロワーがビューポート高ではなく
+                結果一覧の全長まで伸びたうえスクロールに追従して流れ去る。シェルは h-screen＋overflow-hidden の
+                ままにして、スクロールは内側の箱に閉じ込める。
+
+                ヘッダ・サマリーをスクロール箱の外に置くと、スクロールバー幅（約15px）を結果一覧だけが
+                内側で負担して左右端が一致しないため、同じ箱の中に入れて sticky で留める（issue #82）。 */}
             <div
                 ref={setDrawerContainer}
                 // ドロワーを閉じたときの復帰先（起点のカードが消えている場合）。マウスでは焦点化しない
                 tabIndex={-1}
-                className="relative -m-6 flex h-screen flex-col overflow-hidden outline-none"
+                className="relative -m-6 h-screen overflow-hidden outline-none"
             >
-                {/* ページヘッダー（WF_09：タイトル＋サブタイトル。#52 で右側に再マッチングを追加） */}
-                <div className="flex shrink-0 items-center justify-between border-b border-border bg-white px-10 py-4">
-                    <div>
-                        <h1 className="text-lg font-bold text-foreground">マッチング結果</h1>
-                        <p className="mt-0.5 text-xs text-muted-foreground">対象人材にマッチする案件をAIスコアの高い順に表示します</p>
-                    </div>
-                    {/* 実行中は disabled にして二重実行を防ぐ（オーバーレイでも背後の操作は遮断される）。 */}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 shrink-0 gap-1.5 text-xs"
-                        onClick={handleRerun}
-                        disabled={isRerunning}
-                    >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        再マッチング
-                    </Button>
-                </div>
-
-                {/* 対象人材サマリー（WF_09：薄グレーの帯・下境界のみ */}
-                <div className="shrink-0 border-b border-border bg-muted/40 px-10 py-3">
-                    {/* 上段：氏名 + ステータスバッジ（最重要属性なので氏名の直後に置き、同一性と状態をまとめて読ませる） */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* 氏名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（TruncatedText）。
-                            固定の max-w は付けず flex-1 max-w-fit で当てる。min-w-0 だけでは
-                            「折り返すか」の判定に使う基準サイズが max-content（truncate により全文1行分）
-                            のままで、氏名が親幅を超えるとステータスバッジが2行目へ落ちるため。
-                            max-w-fit は flex-1 とセット：これが無いと氏名が余白まで伸びて
-                            ステータスバッジが右端まで離れる（人材詳細・案件詳細と同じ組み方）。 */}
-                        <TruncatedText
-                            as="p"
-                            text={engineer.name}
-                            className="min-w-0 max-w-fit flex-1 text-base font-bold text-foreground"
-                        />
-                        <StatusBadge status={engineer.status} className="shrink-0" />
-                    </div>
-
-                    {/* 年齢・最寄駅・希望単価・勤務形態を、マッチングカードのメタと同じ型2（ラベル語なし・｜区切りの横一列）で表示する。
-                        項目名は MetaItem が sr-only で支援技術に渡す。未指定も同じ流儀で項目名入りトークンにし
-                        （入力済み属性＝未設定／柔軟に決まり得る条件＝未定）、カードと語彙を揃える。 */}
-                    <MetaRow className="mt-1.5">
-                        <MetaItem field="age" valueHasFieldName={engineer.age == null}>
-                            {engineer.age != null ? `${engineer.age}歳` : emptyText('age', true)}
-                        </MetaItem>
-                        {/* 最寄駅・路線名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（max-w で幅を抑える）。 */}
-                        <MetaItem
-                            field="nearestStation"
-                            valueHasFieldName={!engineer.nearest_station}
-                            // gap-0：駅名と「（路線）」は1つの値の続きなので、MetaItem 既定の
-                            // 隙間（gap-1）を入れない（「東京駅 （山手線）」と割れて見えるため）。
-                            className="max-w-[18rem] gap-0"
-                        >
-                            <TruncatedText
-                                text={engineer.nearest_station || emptyText('nearestStation', true)}
-                                className="min-w-0 max-w-[8rem]"
-                            />
-                            <TruncatedText
-                                text={
-                                    engineer.nearest_line
-                                        ? `（${engineer.nearest_line}）`
-                                        : `（${emptyText('nearestLine', true)}）`
-                                }
-                                className="min-w-0 max-w-[8rem]"
-                            />
-                        </MetaItem>
-                        <MetaItem field="availableFrom" valueHasFieldName={!engineer.available_from}>
-                            {engineer.available_from ? engineer.available_label : emptyText('availableFrom', true)}
-                        </MetaItem>
-                        {/* 希望単価は単一値。案件の単価（レンジ）と単位「万円」の見せ方を揃えるため Rate に載せる。 */}
-                        <MetaItem field="desiredRate" valueHasFieldName={engineer.desired_rate == null}>
-                            <Rate value={engineer.desired_rate} variant="plain" withFieldName />
-                        </MetaItem>
-                        <MetaItem field="workStyle" valueHasFieldName={engineer.work_styles.length === 0}>
-                            {engineer.work_styles.length > 0
-                                ? engineer.work_styles.map((w) => w.name).join(' / ')
-                                : emptyText('workStyle', true)}
-                        </MetaItem>
-                    </MetaRow>
-
-                    {/* スキル：マッチングカードと同じくラベル（見出し）なしでタグを直接並べる。
-                        空でも高さを揃えるためプレースホルダタグを出す（カードのスキル行と同じ流儀）。 */}
-                    {engineer.skills.length > 0 ? (
-                        // detail は一覧・簡易表示の規約どおり非表示（詳細は SkillTagDetail を使う人材詳細画面で確認できる）。
-                        <CollapsibleTagRow className="mt-1.5">
-                            {engineer.skills.map((s, i) => (
-                                <SkillTag key={`${s.label ?? ''}-${i}`} label={s.label ?? ''} className="text-muted-foreground" />
-                            ))}
-                        </CollapsibleTagRow>
-                    ) : (
-                        <div className="mt-1.5">
-                            <span className="text-[11px] text-muted-foreground">{emptyText('skills', true)}</span>
+                {/* スクロール箱。地色（bg-muted/30）はここに置き、結果が少ないときも画面最下部まで伸ばす。 */}
+                <div className="h-full overflow-y-auto bg-muted/30">
+                    {/* 固定領域：ページヘッダー＋対象人材サマリー。
+                        bg-white は必須。サマリー帯は bg-muted/40＝半透明で、単独では背後を通過する
+                        結果カードが透ける。 */}
+                    <div className="sticky top-0 z-10 bg-white">
+                        {/* ページヘッダー（WF_09：タイトル＋サブタイトル。#52 で右側に再マッチングを追加） */}
+                        <div className="flex items-center justify-between border-b border-border bg-white px-10 py-4">
+                            <div>
+                                <h1 className="text-lg font-bold text-foreground">マッチング結果</h1>
+                                <p className="mt-0.5 text-xs text-muted-foreground">対象人材にマッチする案件をAIスコアの高い順に表示します</p>
+                            </div>
+                            {/* 実行中は disabled にして二重実行を防ぐ（オーバーレイでも背後の操作は遮断される）。 */}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 shrink-0 gap-1.5 text-xs"
+                                onClick={handleRerun}
+                                disabled={isRerunning}
+                            >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                再マッチング
+                            </Button>
                         </div>
-                    )}
 
-                    {/* 工程経験：マッチングカードと同じくラベルなしで ProcessCheckboxGroup を直接表示（サイズ縮小ラッパーも共通）。 */}
-                    <div className="mt-2 [&_button]:h-3.5 [&_button]:w-3.5 [&_label]:text-[11px] [&_svg]:h-2.5 [&_svg]:w-2.5">
-                        <ProcessCheckboxGroup phases={phaseList} values={phaseValues} readOnly labelClassName="text-muted-foreground" />
-                    </div>
-                </div>
-
-                {/* 結果一覧（WF_09 の list-area：薄グレー背景・この領域のみスクロール。人材一覧カードの一覧エリアと同じ bg-muted/30） */}
-                <div className="flex-1 overflow-y-auto bg-muted/30 px-10 py-4">
-                    {results.length === 0 ? (
-                        (() => {
-                            // 結果0件の理由で出し分ける。emptyReason は0件時は必ず入るが、
-                            // 万一 null でも no_match にフォールバックして必ず何か表示する。
-                            const empty = EMPTY_STATES[emptyReason ?? 'no_match'];
-                            const EmptyIcon = empty.icon;
-                            return (
-                                <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border py-16 text-center">
-                                    <EmptyIcon className="mb-2 h-8 w-8 text-muted-foreground" />
-                                    <p className="text-sm font-semibold text-foreground">{empty.title}</p>
-                                    <p className="mt-1 text-xs text-muted-foreground">{empty.description}</p>
-                                </div>
-                            );
-                        })()
-                    ) : (
-                        <>
-                            {/* 件数表示：人材一覧・進捗管理完了タブと同じ体裁（一覧先頭の小テキスト・件数を強調）。 */}
-                            <div className="mb-3 text-xs text-muted-foreground">
-                                スコア上位 <strong className="text-foreground">{results.length}</strong> 件を表示
+                        {/* 対象人材サマリー（WF_09：薄グレーの帯・下境界のみ */}
+                        <div className="border-b border-border bg-muted/40 px-10 py-3">
+                            {/* 上段：氏名 + ステータスバッジ（最重要属性なので氏名の直後に置き、同一性と状態をまとめて読ませる） */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                {/* 氏名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（TruncatedText）。
+                                    固定の max-w は付けず flex-1 max-w-fit で当てる。min-w-0 だけでは
+                                    「折り返すか」の判定に使う基準サイズが max-content（truncate により全文1行分）
+                                    のままで、氏名が親幅を超えるとステータスバッジが2行目へ落ちるため。
+                                    max-w-fit は flex-1 とセット：これが無いと氏名が余白まで伸びて
+                                    ステータスバッジが右端まで離れる（人材詳細・案件詳細と同じ組み方）。 */}
+                                <TruncatedText
+                                    as="p"
+                                    text={engineer.name}
+                                    className="min-w-0 max-w-fit flex-1 text-base font-bold text-foreground"
+                                />
+                                <StatusBadge status={engineer.status} className="shrink-0" />
                             </div>
-                            <div className="space-y-2.5">
-                                {results.map((result, i) => (
-                                    <MatchCard
-                                        key={result.project.id}
-                                        result={result}
-                                        selected={selected === i}
-                                        onSelect={() => openDrawer(i)}
+
+                            {/* 年齢・最寄駅・希望単価・勤務形態を、マッチングカードのメタと同じ型2（ラベル語なし・｜区切りの横一列）で表示する。
+                                項目名は MetaItem が sr-only で支援技術に渡す。未指定も同じ流儀で項目名入りトークンにし
+                                （入力済み属性＝未設定／柔軟に決まり得る条件＝未定）、カードと語彙を揃える。 */}
+                            <MetaRow className="mt-1.5">
+                                <MetaItem field="age" valueHasFieldName={engineer.age == null}>
+                                    {engineer.age != null ? `${engineer.age}歳` : emptyText('age', true)}
+                                </MetaItem>
+                                {/* 最寄駅・路線名は長くなり得るため 1 行省略＋省略時のみ全文ツールチップ（max-w で幅を抑える）。 */}
+                                <MetaItem
+                                    field="nearestStation"
+                                    valueHasFieldName={!engineer.nearest_station}
+                                    // gap-0：駅名と「（路線）」は1つの値の続きなので、MetaItem 既定の
+                                    // 隙間（gap-1）を入れない（「東京駅 （山手線）」と割れて見えるため）。
+                                    className="max-w-[18rem] gap-0"
+                                >
+                                    <TruncatedText
+                                        text={engineer.nearest_station || emptyText('nearestStation', true)}
+                                        className="min-w-0 max-w-[8rem]"
                                     />
-                                ))}
+                                    <TruncatedText
+                                        text={
+                                            engineer.nearest_line
+                                                ? `（${engineer.nearest_line}）`
+                                                : `（${emptyText('nearestLine', true)}）`
+                                        }
+                                        className="min-w-0 max-w-[8rem]"
+                                    />
+                                </MetaItem>
+                                <MetaItem field="availableFrom" valueHasFieldName={!engineer.available_from}>
+                                    {engineer.available_from ? engineer.available_label : emptyText('availableFrom', true)}
+                                </MetaItem>
+                                {/* 希望単価は単一値。案件の単価（レンジ）と単位「万円」の見せ方を揃えるため Rate に載せる。 */}
+                                <MetaItem field="desiredRate" valueHasFieldName={engineer.desired_rate == null}>
+                                    <Rate value={engineer.desired_rate} variant="plain" withFieldName />
+                                </MetaItem>
+                                <MetaItem field="workStyle" valueHasFieldName={engineer.work_styles.length === 0}>
+                                    {engineer.work_styles.length > 0
+                                        ? engineer.work_styles.map((w) => w.name).join(' / ')
+                                        : emptyText('workStyle', true)}
+                                </MetaItem>
+                            </MetaRow>
+
+                            {/* スキル：マッチングカードと同じくラベル（見出し）なしでタグを直接並べる。
+                                空でも高さを揃えるためプレースホルダタグを出す（カードのスキル行と同じ流儀）。 */}
+                            {engineer.skills.length > 0 ? (
+                                // detail は一覧・簡易表示の規約どおり非表示（詳細は SkillTagDetail を使う人材詳細画面で確認できる）。
+                                <CollapsibleTagRow className="mt-1.5">
+                                    {engineer.skills.map((s, i) => (
+                                        <SkillTag key={`${s.label ?? ''}-${i}`} label={s.label ?? ''} className="text-muted-foreground" />
+                                    ))}
+                                </CollapsibleTagRow>
+                            ) : (
+                                <div className="mt-1.5">
+                                    <span className="text-[11px] text-muted-foreground">{emptyText('skills', true)}</span>
+                                </div>
+                            )}
+
+                            {/* 工程経験：マッチングカードと同じくラベルなしで ProcessCheckboxGroup を直接表示（サイズ縮小ラッパーも共通）。 */}
+                            <div className="mt-2 [&_button]:h-3.5 [&_button]:w-3.5 [&_label]:text-[11px] [&_svg]:h-2.5 [&_svg]:w-2.5">
+                                <ProcessCheckboxGroup phases={phaseList} values={phaseValues} readOnly labelClassName="text-muted-foreground" />
                             </div>
-                        </>
-                    )}
+                        </div>
+                    </div>
+
+                    {/* 結果一覧（WF_09 の list-area）。地色はスクロール箱側の bg-muted/30。
+                        左右ガターは固定領域（px-10）と揃える。 */}
+                    <div className="px-10 py-4">
+                        {results.length === 0 ? (
+                            (() => {
+                                // 結果0件の理由で出し分ける。emptyReason は0件時は必ず入るが、
+                                // 万一 null でも no_match にフォールバックして必ず何か表示する。
+                                const empty = EMPTY_STATES[emptyReason ?? 'no_match'];
+                                const EmptyIcon = empty.icon;
+                                return (
+                                    <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border py-16 text-center">
+                                        <EmptyIcon className="mb-2 h-8 w-8 text-muted-foreground" />
+                                        <p className="text-sm font-semibold text-foreground">{empty.title}</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">{empty.description}</p>
+                                    </div>
+                                );
+                            })()
+                        ) : (
+                            <>
+                                {/* 件数表示：人材一覧・進捗管理完了タブと同じ体裁（一覧先頭の小テキスト・件数を強調）。 */}
+                                <div className="mb-3 text-xs text-muted-foreground">
+                                    スコア上位 <strong className="text-foreground">{results.length}</strong> 件を表示
+                                </div>
+                                <div className="space-y-2.5">
+                                    {results.map((result, i) => (
+                                        <MatchCard
+                                            key={result.project.id}
+                                            result={result}
+                                            selected={selected === i}
+                                            onSelect={() => openDrawer(i)}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 

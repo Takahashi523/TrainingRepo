@@ -108,8 +108,8 @@ export default function EngineerFilterPanel({
         filters.phases.length > 0 ||
         filters.keyword.length > 0;
 
-    // 左右パディングはページヘッダ（px-10）に合わせる。カード一覧はスクロール領域の px-6 に
-    // スクロールバー幅が加わって実質同じ位置になるため、px-6 のままだとこの行だけ左右にはみ出して見える。
+    // 左右パディングは画面共通のガター（px-10）。ページヘッダ・カード一覧と同じ左右端に揃える。
+    // 3者は同じスクロール箱の中にあり、スクロールバー幅を等しく負担する（issue #82）。
     return (
         <div className="border-b border-border bg-muted/40 px-10 py-3">
             <div className="flex flex-wrap items-center gap-2.5">

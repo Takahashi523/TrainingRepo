@@ -62,13 +62,19 @@ export default function Index({
         });
     };
 
+    // 地色（bg-muted/30）は <main> に載せる。本文側に置くと内容が短いときに
+    // 画面下部が <main> の白背景のまま残るため（issue #82）。
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="マスタ管理" />
 
-            {/* WF_12 準拠：フルブリードのヘッダー＋アンダーラインタブ＋スクロール領域（進捗管理と同構造） */}
-            <div className="-m-6 flex h-screen flex-col overflow-hidden">
-                <div className="shrink-0 bg-white">
+            {/* WF_12 準拠：フルブリードのヘッダー＋アンダーラインタブ＋本文（進捗管理・完了済みと同構造）。
+                スクロール境界は AuthenticatedLayout の <main> 1か所に一本化し、ヘッダー＋タブは同じ
+                スクロール箱の中で sticky 固定する。固定領域をスクロール箱の外に置くとスクロールバー幅
+                （約15px）を本文だけが内側で負担し、左右端が一致しない（issue #82）。
+                -m-6 は <main> 内側 div の p-6 を打ち消してフルブリードにするためだけに残す。 */}
+            <div className="-m-6">
+                <div className="sticky top-0 z-10 bg-white">
                     {/* ページヘッダー */}
                     <div className="border-b border-border px-10 py-4">
                         <h1 className="text-lg font-bold text-foreground">マスタ管理</h1>
@@ -77,8 +83,9 @@ export default function Index({
                         </p>
                     </div>
 
-                    {/* アンダーライン型タブ（WF_10＝進捗管理準拠） */}
-                    <div className="flex items-end border-b-2 border-border bg-white px-6">
+                    {/* アンダーライン型タブ（WF_10＝進捗管理準拠）。
+                        左右パディングは画面共通のガター（px-10）に合わせる（issue #82）。 */}
+                    <div className="flex items-end border-b-2 border-border bg-white px-10">
                         <TabItem
                             label="ユーザー管理"
                             count={activeTab === 'users' ? users.length : undefined}
@@ -93,8 +100,8 @@ export default function Index({
                     </div>
                 </div>
 
-                {/* コンテンツエリア（スクロール） */}
-                <div className="flex-1 overflow-y-auto bg-muted/30 px-10 py-6">
+                {/* コンテンツエリア。左右ガターは固定領域（px-10）と揃える。 */}
+                <div className="px-10 py-6">
                     {activeTab === 'users' && (
                         <>
                             <div className="mb-3 flex justify-end">

@@ -10,17 +10,22 @@ export default function Dashboard({
     pipeline_summary,
     upcoming_actions,
 }: DashboardProps) {
+    // 地色（bg-muted/30）は <main> に載せる。本文側に置くと内容が短いときに
+    // 画面下部が <main> の白背景のまま残るため（issue #82）。
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout mainClassName="bg-muted/30">
             <Head title="ダッシュボード" />
 
             {/*
              * 他画面（人材一覧・案件一覧・進捗管理）と同じヘッダ構造に統一する。
-             * -m-6 で <main> の p-6 を打ち消し、固定ヘッダ＋本文スクロールの全高レイアウトにする。
+             * スクロール境界は AuthenticatedLayout の <main> 1か所に一本化し、ヘッダは同じスクロール箱の
+             * 中で sticky 固定する。固定領域をスクロール箱の外に置くとスクロールバー幅（約15px）を
+             * 本文だけが内側で負担し、ヘッダと左右端が一致しない（issue #82）。
+             * -m-6 は <main> 内側 div の p-6 を打ち消してフルブリードにするためだけに残す。
              * 集計軸「メイン・サブ担当含む」はサブタイトルに1回だけ書き、各カードでの重複記載はしない。
              */}
-            <div className="-m-6 flex h-screen flex-col overflow-hidden">
-                <div className="shrink-0 border-b border-border bg-white px-10 py-4">
+            <div className="-m-6">
+                <div className="sticky top-0 z-10 border-b border-border bg-white px-10 py-4">
                     <h1 className="text-lg font-bold text-foreground">
                         ダッシュボード
                     </h1>
@@ -29,7 +34,7 @@ export default function Dashboard({
                     </p>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-10 py-6 bg-muted/30">
+                <div className="px-10 py-6">
                     <div className="mx-auto max-w-7xl space-y-5">
                         {/* ① KPI サマリーバー */}
                     <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
