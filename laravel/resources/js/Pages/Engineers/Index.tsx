@@ -86,6 +86,10 @@ export default function Index({
     // window と scroll-region 属性の要素しか対象にしないため、外しても <main> は動かないため。
     // 成功時のみ戻す（onFinish だと失敗・キャンセルでも画面が飛ぶ）。
     const handlePageChange = (page: number) => {
+        // 現在ページのボタンは disabled ではないため再クリックできる（Pagination.tsx）。
+        // 素通しすると「同じ内容のまま視点だけ先頭へ飛ぶ」不可解な動きになるので、ここで止める
+        // （ついでに同じページを取り直す無駄なリクエストも消える）。
+        if (page === engineers.meta.current_page) return;
         visit({ page }, scrollToTop);
     };
 

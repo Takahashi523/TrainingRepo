@@ -159,6 +159,8 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
     // 人材一覧 Index.tsx と同じ配線（理由の詳細はそちらのコメントを参照）。
     // 条件は現状維持なので patch は空、ページだけを差し替える。
     const handlePageChange = (page: number) => {
+        // 現在ページの再クリックで「同じ内容のまま視点だけ飛ぶ」のを防ぐ（人材一覧と同じ）。
+        if (page === pipelines.meta.current_page) return;
         visit({}, page, scrollToTop);
     };
 
