@@ -8,6 +8,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerFilters, EngineerListPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { useKeywordDebounce } from '@/hooks/use-keyword-debounce';
+import { useScrollContainer } from '@/hooks/use-scroll-container';
 import { Head, router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -61,13 +62,31 @@ export default function Index({
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
-    const visit = (patch: Partial<EngineerFilters>) => {
+    // 一覧のスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴み、
+    // ページ送りのときだけ scrollToTop で先頭へ戻す。
+    const { scrollContainerRef, scrollToTop } = useScrollContainer();
+
+    // onSuccess は「ページ送りのときだけ先頭へ戻す」ために渡す任意引数。
+    // 省略時（フィルタ変更・デバウンス・ソート・すべてクリア）は preserveScroll がそのまま効き、
+    // 条件パネルの位置を保ったまま結果だけが差し替わる。
+    const visit = (patch: Partial<EngineerFilters>, onSuccess?: () => void) => {
         const next: EngineerFilters = { ...filtersRef.current, ...patch };
         router.get('/engineers', buildQuery(next), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            onSuccess,
         });
+    };
+
+    // ページ送りはカード一覧が総入れ替わりになる操作なので、先頭へ戻す（issue #107）。
+    // ページ送りボタンは一覧の最下部にあるため、戻さないと「新しいページの末尾付近」が表示される。
+    //
+    // preserveScroll: true は外さない。スクロール境界が <main> 側にあり、Inertia のリセットは
+    // window と scroll-region 属性の要素しか対象にしないため、外しても <main> は動かないため。
+    // 成功時のみ戻す（onFinish だと失敗・キャンセルでも画面が飛ぶ）。
+    const handlePageChange = (page: number) => {
+        visit({ page }, scrollToTop);
     };
 
     const handleFilterChange = (patch: Partial<EngineerFilters>) => {
@@ -126,7 +145,7 @@ export default function Index({
     // 地色（bg-muted/30）は <main> に載せる。カード一覧側に置くと少件数・0件のときに
     // 画面下部が <main> の白背景のまま残るため。人材詳細・案件詳細と同じ使い方（issue #82）。
     return (
-        <AuthenticatedLayout mainClassName="bg-muted/30">
+        <AuthenticatedLayout mainClassName="bg-muted/30" mainRef={scrollContainerRef}>
             <Head title="人材一覧" />
             {/* マッチング実行の遷移中（Python AI 同期計算）に全画面で計算中を表示する。
                 共通部品の既定は汎用文言のため、ここではマッチング用途の具体文言を渡す。
@@ -212,7 +231,7 @@ export default function Index({
 
                     <Pagination
                         meta={engineers.meta}
-                        onChange={(page) => visit({ page })}
+                        onChange={handlePageChange}
                     />
                 </div>
             </div>

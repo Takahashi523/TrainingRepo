@@ -7,6 +7,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { ProjectFilters, ProjectIndexPageProps } from "@/types/project";
 import { PageProps } from "@/types";
 import { useKeywordDebounce } from "@/hooks/use-keyword-debounce";
+import { useScrollContainer } from "@/hooks/use-scroll-container";
 import { Head, router } from "@inertiajs/react";
 import { Plus } from "lucide-react";
 import { useRef } from "react";
@@ -63,13 +64,27 @@ export default function Index({
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
-    const visit = (patch: Partial<ProjectFilters>) => {
+    // 一覧のスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴み、
+    // ページ送りのときだけ scrollToTop で先頭へ戻す。
+    const { scrollContainerRef, scrollToTop } = useScrollContainer();
+
+    // onSuccess は「ページ送りのときだけ先頭へ戻す」ために渡す任意引数。
+    // 省略時（フィルタ変更・デバウンス・ソート・すべてクリア）は preserveScroll がそのまま効き、
+    // 条件パネルの位置を保ったまま結果だけが差し替わる。
+    const visit = (patch: Partial<ProjectFilters>, onSuccess?: () => void) => {
         const next: ProjectFilters = { ...filtersRef.current, ...patch };
         router.get("/projects", buildQuery(next), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            onSuccess,
         });
+    };
+
+    // ページ送りはカード一覧が総入れ替わりになる操作なので、先頭へ戻す（issue #107）。
+    // 人材一覧 Index.tsx と同じ配線（理由の詳細はそちらのコメントを参照）。
+    const handlePageChange = (page: number) => {
+        visit({ page }, scrollToTop);
     };
 
     const handleFilterChange = (patch: Partial<ProjectFilters>) => {
@@ -99,7 +114,7 @@ export default function Index({
     // 地色（bg-muted/30）は <main> に載せる。カード一覧側に置くと少件数・0件のときに
     // 画面下部が <main> の白背景のまま残るため。人材一覧・案件詳細と同じ使い方（issue #82）。
     return (
-        <AuthenticatedLayout mainClassName="bg-muted/30">
+        <AuthenticatedLayout mainClassName="bg-muted/30" mainRef={scrollContainerRef}>
             <Head title="案件一覧" />
             {/*
              * 人材一覧と同様に、スクロール境界は AuthenticatedLayout の <main> 1か所に一本化する
@@ -186,7 +201,7 @@ export default function Index({
 
                     <Pagination
                         meta={projects.meta}
-                        onChange={(page) => visit({ page })}
+                        onChange={handlePageChange}
                     />
                 </div>
             </div>

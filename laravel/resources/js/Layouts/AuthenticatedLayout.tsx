@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PageProps } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
-import { PropsWithChildren, ReactNode, useEffect } from 'react';
+import { PropsWithChildren, ReactNode, Ref, useEffect } from 'react';
 
 export default function Authenticated({
     header,
@@ -23,8 +23,21 @@ export default function Authenticated({
      *   位置決めやカンバンの確定高さのために自前の全高コンテナを持ち、地色もそちら側で指定する。
      */
     mainClassName,
+    /**
+     * スクロール領域（<main>）への ref。一覧のページ送りで先頭へ戻すために、
+     * ページ側が `useScrollContainer()` で作った ref を受け取る（issue #107）。
+     *
+     * ※ ref を「ページが持ち、レイアウトへ渡す」向きにしているのは、逆向き（レイアウトが
+     *   context で配る）が成立しないため。ページは <AuthenticatedLayout> を子として描画する側
+     *   ＝ Provider の親であり、自分の子孫が提供する context は受け取れない。
+     */
+    mainRef,
     children,
-}: PropsWithChildren<{ header?: ReactNode; mainClassName?: string }>) {
+}: PropsWithChildren<{
+    header?: ReactNode;
+    mainClassName?: string;
+    mainRef?: Ref<HTMLElement>;
+}>) {
     const page = usePage<PageProps>();
     const { toast } = useToast();
 
@@ -82,8 +95,16 @@ export default function Authenticated({
                  * レイヤー③ スクロール境界: ここだけ overflow-y-auto。
                  * padding を <main> 自身ではなく内側 div に置くことで
                  * sticky top-0 の吸着位置が正しく top:0 になる。
+                 *
+                 * この要素は mainRef 経由でページ側にも渡り、一覧のページ送りで先頭へ戻す対象になる
+                 * （issue #107）。Inertia のスクロールリセットは window と scroll-region 属性の要素しか
+                 * 触らないため、ここは自前で戻す必要がある。
+                 *
+                 * ⚠️ ここに scroll-region 属性を足さないこと。属性を足すと preserveScroll: true の
+                 *    visit（一覧のフィルタ・ページ送り）で Inertia が swap 後の rAF に元の位置を
+                 *    復元するようになり、ページ送りの先頭復帰が巻き戻される。
                  */}
-                <main className={cn('flex-1 overflow-y-auto', mainClassName)}>
+                <main ref={mainRef} className={cn('flex-1 overflow-y-auto', mainClassName)}>
                     {/*
                      * この p-6（24px）が既定の左右ガター。詳細・登録・編集はこれをそのまま使い、
                      * sticky ページヘッダだけが -mx-6 でフルブリード化したうえで px-10 を当てている

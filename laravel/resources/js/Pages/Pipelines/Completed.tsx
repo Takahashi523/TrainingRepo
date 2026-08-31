@@ -21,6 +21,7 @@ import { emptyText } from '@/lib/emptyValue';
 import { isValidYmd } from '@/lib/utils';
 import { useDebouncedEffect } from '@/hooks/use-debounced-effect';
 import { KEYWORD_DEBOUNCE_MS, useKeywordDebounce } from '@/hooks/use-keyword-debounce';
+import { useScrollContainer } from '@/hooks/use-scroll-container';
 import { Head, router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -137,13 +138,28 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
-    const visit = (patch: Partial<CompletedFilters>, page: number) => {
+    // テーブルのスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴み、
+    // ページ送りのときだけ scrollToTop で先頭へ戻す。
+    const { scrollContainerRef, scrollToTop } = useScrollContainer();
+
+    // onSuccess は「ページ送りのときだけ先頭へ戻す」ために渡す任意引数。
+    // 省略時（フィルタ変更・キーワード／終了日のデバウンス・ソート・すべてクリア）は
+    // preserveScroll がそのまま効き、条件パネルの位置を保ったまま結果だけが差し替わる。
+    const visit = (patch: Partial<CompletedFilters>, page: number, onSuccess?: () => void) => {
         const next: CompletedFilters = { ...filtersRef.current, ...patch };
         router.get(route('pipelines.completed'), buildQuery(next, page), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            onSuccess,
         });
+    };
+
+    // ページ送りはテーブルの中身が総入れ替わりになる操作なので、先頭へ戻す（issue #107）。
+    // 人材一覧 Index.tsx と同じ配線（理由の詳細はそちらのコメントを参照）。
+    // 条件は現状維持なので patch は空、ページだけを差し替える。
+    const handlePageChange = (page: number) => {
+        visit({}, page, scrollToTop);
     };
 
     // 終了日欄の版 applyKeyword。入力欄の同期と保留デバウンスの無効化をここで一括して行い、
@@ -206,7 +222,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
     // 地色（bg-muted/30）は <main> に載せる。テーブル領域側に置くと少件数・0件のときに
     // 画面下部が <main> の白背景（bg-background）のまま残るため（issue #82）。
     return (
-        <AuthenticatedLayout mainClassName="bg-muted/30">
+        <AuthenticatedLayout mainClassName="bg-muted/30" mainRef={scrollContainerRef}>
             <Head title="進捗管理" />
 
             {/*
@@ -352,7 +368,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
 
                     <Pagination
                         meta={pipelines.meta}
-                        onChange={(page) => visit({}, page)}
+                        onChange={handlePageChange}
                     />
                 </div>
             </div>
