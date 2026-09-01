@@ -295,7 +295,7 @@ class PipelineController extends Controller
         $query = Pipeline::query()
             ->select([
                 'id', 'engineer_id', 'project_id', 'status', 'match_score',
-                'match_rank', 'next_action_date', 'updated_at',
+                'match_rank', 'next_action_date', 'updated_at', 'version',
             ])
             ->with([
                 'engineer:id,name,main_user_id',

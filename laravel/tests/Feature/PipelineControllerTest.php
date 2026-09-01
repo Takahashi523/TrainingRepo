@@ -165,6 +165,25 @@ class PipelineControllerTest extends TestCase
         );
     }
 
+    /**
+     * カンバンカードの version 欠落によるカード上プルダウン更新の回帰防止（issue #45）。
+     * PipelineController::buildActiveProps() が select() で列を絞っており、version を
+     * 追加し忘れると PipelineCardResource が version: null を返し、カード上のステータス変更
+     * （version 必須のバリデーションに引っかかる）が常に 422 で黙って失敗する不具合があった。
+     */
+    public function test_index_card_includes_version_for_optimistic_locking(): void
+    {
+        $me = User::factory()->create();
+        $pipeline = $this->makePipeline($me, ['status' => 'proposed']);
+
+        $response = $this->actingAs($me)->get('/pipelines');
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('columns.0.cards.0.id', $pipeline->id)
+            ->where('columns.0.cards.0.version', 0)
+        );
+    }
+
     public function test_index_filters_by_keyword_on_engineer_name(): void
     {
         $me = User::factory()->create();
