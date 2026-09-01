@@ -85,6 +85,15 @@ export default function Edit({
 
     const { processing, errors } = form;
 
+    // 楽観ロック（version）の競合で保存が拒否され、同じ編集画面へ差し戻された場合の対応（issue #45）。
+    // このページは「この project を編集する」単一目的の画面のため、project Props が変わるのは
+    // 基本的にこの「競合後の再取得」のケースのみ。useForm の初期値はマウント時の1回しか使われず、
+    // Props 更新だけでは同一コンポーネントの再マウントが起きないため、明示的にフォームを作り直す。
+    useEffect(() => {
+        form.setData(toFormData(project));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [project]);
+
     // form.errorsが更新され、DOMに反映された後に実行されることを保証するためuseEffectを使う
     // （onError内でrequestAnimationFrameを使う方式だと、Reactのコミット前にクエリが走ることがあり、
     // 初回のエラー表示時だけスクロールされないことがあった）
@@ -135,6 +144,7 @@ export default function Edit({
             preferred_skills: data.preferred_skills
                 .filter((s) => s.label !== "" || s.detail !== "")
                 .map(({ label, detail }) => ({ label, detail })),
+            version: project.version,
         }));
 
         form.put(route("projects.update", project.id));

@@ -60,6 +60,7 @@ export interface Project {
     preferred_skills: Skill[];
     phases: Array<Phase & { is_target: boolean }>;
     updated_at: string;
+    version: number;
 }
 
 export type FieldSetting = {

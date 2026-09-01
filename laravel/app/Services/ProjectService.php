@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 
+use App\Exceptions\StaleUpdateException;
 use App\Http\Requests\ProjectRequest;
 use App\Models\Project;
 use Illuminate\Support\Facades\DB;
@@ -29,9 +30,17 @@ class ProjectService
         ];
 
         return DB::transaction(function () use ($request, $project, $skills) {
-            $project->update($this->projectAttributes($request));
-            $this->replaceSkills($project, $skills);
-            return $project;
+            $locked = Project::lockForUpdate()->findOrFail($project->id);
+
+            if ($locked->version !== (int) $request->input('version')) {
+                throw StaleUpdateException::forVersionMismatch();
+            }
+            
+            $locked->update($this->projectAttributes($request));
+            $this->replaceSkills($locked, $skills);
+            $locked->increment('version');
+
+            return $locked;
         });
     }
 
@@ -41,7 +50,7 @@ class ProjectService
     private function projectAttributes(ProjectRequest $request): array
     {
         return array_merge(
-            $request->safe()->except(['required_skills', 'preferred_skills', 'rate_is_negotiable']),
+            $request->safe()->except(['required_skills', 'preferred_skills', 'rate_is_negotiable', 'version']),
             [
                 'headcount'        => $request->headcount !== null ? (int) $request->headcount : null,
                 'interview_count'  => $request->interview_count !== null ? (int) $request->interview_count : null,

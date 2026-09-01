@@ -70,6 +70,7 @@ class ProjectResource extends JsonResource
             ], Project::PHASES),
 
             'updated_at' => $this->updated_at,
+            'version' => $this->version,
         ];
     }
 }

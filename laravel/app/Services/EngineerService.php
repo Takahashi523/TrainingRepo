@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\StaleUpdateException;
 use App\Http\Requests\EngineerRequest;
 use App\Models\Engineer;
 use App\Services\Ai\AiSummaryClient;
@@ -57,9 +58,18 @@ class EngineerService
         $previousAppealNote = $engineer->appeal_note;
         $newAppealNote = $request->input('appeal_note');
 
-        DB::transaction(function () use ($request, $engineer) {
-            $engineer->update($this->engineerAttributes($request));
-            $this->replaceSkills($engineer, $request->input('skills', []));
+        $engineer = DB::transaction(function () use ($request, $engineer) {
+            $locked = Engineer::lockForUpdate()->findOrFail($engineer->id);
+
+            if ($locked->version !== (int) $request->input('version')) {
+                throw StaleUpdateException::forVersionMismatch();
+            }
+
+            $locked->update($this->engineerAttributes($request));
+            $this->replaceSkills($locked, $request->input('skills', []));
+            $locked->increment('version');
+
+            return $locked;
         });
 
         $aiSummaryFailed = false;
@@ -309,7 +319,7 @@ class EngineerService
         $workStyles = $request->input('work_styles', []);
 
         return array_merge(
-            $request->safe()->except(['skills', 'work_styles']),
+            $request->safe()->except(['skills', 'work_styles', 'version']),
             [
                 'work_style_onsite' => in_array('onsite', $workStyles),
                 'work_style_hybrid' => in_array('hybrid', $workStyles),

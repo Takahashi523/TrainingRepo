@@ -37,7 +37,7 @@ class EngineerControllerTest extends TestCase
         }
     }
 
-    private function validPayload(int $mainUserId): array
+    private function validPayload(int $mainUserId, int $version = 0): array
     {
         return [
             'name' => '山田太郎',
@@ -45,6 +45,7 @@ class EngineerControllerTest extends TestCase
             'status' => 'proposable',
             'main_user_id' => $mainUserId,
             'sub_user_id' => null,
+            'version' => $version,
         ];
     }
 
@@ -1669,6 +1670,85 @@ class EngineerControllerTest extends TestCase
         $response = $this->actingAs($user)->put('/engineers/99999', $this->validPayload($user->id));
 
         $response->assertNotFound();
+    }
+
+    // -------------------------------------------------------
+    // update: PUT /engineers/{id} — 楽観ロック（version, issue #45）
+    // -------------------------------------------------------
+
+    public function test_update_increments_version_when_version_matches(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        // factory の create() は DB 側の DEFAULT (0) を明示的に返さないため、
+        // モデル属性ではなく DB を見て前提（初期 version=0）を確認する。
+        $this->assertDatabaseHas('engineers', ['id' => $engineer->id, 'version' => 0]);
+
+        $payload = array_merge($this->validPayload($user->id, 0), ['name' => '新氏名']);
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response->assertRedirect("/engineers/{$engineer->id}");
+        $this->assertDatabaseHas('engineers', [
+            'id' => $engineer->id,
+            'name' => '新氏名',
+            'version' => 1,
+        ]);
+    }
+
+    public function test_update_rejects_stale_version_and_keeps_the_winning_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create([
+            'main_user_id' => $user->id,
+            'name' => '元の氏名',
+        ]);
+
+        // A・B ともに version=0 の状態で編集画面を開いた想定。A（勝者）が先に保存する。
+        $winnerPayload = array_merge($this->validPayload($user->id, 0), ['name' => '先勝ちの氏名']);
+        $winnerResponse = $this->actingAs($user)->put("/engineers/{$engineer->id}", $winnerPayload);
+        $winnerResponse->assertRedirect("/engineers/{$engineer->id}");
+
+        // B（敗者）は自分が編集画面を開いた時点の古い version=0 のまま、Aの保存後に保存しようとする。
+        $loserPayload = array_merge($this->validPayload($user->id, 0), ['name' => '後追いの氏名']);
+        $loserResponse = $this->actingAs($user)->put(
+            "/engineers/{$engineer->id}",
+            $loserPayload,
+            ['X-Inertia' => 'true', 'referer' => "/engineers/{$engineer->id}/edit"]
+        );
+
+        // PUT への redirect は Inertia の規約上 303（302だと後続リクエストがPUTのまま引き継がれてしまう）。
+        $loserResponse->assertStatus(303);
+        $loserResponse->assertRedirect("/engineers/{$engineer->id}/edit");
+        $loserResponse->assertSessionHas('error', '他のユーザーがこの人材情報を更新しました。最新のデータを表示しました。');
+
+        // Bの変更（後追いの氏名）は保存されず、Aの保存内容（先勝ちの氏名）のまま・versionもAの保存分の1のまま
+        // （Bのリクエストによって2重にincrementされていないことも合わせて確認する）。
+        $this->assertDatabaseHas('engineers', [
+            'id' => $engineer->id,
+            'name' => '先勝ちの氏名',
+            'version' => 1,
+        ]);
+        $this->assertDatabaseMissing('engineers', [
+            'id' => $engineer->id,
+            'name' => '後追いの氏名',
+        ]);
+    }
+
+    public function test_update_requires_version_field(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $engineer = Engineer::factory()->create(['main_user_id' => $user->id]);
+
+        $payload = $this->validPayload($user->id);
+        unset($payload['version']);
+
+        $response = $this->actingAs($user)->put("/engineers/{$engineer->id}", $payload);
+
+        $response->assertSessionHasErrors('version');
     }
 
     // -------------------------------------------------------
