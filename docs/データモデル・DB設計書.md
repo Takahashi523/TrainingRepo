@@ -234,7 +234,7 @@ erDiagram
 | 常駐可 | work_style_onsite | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
 | 一部リモート可 | work_style_hybrid | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
 | フルリモート希望 | work_style_remote | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
-| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集フォームは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）** |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集フォームは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。CSVインポート（更新行）も同じversionで照合し、更新のたびに+1する（新規行は常に0）。詳細は08_CSV入出力APIエンドポイント一覧.md参照【2026-09-01 issue #45 追記】** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -273,7 +273,7 @@ erDiagram
 | 開発対象 | proc_development | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
 | テスト対象 | proc_testing | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
 | 保守運用対象 | proc_maintenance | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
-| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集フォームは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）** |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集フォームは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。CSVインポート（更新行）も同じversionで照合し、更新のたびに+1する（新規行は常に0）。詳細は08_CSV入出力APIエンドポイント一覧.md参照【2026-09-01 issue #45 追記】** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
