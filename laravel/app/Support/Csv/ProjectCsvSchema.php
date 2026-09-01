@@ -7,10 +7,15 @@ use App\Validation\ProjectRules;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * 案件（projects）CSV のカラム定義（api/08 §3：A〜AC の29列）。
+ * 案件（projects）CSV のカラム定義（api/08 §3：A〜AD の30列）。
  *
  * 列順・ヘッダー名は api/08 §3 を正とする。担当者名（主担当名/サブ担当名）は
  * エクスポート専用（export_only）でインポート時は無視する（案件に ai_summary 列は無い）。
+ * バージョン（末尾列）は楽観ロック制御列（issue #45）：インポート時は更新行の照合にのみ使い、
+ * 値をそのまま書き込みはしない。
+ * ヘッダー名を「バージョン（システム管理）」とし、業務担当者が見て「自分が入力・編集する項目
+ * ではない」と分かるようにしている（2026-09-01 追記。列自体を無くすとCSV再取込時に競合を
+ * 検知する手段が無くなるため、列は残しつつ名称と案内文で誤解を防ぐ方針とした）。
  */
 class ProjectCsvSchema extends CsvSchema
 {
@@ -46,6 +51,8 @@ class ProjectCsvSchema extends CsvSchema
             ['header' => '開発対象', 'field' => 'proc_development', 'type' => 'flag'],
             ['header' => 'テスト対象', 'field' => 'proc_testing', 'type' => 'flag'],
             ['header' => '保守運用対象', 'field' => 'proc_maintenance', 'type' => 'flag'],
+            // 楽観ロック制御列（issue #45）。既存の列順（A〜AC）を崩さないため末尾に追加する。
+            ['header' => 'バージョン（システム管理）', 'field' => 'version', 'type' => 'version'],
         ];
     }
 
@@ -131,6 +138,7 @@ class ProjectCsvSchema extends CsvSchema
                 'remarks', 'status', 'main_user_id', 'sub_user_id',
                 'proc_requirements', 'proc_basic_design', 'proc_detail_design',
                 'proc_development', 'proc_testing', 'proc_maintenance',
+                'version',
             ])
             ->with(['mainUser:id,name', 'subUser:id,name'])
             ->orderBy('id');

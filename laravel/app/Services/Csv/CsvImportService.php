@@ -21,12 +21,20 @@ use Illuminate\Validation\ValidationException;
  *   3. データ0行チェック（O-9）
  *   4. 参照データ preload（users.id・既存 id を各1回／N+1回避・O-13）
  *   5. 行ごと：レイアウト（列数）先行 → 復元（CsvInjection）→ 正規化 → 項目検証（bail なし・全メッセージ収集）
- *              → 担当者/更新 id の存在照合（メモリ）→ ファイル内 id 重複（O-8）
+ *              → 担当者/更新 id の存在照合（メモリ）→ version 照合（楽観ロック・issue #45）→ ファイル内 id 重複（O-8）
  *   6. エラーが1件でもあれば書き込まず 422（errors.importErrors に構造化 JSON）
- *   7. エラー0件なら DB::transaction 内で upsert によるバッチ INSERT / UPDATE（全項目上書き＝O-1 暫定許容）
+ *   7. エラー0件なら DB::transaction 内で upsert によるバッチ INSERT / UPDATE（全項目上書き＋
+ *      version 更新＝O-1。新規行は version=0、更新行は version+1）
  *
  * 設計原則：SRP（1クラス＝インポートの1責務）／DRY（列定義は CsvSchema・書式ルールは *Rules に集約）／
  * フェイルセーフ（全エラー収集後に一括ロールバック）。
+ *
+ * **楽観ロック（version・issue #45）**：更新行（id 指定）は version 列必須。preload 済みの現在値と
+ * 照合し、不一致なら当該行を「バージョンが一致しません」エラーとする（他の行エラーと同じ422・
+ * 全行ロールバック）。一致した行のみ write() で version+1 して書き込む。新規行（id 空）は
+ * version 列を無視し、常に 0（DBのdefaultと同値）で作成する。画面編集（PUT/PATCH）側の
+ * `version` チェックと同じ「読んだ版を照合してから+1」方式に揃えることで、CSVインポートと
+ * 画面編集のどちらが先に更新しても、後から保存しようとした側が確実に競合として検知される。
  */
 class CsvImportService
 {
@@ -163,13 +171,15 @@ class CsvImportService
             $parsed[] = ['row' => $rowNum, 'id' => $id, 'dupKey' => $dupKey, 'assoc' => $assoc];
         }
 
-        // 既存 id 集合を1回だけロード（更新対象・非空かつ数値のみ）
+        // 既存 id 集合を1回だけロード（更新対象・非空かつ数値のみ）。
+        // version（楽観ロック・issue #45）の照合にも使うため、id だけでなく version も同じ1クエリで
+        // 取得する（N+1回避。id => version の連想配列。存在確認は isset() で兼ねる）。
         $idsInFile = array_values(array_unique(array_filter(
             array_map(fn ($p) => $p['id'], $parsed),
             fn ($v) => $v !== null && is_numeric($v),
         )));
-        $existingIdSet = $idsInFile !== []
-            ? array_flip($schema->modelClass()::query()->whereIn('id', $idsInFile)->pluck('id')->all())
+        $existingVersions = $idsInFile !== []
+            ? $schema->modelClass()::query()->whereIn('id', $idsInFile)->pluck('version', 'id')->all()
             : [];
 
         $duplicateIds = array_flip(array_keys(array_filter(
@@ -213,9 +223,20 @@ class CsvImportService
                 if (! is_numeric($id) || (float) $id != (int) $id) {
                     $rowHasError = true;
                     $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["ID「{$id}」が正しくありません。IDは整数で入力してください（新規追加はID列を空欄にしてください）。"]];
-                } elseif (! isset($existingIdSet[(int) $id])) {
+                } elseif (! isset($existingVersions[(int) $id])) {
                     $rowHasError = true;
                     $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["指定されたID「{$id}」のデータが存在しません。新規追加はID列を空欄にし、更新する場合は既存の正しいIDを指定してください。"]];
+                } else {
+                    // version 照合（楽観ロック・issue #45）。id が実在し形式も正しい場合のみ判定する
+                    // （id 自体が不正/不存在の行は上の分岐で既にエラー済みのため二重に判定しない）。
+                    // version セル自体が空/不正な場合は importRules() の required/integer ルールが
+                    // 別途エラーを出すため、ここでは「数値として正しく読めた場合」のみ照合する。
+                    $version = $assoc['version'] ?? null;
+                    if ($version !== null && is_numeric($version) && (float) $version == (int) $version
+                        && (int) $version !== $existingVersions[(int) $id]) {
+                        $rowHasError = true;
+                        $errors[] = ['row' => $rowNum, 'field' => 'version', 'messages' => ['バージョンが一致しません。他のユーザーがこのデータを更新済みの可能性があります。最新のデータをエクスポートし直してから、再度インポートしてください。']];
+                    }
                 }
             }
 
@@ -230,7 +251,7 @@ class CsvImportService
             $this->fail($errors);
         }
 
-        $writeResult = $this->write($schema, $writable);
+        $writeResult = $this->write($schema, $writable, $existingVersions);
 
         return [
             'resource' => $schema->resourceKey(),
@@ -258,12 +279,15 @@ class CsvImportService
      * 従来方式に比べ、更新中心のインポートでも SQL 発行回数が件数に比例して増えない。
      * engineers / projects は主キー（id）以外にユニーク制約が無いため、他キー衝突で別レコードを
      * 取り違えて更新する危険はない（マイグレーション確認済み）。
-     * `created_at` は更新列に含めない（既存行の作成日時を保持）。全項目上書き＝O-1 暫定許容。
+     * `created_at` は更新列に含めない（既存行の作成日時を保持）。全項目上書き＝O-1（issue #45で確定：
+     * version 列による楽観ロックをCSV更新経路にも適用。version 照合済みの行のみここに到達する）。
      *
      * @param  array<int, array{id: ?string, assoc: array<string, mixed>}>  $writable
+     * @param  array<int, int>  $currentVersions  id => 現在の version（pass2 で照合済み。write() 側では
+     *                                             再照合せず、更新行の新 version（+1）の算出にのみ使う）
      * @return array{total_rows: int, created: int, updated: int, updated_ids: array<int, int>, written_at: \Illuminate\Support\Carbon}
      */
-    private function write(CsvSchema $schema, array $writable): array
+    private function write(CsvSchema $schema, array $writable, array $currentVersions): array
     {
         /** @var class-string<Model> $model */
         $model = $schema->modelClass();
@@ -276,17 +300,24 @@ class CsvImportService
         $updateColumns = null;
         foreach ($writable as $row) {
             $attrs = $schema->buildAttributes($row['assoc']);
+            $id = $row['id'];
+            // version（楽観ロック・issue #45）：CSVセルの値をそのまま書き込まない。新規行は 0
+            // （DBのdefaultと同値。upsert は全行で同一のキー構成が必要なため明示する）、更新行は
+            // pass2 で照合済みの現在値 + 1 を書き込む（画面編集の PUT/PATCH 側と同じ「保存の都度+1」
+            // にすることで、CSVインポート後に開いていた編集画面の version が確実に古くなり、
+            // 画面側の楽観ロックにも検知される＝相互に穴を作らない）。
+            $attrs['version'] = $id === null ? 0 : $currentVersions[(int) $id] + 1;
             // 更新時に上書きする列＝全属性＋updated_at。id（一致キー）と created_at は除外し既存値を保持する。
             $updateColumns ??= array_merge(array_keys($attrs), ['updated_at']);
             // 全行で列構成を揃える（upsert は先頭行のキーで列を決めるため）。id は新規=null／更新=既存値。
-            $rows[] = ['id' => $row['id'] === null ? null : (int) $row['id']]
+            $rows[] = ['id' => $id === null ? null : (int) $id]
                 + $attrs
                 + ['created_at' => $now, 'updated_at' => $now];
-            if ($row['id'] === null) {
+            if ($id === null) {
                 $created++;
             } else {
                 $updated++;
-                $updatedIds[] = (int) $row['id'];
+                $updatedIds[] = (int) $id;
             }
         }
 

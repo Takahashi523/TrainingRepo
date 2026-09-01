@@ -574,6 +574,103 @@ class CsvImportTest extends CsvTestCase
         $this->assertDatabaseMissing('engineers', ['name' => '存在しないID']);
     }
 
+    // ------------------------------------------------------------------
+    // version（楽観ロック・issue #45）
+    // ------------------------------------------------------------------
+
+    public function test_import_creates_new_row_with_version_zero(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '新規版数', 'name_kana' => 'シンキバンスウ', 'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertDatabaseHas('engineers', ['name' => '新規版数', 'version' => 0]);
+    }
+
+    public function test_import_increments_version_on_matching_update(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+        // Engineer::create() 直後の $engineer には version の DB デフォルト（0）が読み込まれて
+        // いない（Eloquent は insert 後に自動採番PK以外の属性を再取得しない）ため、
+        // DBの実値で確認するには refresh() が必要。
+        $engineer->refresh();
+        $this->assertSame(0, $engineer->version);
+
+        // buildCsv は id 指定行の version を DB の現在値（0）で自動補完する
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id, 'name' => '更新後', 'name_kana' => 'コウシンゴ',
+            'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertDatabaseHas('engineers', ['id' => $engineer->id, 'name' => '更新後', 'version' => 1]);
+    }
+
+    public function test_import_rejects_stale_version_and_does_not_write_any_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id, 'name' => '既存太郎']);
+
+        // 1行目は version 不一致（他ユーザーが先に更新した想定）、2行目は正常な新規行。
+        // 全行ロールバック方針のとおり、2行目も書き込まれないことを確認する。
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            [
+                'id' => $engineer->id, 'name' => '横取り更新', 'name_kana' => 'ヨコドリコウシン',
+                'status' => 'proposable', 'main_user_id' => $user->id, 'version' => 99,
+            ],
+            ['name' => '道連れ新規', 'name_kana' => 'ミチヅレシンキ', 'status' => 'proposable', 'main_user_id' => $user->id],
+        ]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+
+        $error = $this->findError($this->importErrors($response), 2, 'version');
+        $this->assertNotNull($error);
+        $this->assertStringContainsString('バージョンが一致しません', $error['messages'][0]);
+
+        // 全行ロールバック：1行目の上書きも2行目の新規作成も起きていない
+        $engineer->refresh();
+        $this->assertSame('既存太郎', $engineer->name);
+        $this->assertSame(0, $engineer->version);
+        $this->assertDatabaseMissing('engineers', ['name' => '道連れ新規']);
+    }
+
+    public function test_import_requires_version_on_update_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+        // version を明示的に空欄にする（buildCsv の自動補完を上書き）
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id, 'name' => '更新後', 'name_kana' => 'コウシンゴ',
+            'status' => 'proposable', 'main_user_id' => $user->id, 'version' => '',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'version'));
+    }
+
+    public function test_import_ignores_version_cell_on_new_row(): void
+    {
+        // 新規行（id 空）に version を書いても無視され、常に 0 で作成される
+        // （エクスポートしたテンプレートを複製して新規行を作ったケースを想定）。
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '複製新規', 'name_kana' => 'フクセイシンキ', 'status' => 'proposable',
+            'main_user_id' => $user->id, 'version' => '7',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertDatabaseHas('engineers', ['name' => '複製新規', 'version' => 0]);
+    }
+
     public function test_duplicate_id_in_file_is_structural_error(): void
     {
         $user = $this->makeUser('admin');

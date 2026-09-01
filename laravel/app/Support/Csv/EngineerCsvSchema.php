@@ -7,10 +7,14 @@ use App\Validation\EngineerRules;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * 人材（engineers）CSV のカラム定義（api/08 §3：A〜Z の26列）。
+ * 人材（engineers）CSV のカラム定義（api/08 §3：A〜AA の27列）。
  *
  * 列順・ヘッダー名は api/08 §3 を正とする。担当者名（主担当名/サブ担当名）と AI要約は
- * エクスポート専用（export_only）でインポート時は無視する。
+ * エクスポート専用（export_only）でインポート時は無視する。バージョン（末尾列）は楽観ロック
+ * 制御列（issue #45）：インポート時は更新行の照合にのみ使い、値をそのまま書き込みはしない。
+ * ヘッダー名を「バージョン（システム管理）」とし、業務担当者が見て「自分が入力・編集する項目
+ * ではない」と分かるようにしている（2026-09-01 追記。列自体を無くすとCSV再取込時に競合を
+ * 検知する手段が無くなるため、列は残しつつ名称と案内文で誤解を防ぐ方針とした）。
  */
 class EngineerCsvSchema extends CsvSchema
 {
@@ -43,6 +47,8 @@ class EngineerCsvSchema extends CsvSchema
             ['header' => 'テスト経験', 'field' => 'proc_testing', 'type' => 'flag'],
             ['header' => '保守運用経験', 'field' => 'proc_maintenance', 'type' => 'flag'],
             ['header' => '顧客折衝経験', 'field' => 'has_negotiation_exp', 'type' => 'flag'],
+            // 楽観ロック制御列（issue #45）。既存の列順（A〜Z）を崩さないため末尾に追加する。
+            ['header' => 'バージョン（システム管理）', 'field' => 'version', 'type' => 'version'],
         ];
     }
 
@@ -93,6 +99,7 @@ class EngineerCsvSchema extends CsvSchema
                 'work_style_onsite', 'work_style_hybrid', 'work_style_remote',
                 'proc_requirements', 'proc_basic_design', 'proc_detail_design',
                 'proc_development', 'proc_testing', 'proc_maintenance', 'has_negotiation_exp',
+                'version',
             ])
             ->with(['mainUser:id,name', 'subUser:id,name'])
             ->orderBy('id');

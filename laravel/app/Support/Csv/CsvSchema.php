@@ -23,6 +23,10 @@ use Illuminate\Support\Carbon;
  *   - enum          … status / commercial_flow / work_style（共有ルールの in:... を使用）
  *   - user          … main_user_id / sub_user_id（integer のみ。exists は Service が preload 照合＝N+1回避）
  *   - relation_name … 担当者名（主担当名/サブ担当名）。エクスポート専用の派生値
+ *   - version       … 楽観ロック制御列（issue #45）。エクスポートは参照用の現在値、インポートは
+ *                     更新行の照合にのみ使う。writableColumns() には含めない（DB書き込み値は
+ *                     CsvImportService が「新規=0／更新=照合済みの現在値+1」を算出して設定するため、
+ *                     CSVセルの値をそのまま保存してはいけない）
  *
  * 設計原則：DRY（列定義の単一出所）／SRP（列メタデータと導出に責務を限定）／OCP（列追加に対して開いている）。
  */
@@ -172,6 +176,14 @@ abstract class CsvSchema
             $rules[$field] = array_merge([$prefix], $base);
         }
 
+        // version（楽観ロック・issue #45）：writableColumns() に含めないため専用に組み立てる。
+        // 更新行（id 指定）は他ユーザーとの競合を検知するために必須、新規行（id 空）は不要（無視される）。
+        $rules['version'] = [
+            ($row['id'] ?? null) !== null ? 'required' : 'nullable',
+            'integer',
+            'min:0',
+        ];
+
         foreach ($this->conditionalImportRules($row) as $field => $extra) {
             $rules[$field] = array_merge($rules[$field] ?? ['nullable'], $extra);
         }
@@ -247,7 +259,10 @@ abstract class CsvSchema
         return array_values(array_filter($this->columns(), function ($col) {
             return ! ($col['export_only'] ?? false)
                 && $col['field'] !== null
-                && $col['type'] !== 'id';
+                && $col['type'] !== 'id'
+                // version は楽観ロック制御列（issue #45）。読み取り・照合はするが buildAttributes()
+                // でCSVセルの値をそのまま書き込ませないため、通常の書き込み可能列からは除外する。
+                && $col['type'] !== 'version';
         }));
     }
 
@@ -324,7 +339,7 @@ abstract class CsvSchema
         }
 
         return match ($col['type']) {
-            'id', 'integer', 'user' => (string) $value,
+            'id', 'integer', 'user', 'version' => (string) $value,
             // boolean キャスト or 0/1 を確実に '0'/'1' へ
             'flag' => ((int) $value) === 0 ? '0' : '1',
             'date' => Carbon::parse($value)->format('Y-m-d'),
