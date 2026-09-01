@@ -294,6 +294,8 @@
     "ng_reason": "string",                         // NG理由。null許容
     "next_action_date": "date(YYYY-MM-DD)",        // 次回アクション予定日。null許容
     "updated_at": "datetime(ISO8601)",
+    // 【issue #45 追加】楽観ロック用カウンタ。ドロワーはこの値を保持し、PATCH時に送信する（→ 下記送信データ表）。
+    "version": "int",
     "engineer": {
       "id": "int",
       "name": "string",
@@ -335,6 +337,7 @@
 | client_comment | string | 任意 | 顧客コメント（null許容） |
 | ng_reason | string | 任意 | NG理由（null許容） |
 | next_action_date | date | 任意 | 次回アクション予定日（null許容・QA #54確定） |
+| version | int | ✓ | 【issue #45 追加】楽観ロック用。ドロワーが `GET /pipelines/{id}` で読み込んだ version を毎回送信する。DB上の現在値と不一致の場合は保存を拒否する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」） |
 
 > **送信しないフィールド（変更不可）**
 > - `engineer_id` / `project_id`：パイプライン生成後に変更不可
@@ -345,8 +348,9 @@
 
 | 条件 | 動作 |
 |---|---|
-| 成功時 | 200 OK。更新後のパイプライン情報を返す（Inertia リロード） |
+| 成功時 | 303（Inertiaリダイレクト）。進行中カンバン（`/pipelines`。絞り込み条件は referer のクエリから引き継ぐ）へ遷移し、`flash.success`：「パイプラインを更新しました。」を返す【2026-09-01 修正：実装（`PipelineController::update()`）に合わせて200 OKの誤記を訂正】 |
 | ステータス遷移ガード（終了→進行中への変更試行） | 422。エラーメッセージを返す |
+| バージョン不一致（他ユーザーが先に更新・issue #45） | 303（Inertiaリダイレクト）。`flash.error`：「他のユーザーがこのパイプラインを更新しました。最新のデータを表示しました。」（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」） |
 | 権限不足時 | 403 |
 | 対象データなし | 404 |
 
