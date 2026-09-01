@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\StaleUpdateException;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -45,7 +46,17 @@ class UserService
     {
         return DB::transaction(function () use ($user, $data) {
             // 最後の管理者を一般に降格する操作を行ロックで再検査（並行時のロストアップデート防止）。
+            // guardLastAdminOnDelete と同じ「admin セットをロック → 対象行を変更」の順序を保つため、
+            // 楽観ロック用に対象行を取得し直すより先に行う。
             $this->guardLastAdminOnDemotion($user, $data['role']);
+
+            // 楽観ロック（version, issue #45）。対象行をロックし、フォームが読み込んだ version と
+            // DB上の現在の version を照合する。
+            $locked = User::lockForUpdate()->findOrFail($user->id);
+
+            if ($locked->version !== (int) ($data['version'] ?? null)) {
+                throw StaleUpdateException::forVersionMismatch();
+            }
 
             $attributes = [
                 'name' => $data['name'],
@@ -58,12 +69,13 @@ class UserService
             }
 
             try {
-                $user->update($attributes);
+                $locked->update($attributes);
+                $locked->increment('version');
             } catch (QueryException $e) {
                 $this->rethrowDuplicateEmail($e, $data['email']);
             }
 
-            return $user;
+            return $locked;
         });
     }
 

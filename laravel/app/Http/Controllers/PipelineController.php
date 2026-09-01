@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\StaleUpdateException;
 use App\Http\Controllers\Concerns\ResolvesSort;
 use App\Http\Requests\PipelineCompletedRequest;
 use App\Http\Requests\PipelineStoreRequest;
@@ -186,9 +187,17 @@ class PipelineController extends Controller
      */
     public function update(PipelineUpdateRequest $request, Pipeline $pipeline): RedirectResponse
     {
-        $data = $request->safe()->only(['status', 'client_comment', 'ng_reason', 'next_action_date']);
+        $data = $request->safe()->only(['status', 'client_comment', 'ng_reason', 'next_action_date', 'version']);
 
-        $this->pipelineService->update($pipeline, $data);
+        try {
+            $this->pipelineService->update($pipeline, $data);
+        } catch (StaleUpdateException) {
+            // 楽観ロック競合時は、進行中カンバンへの固定リダイレクトはせずreferer（ドロワー表示中なら
+            // show URL）へ戻す。ドロワーは開くたびに再マウントされる設計のため、show へ戻れば
+            // 最新データで再描画される（referer が無い場合は index へフォールバック）。
+            return back(fallback: route('pipelines.index'))
+                ->with('error', '他のユーザーがこのパイプラインを更新しました。最新のデータを表示しました。');
+        }
 
         // 更新後は必ず進行中カンバン（index）へ戻す。
         // redirect()->back() だと、ドロワー表示中は URL が /pipelines/{id}（＝show）のため

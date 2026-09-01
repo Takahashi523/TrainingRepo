@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\StaleUpdateException;
 use App\Models\Pipeline;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -107,16 +108,26 @@ class PipelineService
             unset($data['status']);
         }
 
-        return DB::transaction(function () use ($pipeline, $data) {
+        $version = $data['version'] ?? null;
+        unset($data['version']);
+
+        return DB::transaction(function () use ($pipeline, $data, $version) {
+            $locked = Pipeline::lockForUpdate()->findOrFail($pipeline->id);
+
+            if ($locked->version !== (int) $version) {
+                throw StaleUpdateException::forVersionMismatch();
+            }
+
             if (array_key_exists('status', $data)
                 && Pipeline::isTerminal($data['status'])
-                && ! Pipeline::isTerminal($pipeline->status)) {
+                && ! Pipeline::isTerminal($locked->status)) {
                 $data['ended_at'] = now();
             }
 
-            $pipeline->update($data);
+            $locked->update($data);
+            $locked->increment('version');
 
-            return $pipeline;
+            return $locked;
         });
     }
 

@@ -26,6 +26,7 @@ class MasterUserResource extends JsonResource
             'role' => $this->role,
             'role_label' => $this->role === 'admin' ? '管理者' : '一般',
             'last_login_at' => $this->last_login_at?->toIso8601String(),
+            'version' => $this->version,
         ];
     }
 }

@@ -573,6 +573,7 @@ class PipelineControllerTest extends TestCase
         $response = $this->actingAs($me)->from(route('pipelines.index'))->patch('/pipelines/'.$pipeline->id, [
             'status' => null,
             'client_comment' => 'コメントのみ更新',
+            'version' => 0,
         ]);
 
         $response->assertRedirect(route('pipelines.index'));
@@ -593,6 +594,7 @@ class PipelineControllerTest extends TestCase
             'client_comment' => '顧客からの返信あり',
             'ng_reason' => null,
             'next_action_date' => '2026-08-15',
+            'version' => 0,
         ]);
 
         $response->assertRedirect(route('pipelines.index'));
@@ -611,6 +613,7 @@ class PipelineControllerTest extends TestCase
 
         $this->actingAs($me)->from(route('pipelines.index'))->patch('/pipelines/'.$pipeline->id, [
             'status' => 'rejected',
+            'version' => 0,
         ])->assertRedirect(route('pipelines.index'));
 
         $pipeline->refresh();
@@ -631,6 +634,7 @@ class PipelineControllerTest extends TestCase
 
         $this->actingAs($me)->from(route('pipelines.index'))->patch('/pipelines/'.$pipeline->id, [
             'status' => 'final_waiting',
+            'version' => 0,
         ])->assertRedirect(route('pipelines.index'));
 
         $pipeline->refresh();
@@ -650,6 +654,7 @@ class PipelineControllerTest extends TestCase
 
         $response = $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
             'status' => 'proposed',
+            'version' => 0,
         ]);
 
         $response->assertSessionHasErrors('status');
@@ -663,6 +668,7 @@ class PipelineControllerTest extends TestCase
 
         $response = $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
             'status' => 'closed',
+            'version' => 0,
         ]);
 
         $response->assertSessionHasErrors('status');
@@ -682,6 +688,7 @@ class PipelineControllerTest extends TestCase
         $response = $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
             'ng_reason' => '終了後に追記しようとしたメモ',
             'next_action_date' => '2026-09-01',
+            'version' => 0,
         ]);
 
         $response->assertSessionHasErrors('status');
@@ -704,7 +711,7 @@ class PipelineControllerTest extends TestCase
 
         $response = $this->actingAs($me)
             ->from('/pipelines/'.$pipeline->id.'?keyword=foo')
-            ->patch('/pipelines/'.$pipeline->id, ['status' => 'rejected']);
+            ->patch('/pipelines/'.$pipeline->id, ['status' => 'rejected', 'version' => 0]);
 
         // show URL ではなく index パスへ戻り、フィルタ（keyword）は保持される
         $response->assertRedirect(route('pipelines.index', ['keyword' => 'foo']));
@@ -719,6 +726,7 @@ class PipelineControllerTest extends TestCase
 
         $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
             'status' => 'not_a_real_status',
+            'version' => 0,
         ])->assertSessionHasErrors('status');
     }
 
@@ -729,6 +737,7 @@ class PipelineControllerTest extends TestCase
 
         $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
             'next_action_date' => 'not-a-date',
+            'version' => 0,
         ])->assertSessionHasErrors('next_action_date');
     }
 
@@ -741,6 +750,7 @@ class PipelineControllerTest extends TestCase
         // assertInvalid は部分一致判定のため、項目名だけを検証できる。
         $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
             'client_comment' => str_repeat('あ', 1001),
+            'version' => 0,
         ])->assertInvalid(['client_comment' => '顧客コメント']);
     }
 
@@ -751,6 +761,7 @@ class PipelineControllerTest extends TestCase
 
         $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
             'ng_reason' => str_repeat('あ', 1001),
+            'version' => 0,
         ])->assertInvalid(['ng_reason' => 'NG理由']);
     }
 
@@ -759,6 +770,74 @@ class PipelineControllerTest extends TestCase
         $me = User::factory()->create();
         $this->actingAs($me)->patch('/pipelines/99999', ['status' => 'proposed'])
             ->assertNotFound();
+    }
+
+    // -------------------------------------------------------
+    // update: PATCH /pipelines/{pipeline} — 楽観ロック（version, issue #45）
+    // -------------------------------------------------------
+
+    public function test_update_increments_version_when_version_matches(): void
+    {
+        $me = User::factory()->create();
+        $pipeline = $this->makePipeline($me, ['status' => 'proposed']);
+
+        // Pipeline::factory()->create() は DB 側の DEFAULT (0) を明示的に返さないため、
+        // モデル属性ではなく DB を見て前提（初期 version=0）を確認する。
+        $this->assertDatabaseHas('pipelines', ['id' => $pipeline->id, 'version' => 0]);
+
+        $response = $this->actingAs($me)->from(route('pipelines.index'))->patch('/pipelines/'.$pipeline->id, [
+            'client_comment' => '新しいコメント',
+            'version' => 0,
+        ]);
+
+        $response->assertRedirect(route('pipelines.index'));
+        $this->assertDatabaseHas('pipelines', [
+            'id' => $pipeline->id,
+            'client_comment' => '新しいコメント',
+            'version' => 1,
+        ]);
+    }
+
+    public function test_update_rejects_stale_version_and_keeps_the_winning_update(): void
+    {
+        $me = User::factory()->create();
+        $pipeline = $this->makePipeline($me, ['status' => 'proposed', 'client_comment' => '元のコメント']);
+
+        $winnerResponse = $this->actingAs($me)->from(route('pipelines.index'))->patch('/pipelines/'.$pipeline->id, [
+            'client_comment' => '先勝ちのコメント',
+            'version' => 0,
+        ]);
+        $winnerResponse->assertRedirect(route('pipelines.index'));
+
+        $loserResponse = $this->actingAs($me)
+            ->from(route('pipelines.show', $pipeline->id))
+            ->patch('/pipelines/'.$pipeline->id, [
+                'client_comment' => '後追いのコメント',
+                'version' => 0,
+            ]);
+
+        $loserResponse->assertRedirect(route('pipelines.show', $pipeline->id));
+        $loserResponse->assertSessionHas('error', '他のユーザーがこのパイプラインを更新しました。最新のデータを表示しました。');
+
+        $this->assertDatabaseHas('pipelines', [
+            'id' => $pipeline->id,
+            'client_comment' => '先勝ちのコメント',
+            'version' => 1,
+        ]);
+        $this->assertDatabaseMissing('pipelines', [
+            'id' => $pipeline->id,
+            'client_comment' => '後追いのコメント',
+        ]);
+    }
+
+    public function test_update_requires_version_field(): void
+    {
+        $me = User::factory()->create();
+        $pipeline = $this->makePipeline($me, ['status' => 'proposed']);
+
+        $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
+            'client_comment' => 'バージョン未送信',
+        ])->assertSessionHasErrors('version');
     }
 
     // -------------------------------------------------------
@@ -943,6 +1022,7 @@ class PipelineControllerTest extends TestCase
         $response = $this->actingAs($admin)->from(route('pipelines.index'))->patch('/pipelines/'.$pipeline->id, [
             'status' => 'first_waiting',
             'client_comment' => '管理者による更新',
+            'version' => 0,
         ]);
 
         $response->assertRedirect(route('pipelines.index'));

@@ -253,6 +253,7 @@ class MasterUserControllerTest extends TestCase
             'name' => '新名',
             'email' => 'new@example.com',
             'role' => 'admin',
+            'version' => 0,
         ])->assertRedirect(route('master.index'))->assertSessionHas('success');
 
         $this->assertDatabaseHas('users', [
@@ -261,6 +262,79 @@ class MasterUserControllerTest extends TestCase
             'email' => 'new@example.com',
             'role' => 'admin',
         ]);
+    }
+
+    // -------------------------------------------------------
+    // update: PUT /master/users/{user} — 楽観ロック（version, issue #45）
+    // -------------------------------------------------------
+
+    public function test_update_increments_version_when_version_matches(): void
+    {
+        $admin = $this->admin();
+        $target = $this->general(['name' => '旧名']);
+
+        // factory の create() は DB 側の DEFAULT (0) を明示的に返さないため、
+        // モデル属性ではなく DB を見て前提（初期 version=0）を確認する。
+        $this->assertDatabaseHas('users', ['id' => $target->id, 'version' => 0]);
+
+        $this->actingAs($admin)->put("/master/users/{$target->id}", [
+            'name' => '新名',
+            'email' => $target->email,
+            'role' => 'general',
+            'version' => 0,
+        ])->assertRedirect(route('master.index'));
+
+        $this->assertDatabaseHas('users', [
+            'id' => $target->id,
+            'name' => '新名',
+            'version' => 1,
+        ]);
+    }
+
+    public function test_update_rejects_stale_version_and_keeps_the_winning_update(): void
+    {
+        $admin = $this->admin();
+        $target = $this->general(['name' => '元の氏名']);
+
+        $winnerResponse = $this->actingAs($admin)->put("/master/users/{$target->id}", [
+            'name' => '先勝ちの氏名',
+            'email' => $target->email,
+            'role' => 'general',
+            'version' => 0,
+        ]);
+        $winnerResponse->assertRedirect(route('master.index'));
+
+        $loserResponse = $this->actingAs($admin)->from(route('master.index'))->put("/master/users/{$target->id}", [
+            'name' => '後追いの氏名',
+            'email' => $target->email,
+            'role' => 'general',
+            'version' => 0,
+        ]);
+
+        $loserResponse->assertRedirect(route('master.index'));
+        $loserResponse->assertSessionHas('error', '他のユーザーがこのユーザー情報を更新しました。最新のデータを表示しました。');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $target->id,
+            'name' => '先勝ちの氏名',
+            'version' => 1,
+        ]);
+        $this->assertDatabaseMissing('users', [
+            'id' => $target->id,
+            'name' => '後追いの氏名',
+        ]);
+    }
+
+    public function test_update_requires_version_field(): void
+    {
+        $admin = $this->admin();
+        $target = $this->general();
+
+        $this->actingAs($admin)->put("/master/users/{$target->id}", [
+            'name' => $target->name,
+            'email' => $target->email,
+            'role' => 'general',
+        ])->assertSessionHasErrors('version');
     }
 
     public function test_password_is_unchanged_when_omitted_on_update(): void
@@ -272,6 +346,7 @@ class MasterUserControllerTest extends TestCase
             'name' => $target->name,
             'email' => $target->email,
             'role' => 'general',
+            'version' => 0,
         ])->assertSessionHasNoErrors();
 
         // Factory の初期パスワードは 'password'
@@ -289,6 +364,7 @@ class MasterUserControllerTest extends TestCase
             'role' => 'general',
             'password' => 'brandnew123',
             'password_confirmation' => 'brandnew123',
+            'version' => 0,
         ])->assertSessionHasNoErrors();
 
         $this->assertTrue(Hash::check('brandnew123', $target->fresh()->password));
@@ -306,6 +382,7 @@ class MasterUserControllerTest extends TestCase
             'role' => 'general',
             'password' => 'newpass123',
             'password_confirmation' => '',
+            'version' => 0,
         ])->assertSessionHasErrors('password_confirmation');
     }
 
@@ -321,6 +398,7 @@ class MasterUserControllerTest extends TestCase
             'role' => 'general',
             'password' => $long,
             'password_confirmation' => $long,
+            'version' => 0,
         ])->assertSessionHasErrors('password');
     }
 
@@ -332,6 +410,7 @@ class MasterUserControllerTest extends TestCase
             'name' => '自分',
             'email' => 'me@example.com',
             'role' => 'admin',
+            'version' => 0,
         ])->assertSessionHasNoErrors();
     }
 
@@ -343,6 +422,7 @@ class MasterUserControllerTest extends TestCase
             'name' => $admin->name,
             'email' => $admin->email,
             'role' => 'general',
+            'version' => 0,
         ])->assertSessionHasErrors('role');
 
         $this->assertSame('admin', $admin->fresh()->role);
@@ -357,6 +437,7 @@ class MasterUserControllerTest extends TestCase
             'name' => $target->name,
             'email' => $target->email,
             'role' => 'general',
+            'version' => 0,
         ])->assertSessionHasNoErrors();
 
         $this->assertSame('general', $target->fresh()->role);
@@ -372,6 +453,7 @@ class MasterUserControllerTest extends TestCase
             'name' => $actor->name,
             'email' => $actor->email,
             'role' => 'general',
+            'version' => 0,
         ])->assertSessionHasErrors('role');
 
         $this->assertSame('admin', $actor->fresh()->role);
@@ -386,6 +468,7 @@ class MasterUserControllerTest extends TestCase
             'name' => '新名',
             'email' => 'new@example.com',
             'role' => 'admin',
+            'version' => 0,
         ])->assertSessionHasNoErrors();
 
         $fresh = $actor->fresh();
