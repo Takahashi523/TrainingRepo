@@ -23,8 +23,8 @@ use Illuminate\Validation\ValidationException;
  *   5. 行ごと：レイアウト（列数）先行 → 復元（CsvInjection）→ 正規化 → 項目検証（bail なし・全メッセージ収集）
  *              → 担当者/更新 id の存在照合（メモリ）→ version 照合（楽観ロック・issue #45）→ ファイル内 id 重複（O-8）
  *   6. エラーが1件でもあれば書き込まず 422（errors.importErrors に構造化 JSON）
- *   7. エラー0件なら DB::transaction 内で upsert によるバッチ INSERT / UPDATE（全項目上書き＋
- *      version 更新＝O-1。新規行は version=0、更新行は version+1）
+ *   7. エラー0件なら DB::transaction 内で version 再照合（下記）→ upsert によるバッチ INSERT / UPDATE
+ *      （全項目上書き＋version 更新＝O-1。新規行は version=0、更新行は version+1）
  *
  * 設計原則：SRP（1クラス＝インポートの1責務）／DRY（列定義は CsvSchema・書式ルールは *Rules に集約）／
  * フェイルセーフ（全エラー収集後に一括ロールバック）。
@@ -35,6 +35,15 @@ use Illuminate\Validation\ValidationException;
  * version 列を無視し、常に 0（DBのdefaultと同値）で作成する。画面編集（PUT/PATCH）側の
  * `version` チェックと同じ「読んだ版を照合してから+1」方式に揃えることで、CSVインポートと
  * 画面編集のどちらが先に更新しても、後から保存しようとした側が確実に競合として検知される。
+ *
+ * **version 照合のタイミングと再照合（issue #45・2026-09-02 修正／レビュー指摘）**：上記の照合は
+ * preload 時点の値を見ているだけで、画面編集4経路（lockForUpdate() ロック内で照合〜更新まで
+ * 1トランザクションに閉じる）と異なり、preload〜実際の書き込み（write()）までの間に競合が
+ * 割り込む余地が元々あった（最大5,000行を許容する仕様のため、この間隔はゼロではない）。
+ * これを塞ぐため、write() は実際に書き込む直前・同一トランザクション内でも対象行を
+ * lockForUpdate() で再照合する（{@see write()}・{@see guardVersionsUnchangedSincePreload()}）。
+ * これにより「ロック→照合→更新」が1トランザクションに閉じる形になり、画面編集4経路と
+ * 同じ強度の保証になる。
  */
 class CsvImportService
 {
@@ -241,7 +250,9 @@ class CsvImportService
             }
 
             if (! $rowHasError) {
-                $writable[] = ['id' => $id, 'assoc' => $assoc];
+                // row は write() 側の最終再照合（issue #45・2026-09-02 修正）でエラー行番号を
+                // 正しく報告するために保持する。
+                $writable[] = ['row' => $rowNum, 'id' => $id, 'assoc' => $assoc];
             }
         }
 
@@ -282,10 +293,23 @@ class CsvImportService
      * `created_at` は更新列に含めない（既存行の作成日時を保持）。全項目上書き＝O-1（issue #45で確定：
      * version 列による楽観ロックをCSV更新経路にも適用。version 照合済みの行のみここに到達する）。
      *
-     * @param  array<int, array{id: ?string, assoc: array<string, mixed>}>  $writable
-     * @param  array<int, int>  $currentVersions  id => 現在の version（pass2 で照合済み。write() 側では
-     *                                             再照合せず、更新行の新 version（+1）の算出にのみ使う）
+     * **version 再照合（issue #45・2026-09-02 修正／レビュー指摘）**：pass2 の version 照合は
+     * `import()` の preload 時点（=このメソッドの呼び出しより前）の値を見ているだけで、その後
+     * upsert() がコミットされるまでの間に他セッション（画面編集や別のCSVインポート）が同じ行を
+     * 更新すると、その更新をそのまま上書きしてしまう（画面編集4経路は lockForUpdate() ロック内で
+     * 照合〜更新まで1トランザクションに閉じているのに対し、従来のCSVはそうなっていなかった）。
+     * これを塞ぐため、実際に書き込む直前・同一トランザクション内で対象行を再度 lockForUpdate() し、
+     * pass2 で照合済みの version から変化していないかをもう一度確認する。変化していれば
+     * （＝ちょうどこの間に競合が起きた）1行もコミットせず、pass2 と同じ 422 エラー行一覧で返す
+     * （全行ロールバック方針を維持）。これにより画面編集4経路と同じ「ロック→照合→更新」が
+     * 1トランザクションに閉じる形になり、CSVインポートだけ空いていた競合ウィンドウを閉じる。
+     *
+     * @param  array<int, array{row: int, id: ?string, assoc: array<string, mixed>}>  $writable
+     * @param  array<int, int>  $currentVersions  id => pass2 で照合済みの version（新 version・+1 の
+     *                                             算出と、書き込み直前の再照合の両方に使う）
      * @return array{total_rows: int, created: int, updated: int, updated_ids: array<int, int>, written_at: \Illuminate\Support\Carbon}
+     *
+     * @throws ValidationException 書き込み直前の再照合で version 不一致を検出した場合
      */
     private function write(CsvSchema $schema, array $writable, array $currentVersions): array
     {
@@ -294,6 +318,7 @@ class CsvImportService
         $now = now();
 
         $rows = [];
+        $rowNumbersByUpdateId = []; // id => CSV上の行番号（再照合で不一致だった場合のエラー行番号用）
         $updatedIds = [];
         $created = 0;
         $updated = 0;
@@ -318,10 +343,13 @@ class CsvImportService
             } else {
                 $updated++;
                 $updatedIds[] = (int) $id;
+                $rowNumbersByUpdateId[(int) $id] = $row['row'];
             }
         }
 
-        DB::transaction(function () use ($model, $rows, $updateColumns): void {
+        DB::transaction(function () use ($model, $rows, $updateColumns, $currentVersions, $rowNumbersByUpdateId): void {
+            $this->guardVersionsUnchangedSincePreload($model, $currentVersions, $rowNumbersByUpdateId);
+
             foreach (array_chunk($rows, 500) as $chunk) {
                 $model::query()->upsert($chunk, ['id'], $updateColumns);
             }
@@ -334,6 +362,46 @@ class CsvImportService
             'updated_ids' => $updatedIds,
             'written_at' => $now,
         ];
+    }
+
+    /**
+     * write() の書き込み直前・同一トランザクション内で行う version の最終再照合（issue #45・2026-09-02 修正）。
+     *
+     * 対象の更新行（id 指定）を lockForUpdate() で再取得し、pass2 で照合した $currentVersions と
+     * 現在の DB 値を比較する。1件でも変化していれば（＝preload〜ここまでの間に他セッションが更新した）
+     * 呼び出し元の DB::transaction を通じて全行ロールバックし、他のバリデーションエラーと同じ
+     * 422 のエラー行一覧（`field: "version"`）を投げる。
+     *
+     * @param  class-string<Model>  $model
+     * @param  array<int, int>  $currentVersions  id => pass2 で照合済みの version
+     * @param  array<int, int>  $rowNumbersByUpdateId  id => CSV上の行番号（エラー表示用）
+     *
+     * @throws ValidationException
+     */
+    private function guardVersionsUnchangedSincePreload(string $model, array $currentVersions, array $rowNumbersByUpdateId): void
+    {
+        $updateIds = array_keys($rowNumbersByUpdateId);
+        if ($updateIds === []) {
+            return;
+        }
+
+        $latestVersions = $model::query()->whereIn('id', $updateIds)->lockForUpdate()->pluck('version', 'id');
+
+        $errors = [];
+        foreach ($updateIds as $id) {
+            if (($latestVersions[$id] ?? null) !== $currentVersions[$id]) {
+                $errors[] = [
+                    'row' => $rowNumbersByUpdateId[$id],
+                    'field' => 'version',
+                    'messages' => ['バージョンが一致しません。他のユーザーがこのデータを更新済みの可能性があります。最新のデータをエクスポートし直してから、再度インポートしてください。'],
+                ];
+            }
+        }
+
+        if ($errors !== []) {
+            usort($errors, fn ($a, $b) => $a['row'] <=> $b['row']);
+            $this->fail($errors);
+        }
     }
 
     /**

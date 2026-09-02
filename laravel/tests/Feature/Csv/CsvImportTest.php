@@ -671,6 +671,74 @@ class CsvImportTest extends CsvTestCase
         $this->assertDatabaseHas('engineers', ['name' => '複製新規', 'version' => 0]);
     }
 
+    /**
+     * 2026-09-02 追加（レビュー指摘）：新規行では version セルの内容を一切検証しないことの確認。
+     * 数値ですらない値（コピペ残り等を想定）が入っていても弾かれず、常に 0 で作成される。
+     * 「新規行では何を入れても無視される」というCSVヒント文・チェックリストの説明と実装を一致させる。
+     */
+    public function test_import_ignores_non_numeric_version_cell_on_new_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '非数値版数', 'name_kana' => 'ヒスウチバンスウ', 'status' => 'proposable',
+            'main_user_id' => $user->id, 'version' => 'abc',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertDatabaseHas('engineers', ['name' => '非数値版数', 'version' => 0]);
+    }
+
+    /**
+     * 2026-09-02 追加（レビュー指摘）：write() が書き込み直前・同一トランザクション内で行う
+     * version 再照合（{@see \App\Services\Csv\CsvImportService}）を確認する。
+     *
+     * pass2 の version 照合は import() 冒頭の preload 時点の値しか見ていないため、そこから実際の
+     * upsert() がコミットされるまでの間に他セッションが同じ行を更新すると、その更新をそのまま
+     * 上書きしてしまう可能性があった。ここでは DB::listen で「preload 用の SELECT」が発行された
+     * 直後（＝pass2 のバリデーションが走るより前）を捉え、別セッションからの更新を模して
+     * DB 上の version を直接進める。write() 側の再照合がこれを検知し、422（全行ロールバック）に
+     * なることを確認する。
+     */
+    public function test_import_rejects_when_row_changes_between_preload_and_write(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id, 'name' => '既存太郎']);
+        $engineer->refresh();
+
+        // buildCsv が preload 前の現在値（0）で version を自動補完する
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id, 'name' => '横取りテスト', 'name_kana' => 'ヨコドリテスト',
+            'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        // 「engineers」「version」を含む最初のクエリ（＝import() 冒頭の preload）を捉えたタイミングで
+        // 一度だけ、別セッションからの更新を模した直接更新を割り込ませる。$raced ガードにより、
+        // この直接更新自身のクエリや write() 側の再照合クエリで再度発火することはない。
+        $raced = false;
+        DB::listen(function ($query) use ($engineer, &$raced): void {
+            if ($raced) {
+                return;
+            }
+            if (str_contains($query->sql, 'engineers') && str_contains($query->sql, 'version')) {
+                $raced = true;
+                DB::table('engineers')->where('id', $engineer->id)->update(['version' => 1]);
+            }
+        });
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+
+        $error = $this->findError($this->importErrors($response), 2, 'version');
+        $this->assertNotNull($error);
+        $this->assertStringContainsString('バージョンが一致しません', $error['messages'][0]);
+
+        // 全行ロールバック：CSV側の更新（横取りテスト）は反映されず、割り込んだ直接更新（version=1）だけが残る
+        $fresh = $engineer->fresh();
+        $this->assertSame('既存太郎', $fresh->name);
+        $this->assertSame(1, $fresh->version);
+    }
+
     public function test_duplicate_id_in_file_is_structural_error(): void
     {
         $user = $this->makeUser('admin');

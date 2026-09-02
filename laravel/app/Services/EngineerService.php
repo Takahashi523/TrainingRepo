@@ -65,6 +65,14 @@ class EngineerService
                 throw StaleUpdateException::forVersionMismatch();
             }
 
+            // 2026-09-02 修正／レビュー指摘: 一時的に update()+increment() を
+            // increment($column, $amount, $extra) の1回のUPDATEにまとめていたが、
+            // Eloquent の increment() は $extra を forceFill() でモデルの属性には
+            // 正しくキャスト・整形して反映する一方、実際に発行するSQLには $extra を
+            // 「渡された生の値のまま」使う（update() のように getDirty() 経由の
+            // キャスト済み値を使わない）。そのため date/datetime キャストの列
+            // （本サービスでは birth_date・available_from）が DB 上で書式崩れする
+            // 不具合があり、安全な2回のUPDATEに戻した。
             $locked->update($this->engineerAttributes($request));
             $this->replaceSkills($locked, $request->input('skills', []));
             $locked->increment('version');

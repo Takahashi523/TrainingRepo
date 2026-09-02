@@ -124,6 +124,10 @@ class PipelineService
                 $data['ended_at'] = now();
             }
 
+            // 2026-09-02 修正／レビュー指摘: increment($column, $amount, $extra) による
+            // 1回のUPDATEへの統合は、date/datetime キャスト列（本サービスでは next_action_date）が
+            // DB上で書式崩れする不具合（実テストで next_action_date が "Y-m-d H:i:s" ではなく
+            // "Y-m-d" で保存される事象を確認）があったため取り消した（詳細は EngineerService 参照）。
             $locked->update($data);
             $locked->increment('version');
 

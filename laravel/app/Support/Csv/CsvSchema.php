@@ -177,12 +177,14 @@ abstract class CsvSchema
         }
 
         // version（楽観ロック・issue #45）：writableColumns() に含めないため専用に組み立てる。
-        // 更新行（id 指定）は他ユーザーとの競合を検知するために必須、新規行（id 空）は不要（無視される）。
-        $rules['version'] = [
-            ($row['id'] ?? null) !== null ? 'required' : 'nullable',
-            'integer',
-            'min:0',
-        ];
+        // 更新行（id 指定）は他ユーザーとの競合を検知するために必須（形式もチェックする）。
+        // 新規行（id 空）は書き込み時に必ず無視され値を読み取らないため、形式チェック自体を行わない
+        // （nullable + integer/min:0 のままだと「空欄以外の非数値」が弾かれてしまい、CSVヒント文や
+        // チェックリストが説明する「新規行では何を入れても無視される」という前提と食い違うため。
+        // 2026-09-02 修正：レビュー指摘）。
+        $rules['version'] = ($row['id'] ?? null) !== null
+            ? ['required', 'integer', 'min:0']
+            : [];
 
         foreach ($this->conditionalImportRules($row) as $field => $extra) {
             $rules[$field] = array_merge($rules[$field] ?? ['nullable'], $extra);

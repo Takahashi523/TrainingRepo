@@ -719,6 +719,41 @@ class PipelineControllerTest extends TestCase
     }
 
     /**
+     * 2026-09-02 追加（レビュー指摘）：終了ロックと version 不一致が同時に成立する場合、
+     * 終了ロックのメッセージが優先されることの回帰防止。
+     *
+     * 終了ロック（PipelineUpdateRequest::withValidator）は FormRequest のバリデーション段階で
+     * 判定されるため、Controller/PipelineService（version 照合・StaleUpdateException）に
+     * 到達する前に必ず先に弾かれる。これは「たまたまコード上の判定順序がそうなっている」の
+     * ではなく、FormRequest のバリデーションが Controller アクションより必ず先に実行される、
+     * という Laravel のリクエストライフサイクル自体による構造的な保証。既存の終了ロックのテストは
+     * いずれも version に正しい現在値（0）を送っており version 不一致とは同時に起きていなかった
+     * ため、ここでは意図的に不一致な version を送ってメッセージの優先順位を確認する。
+     */
+    public function test_update_on_terminal_pipeline_shows_terminal_message_even_with_stale_version(): void
+    {
+        $me = User::factory()->create();
+        $pipeline = $this->makePipeline($me, [
+            'status' => 'rejected',
+            'ended_at' => now()->subDay(),
+        ]);
+
+        $response = $this->actingAs($me)->patch('/pipelines/'.$pipeline->id, [
+            'ng_reason' => '終了後に追記しようとしたメモ',
+            'version' => 99, // 現在値（0）と一致しない、意図的な不一致
+        ]);
+
+        // 終了ロックのメッセージ（バリデーションエラー）が返ること。
+        $response->assertSessionHasErrors(['status' => '終了したパイプラインは変更できません。']);
+        // version 不一致のメッセージは StaleUpdateException 発生時にのみ flash される別の
+        // セッションキー（'error'・単数形）を使う。終了ロックで弾かれていれば Service 層の
+        // version 照合自体に到達しないため、このキーは存在しないはず。
+        $response->assertSessionMissing('error');
+
+        $this->assertSame('rejected', $pipeline->fresh()->status);
+    }
+
+    /**
      * ドロワー表示中（referer が show URL /pipelines/{id}）にステータス更新しても、
      * 常に進行中カンバン（index）へ戻す。show へ戻るとドロワーが残る／開く不具合になるため。
      * 絞り込み条件（referer のクエリ）は index に引き継ぐ。

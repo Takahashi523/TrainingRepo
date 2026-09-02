@@ -414,7 +414,21 @@ class MasterUserControllerTest extends TestCase
         ])->assertSessionHasNoErrors();
     }
 
-    public function test_demoting_last_admin_is_rejected(): void
+    /**
+     * 【2026-09-02 改名】旧名 test_demoting_last_admin_is_rejected。
+     *
+     * 管理者が自分1人だけの状態で自己降格を試みるケース。actor === target のため、
+     * UpdateUserRequest::withValidator() は「自分自身のロール変更禁止」ガードで先に return し、
+     * 「最後の管理者」ガード（$demotingAdmin && adminCount <= 1）には到達しない
+     * （到達するには actor ≠ target が必要だが、その場合 actor 自身も管理者としてカウントされる
+     * ため adminCount は必ず2以上になり、両立しえない）。つまりこのテストは
+     * test_changing_own_role_is_rejected_even_when_another_admin_exists() と同じ自己降格ガードを
+     * 別のDB状態（管理者1人）で確認しているだけで、「最後の管理者」ガード自体の検証にはならない。
+     * メッセージまで検証することで、どちらのガードが発火したかを明示しておく。
+     * 「最後の管理者」ガード本体の検証は tests/Feature/UserServiceTest.php の
+     * test_update_rejects_demoting_the_only_admin() を参照。
+     */
+    public function test_self_demotion_as_sole_admin_is_rejected_by_self_guard(): void
     {
         $admin = $this->admin();
 
@@ -423,7 +437,7 @@ class MasterUserControllerTest extends TestCase
             'email' => $admin->email,
             'role' => 'general',
             'version' => 0,
-        ])->assertSessionHasErrors('role');
+        ])->assertSessionHasErrors(['role' => '自分自身のロールは変更できません。']);
 
         $this->assertSame('admin', $admin->fresh()->role);
     }

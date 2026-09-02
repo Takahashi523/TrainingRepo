@@ -36,6 +36,9 @@ class ProjectService
                 throw StaleUpdateException::forVersionMismatch();
             }
             
+            // 2026-09-02 修正／レビュー指摘: increment($column, $amount, $extra) による
+            // 1回のUPDATEへの統合は、date/datetime キャスト列（本サービスでは start_date）が
+            // DB上で書式崩れする不具合があったため取り消した（詳細は EngineerService 参照）。
             $locked->update($this->projectAttributes($request));
             $this->replaceSkills($locked, $skills);
             $locked->increment('version');

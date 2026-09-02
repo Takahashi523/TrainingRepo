@@ -69,6 +69,10 @@ class UserService
             }
 
             try {
+                // 2026-09-02 修正／レビュー指摘: increment($column, $amount, $extra) による
+                // 1回のUPDATEへの統合は、date/datetime キャスト列で DB上の書式が崩れる不具合が
+                // あったため取り消した（詳細は EngineerService 参照。本サービスは現状 date系の
+                // 更新対象列は無いが、将来の変更に備えて他サービスと同じ安全な形に揃える）。
                 $locked->update($attributes);
                 $locked->increment('version');
             } catch (QueryException $e) {
