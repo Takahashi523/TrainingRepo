@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\StaleUpdateException;
 use App\Http\Requests\EngineerRequest;
 use App\Models\Engineer;
 use App\Services\Ai\AiSummaryClient;
@@ -57,9 +58,26 @@ class EngineerService
         $previousAppealNote = $engineer->appeal_note;
         $newAppealNote = $request->input('appeal_note');
 
-        DB::transaction(function () use ($request, $engineer) {
-            $engineer->update($this->engineerAttributes($request));
-            $this->replaceSkills($engineer, $request->input('skills', []));
+        $engineer = DB::transaction(function () use ($request, $engineer) {
+            $locked = Engineer::lockForUpdate()->findOrFail($engineer->id);
+
+            if ($locked->version !== (int) $request->input('version')) {
+                throw StaleUpdateException::forVersionMismatch();
+            }
+
+            // 2026-09-02 修正／レビュー指摘: 一時的に update()+increment() を
+            // increment($column, $amount, $extra) の1回のUPDATEにまとめていたが、
+            // Eloquent の increment() は $extra を forceFill() でモデルの属性には
+            // 正しくキャスト・整形して反映する一方、実際に発行するSQLには $extra を
+            // 「渡された生の値のまま」使う（update() のように getDirty() 経由の
+            // キャスト済み値を使わない）。そのため date/datetime キャストの列
+            // （本サービスでは birth_date・available_from）が DB 上で書式崩れする
+            // 不具合があり、安全な2回のUPDATEに戻した。
+            $locked->update($this->engineerAttributes($request));
+            $this->replaceSkills($locked, $request->input('skills', []));
+            $locked->increment('version');
+
+            return $locked;
         });
 
         $aiSummaryFailed = false;
@@ -309,7 +327,7 @@ class EngineerService
         $workStyles = $request->input('work_styles', []);
 
         return array_merge(
-            $request->safe()->except(['skills', 'work_styles']),
+            $request->safe()->except(['skills', 'work_styles', 'version']),
             [
                 'work_style_onsite' => in_array('onsite', $workStyles),
                 'work_style_hybrid' => in_array('hybrid', $workStyles),

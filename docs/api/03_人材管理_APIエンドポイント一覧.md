@@ -249,7 +249,9 @@
     // 【issue #61 追加】表示中の ai_summary が現在の appeal_note に対応していない（陳腐化）かどうか。
     // ai_summary_source_hash と現在の appeal_note のハッシュ比較で判定する派生値（DB設計書 §1-10）。
     "is_ai_summary_stale": "bool",
-    "updated_at": "datetime(ISO8601)"
+    "updated_at": "datetime(ISO8601)",
+    // 【issue #45 追加】楽観ロック用カウンタ。編集画面はこの値を保持し、PUT時に送信する（→ 下記送信データ表）。
+    "version": "int"
   }
 }
 ```
@@ -309,6 +311,7 @@
 | status | string | ✓ | ステータス（システム固定必須・proposable / interviewing / not_proposable） |
 | main_user_id | int | ✓ | 主担当ユーザーID（システム固定必須） |
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |
+| version | int | PUTのみ✓ | 【issue #45 追加】楽観ロック用。編集画面が `GET /engineers/{id}` で読み込んだ version を保存時に送信する。DB上の現在値と不一致の場合は保存を拒否する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。POST（新規作成）では送信不要 |
 
 ---
 

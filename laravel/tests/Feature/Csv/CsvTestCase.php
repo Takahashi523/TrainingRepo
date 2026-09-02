@@ -23,6 +23,11 @@ abstract class CsvTestCase extends TestCase
      * スキーマの「インポート対象ヘッダー（export-only 列を除く）」を用いて CSV 文字列を生成する。
      * $rows は field => value の連想配列の配列。未指定 field は空セルになる。
      *
+     * `id` を指定した行（更新行）で `version` を明示しなかった場合、issue #45 の楽観ロックにより
+     * version が必須になったため、DB の現在値を自動補完する（既存テストの大半を「version の存在を
+     * 意識しない更新」のまま書けるようにするための配慮。version 不一致を意図的にテストする場合は
+     * 呼び出し側で `version` を明示すればこの自動補完は行われない）。
+     *
      * @param  array<int, array<string, mixed>>  $rows
      */
     protected function buildCsv(CsvSchema $schema, array $rows): string
@@ -35,6 +40,12 @@ abstract class CsvTestCase extends TestCase
         $writer->setEscape('');
         $writer->insertOne($headers);
         foreach ($rows as $row) {
+            if (isset($row['id']) && ! array_key_exists('version', $row)) {
+                $current = $schema->modelClass()::query()->find($row['id']);
+                if ($current !== null) {
+                    $row['version'] = $current->version;
+                }
+            }
             $writer->insertOne(array_map(fn ($f) => (string) ($row[$f] ?? ''), $fields));
         }
 

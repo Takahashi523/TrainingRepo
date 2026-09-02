@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\StaleUpdateException;
 use App\Http\Controllers\Concerns\ResolvesSort;
 use App\Http\Requests\EngineerIndexRequest;
 use App\Http\Requests\EngineerRequest;
@@ -185,7 +186,11 @@ class EngineerController extends Controller
 
     public function update(EngineerRequest $request, Engineer $engineer): RedirectResponse
     {
-        $result = $this->engineerService->update($request, $engineer);
+        try {
+            $result = $this->engineerService->update($request, $engineer);
+        } catch (StaleUpdateException) {
+            return back()->with('error', '他のユーザーがこの人材情報を更新しました。最新のデータを表示しました。');
+        }
 
         $redirect = redirect()->route('engineers.show', $result->engineer)
             ->with('success', '人材情報を更新しました。');

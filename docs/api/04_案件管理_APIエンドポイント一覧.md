@@ -264,7 +264,9 @@
         "is_target": "bool"                   // 対象工程か否か
       }
     ],
-    "updated_at": "datetime(ISO8601)"
+    "updated_at": "datetime(ISO8601)",
+    // 【issue #45 追加】楽観ロック用カウンタ。編集画面はこの値を保持し、PUT時に送信する（→ 下記送信データ表）。
+    "version": "int"
   }
 }
 ```
@@ -341,6 +343,7 @@
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |
 | billing_range | string | 任意 | 精算幅（form_field_settings制御・最大100文字） |
 | remarks | string | 任意 | 特記事項（form_field_settings制御・最大1000文字） |
+| version | int | PUTのみ✓ | 【issue #45 追加】楽観ロック用。編集画面が `GET /projects/{id}` で読み込んだ version を保存時に送信する。DB上の現在値と不一致の場合は保存を拒否する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。POST（新規作成）では送信不要 |
 
 > **文字数上限について（2026-08-17確定・#34対応）**：`description`(max:4000) / `work_env`(max:1000) / `remarks`(max:1000)は、人材側`appeal_note`(max:4000) / `remarks`(max:1000)と揃える形で確定した。§3 TBDにあった同項目は解消済み。
 

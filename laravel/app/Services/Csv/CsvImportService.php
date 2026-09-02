@@ -21,12 +21,29 @@ use Illuminate\Validation\ValidationException;
  *   3. データ0行チェック（O-9）
  *   4. 参照データ preload（users.id・既存 id を各1回／N+1回避・O-13）
  *   5. 行ごと：レイアウト（列数）先行 → 復元（CsvInjection）→ 正規化 → 項目検証（bail なし・全メッセージ収集）
- *              → 担当者/更新 id の存在照合（メモリ）→ ファイル内 id 重複（O-8）
+ *              → 担当者/更新 id の存在照合（メモリ）→ version 照合（楽観ロック・issue #45）→ ファイル内 id 重複（O-8）
  *   6. エラーが1件でもあれば書き込まず 422（errors.importErrors に構造化 JSON）
- *   7. エラー0件なら DB::transaction 内で upsert によるバッチ INSERT / UPDATE（全項目上書き＝O-1 暫定許容）
+ *   7. エラー0件なら DB::transaction 内で version 再照合（下記）→ upsert によるバッチ INSERT / UPDATE
+ *      （全項目上書き＋version 更新＝O-1。新規行は version=0、更新行は version+1）
  *
  * 設計原則：SRP（1クラス＝インポートの1責務）／DRY（列定義は CsvSchema・書式ルールは *Rules に集約）／
  * フェイルセーフ（全エラー収集後に一括ロールバック）。
+ *
+ * **楽観ロック（version・issue #45）**：更新行（id 指定）は version 列必須。preload 済みの現在値と
+ * 照合し、不一致なら当該行を「バージョンが一致しません」エラーとする（他の行エラーと同じ422・
+ * 全行ロールバック）。一致した行のみ write() で version+1 して書き込む。新規行（id 空）は
+ * version 列を無視し、常に 0（DBのdefaultと同値）で作成する。画面編集（PUT/PATCH）側の
+ * `version` チェックと同じ「読んだ版を照合してから+1」方式に揃えることで、CSVインポートと
+ * 画面編集のどちらが先に更新しても、後から保存しようとした側が確実に競合として検知される。
+ *
+ * **version 照合のタイミングと再照合（issue #45・2026-09-02 修正／レビュー指摘）**：上記の照合は
+ * preload 時点の値を見ているだけで、画面編集4経路（lockForUpdate() ロック内で照合〜更新まで
+ * 1トランザクションに閉じる）と異なり、preload〜実際の書き込み（write()）までの間に競合が
+ * 割り込む余地が元々あった（最大5,000行を許容する仕様のため、この間隔はゼロではない）。
+ * これを塞ぐため、write() は実際に書き込む直前・同一トランザクション内でも対象行を
+ * lockForUpdate() で再照合する（{@see write()}・{@see guardVersionsUnchangedSincePreload()}）。
+ * これにより「ロック→照合→更新」が1トランザクションに閉じる形になり、画面編集4経路と
+ * 同じ強度の保証になる。
  */
 class CsvImportService
 {
@@ -163,13 +180,15 @@ class CsvImportService
             $parsed[] = ['row' => $rowNum, 'id' => $id, 'dupKey' => $dupKey, 'assoc' => $assoc];
         }
 
-        // 既存 id 集合を1回だけロード（更新対象・非空かつ数値のみ）
+        // 既存 id 集合を1回だけロード（更新対象・非空かつ数値のみ）。
+        // version（楽観ロック・issue #45）の照合にも使うため、id だけでなく version も同じ1クエリで
+        // 取得する（N+1回避。id => version の連想配列。存在確認は isset() で兼ねる）。
         $idsInFile = array_values(array_unique(array_filter(
             array_map(fn ($p) => $p['id'], $parsed),
             fn ($v) => $v !== null && is_numeric($v),
         )));
-        $existingIdSet = $idsInFile !== []
-            ? array_flip($schema->modelClass()::query()->whereIn('id', $idsInFile)->pluck('id')->all())
+        $existingVersions = $idsInFile !== []
+            ? $schema->modelClass()::query()->whereIn('id', $idsInFile)->pluck('version', 'id')->all()
             : [];
 
         $duplicateIds = array_flip(array_keys(array_filter(
@@ -213,14 +232,27 @@ class CsvImportService
                 if (! is_numeric($id) || (float) $id != (int) $id) {
                     $rowHasError = true;
                     $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["ID「{$id}」が正しくありません。IDは整数で入力してください（新規追加はID列を空欄にしてください）。"]];
-                } elseif (! isset($existingIdSet[(int) $id])) {
+                } elseif (! isset($existingVersions[(int) $id])) {
                     $rowHasError = true;
                     $errors[] = ['row' => $rowNum, 'field' => 'id', 'messages' => ["指定されたID「{$id}」のデータが存在しません。新規追加はID列を空欄にし、更新する場合は既存の正しいIDを指定してください。"]];
+                } else {
+                    // version 照合（楽観ロック・issue #45）。id が実在し形式も正しい場合のみ判定する
+                    // （id 自体が不正/不存在の行は上の分岐で既にエラー済みのため二重に判定しない）。
+                    // version セル自体が空/不正な場合は importRules() の required/integer ルールが
+                    // 別途エラーを出すため、ここでは「数値として正しく読めた場合」のみ照合する。
+                    $version = $assoc['version'] ?? null;
+                    if ($version !== null && is_numeric($version) && (float) $version == (int) $version
+                        && (int) $version !== $existingVersions[(int) $id]) {
+                        $rowHasError = true;
+                        $errors[] = ['row' => $rowNum, 'field' => 'version', 'messages' => ['バージョンが一致しません。他のユーザーがこのデータを更新済みの可能性があります。最新のデータをエクスポートし直してから、再度インポートしてください。']];
+                    }
                 }
             }
 
             if (! $rowHasError) {
-                $writable[] = ['id' => $id, 'assoc' => $assoc];
+                // row は write() 側の最終再照合（issue #45・2026-09-02 修正）でエラー行番号を
+                // 正しく報告するために保持する。
+                $writable[] = ['row' => $rowNum, 'id' => $id, 'assoc' => $assoc];
             }
         }
 
@@ -230,7 +262,7 @@ class CsvImportService
             $this->fail($errors);
         }
 
-        $writeResult = $this->write($schema, $writable);
+        $writeResult = $this->write($schema, $writable, $existingVersions);
 
         return [
             'resource' => $schema->resourceKey(),
@@ -258,39 +290,66 @@ class CsvImportService
      * 従来方式に比べ、更新中心のインポートでも SQL 発行回数が件数に比例して増えない。
      * engineers / projects は主キー（id）以外にユニーク制約が無いため、他キー衝突で別レコードを
      * 取り違えて更新する危険はない（マイグレーション確認済み）。
-     * `created_at` は更新列に含めない（既存行の作成日時を保持）。全項目上書き＝O-1 暫定許容。
+     * `created_at` は更新列に含めない（既存行の作成日時を保持）。全項目上書き＝O-1（issue #45で確定：
+     * version 列による楽観ロックをCSV更新経路にも適用。version 照合済みの行のみここに到達する）。
      *
-     * @param  array<int, array{id: ?string, assoc: array<string, mixed>}>  $writable
+     * **version 再照合（issue #45・2026-09-02 修正／レビュー指摘）**：pass2 の version 照合は
+     * `import()` の preload 時点（=このメソッドの呼び出しより前）の値を見ているだけで、その後
+     * upsert() がコミットされるまでの間に他セッション（画面編集や別のCSVインポート）が同じ行を
+     * 更新すると、その更新をそのまま上書きしてしまう（画面編集4経路は lockForUpdate() ロック内で
+     * 照合〜更新まで1トランザクションに閉じているのに対し、従来のCSVはそうなっていなかった）。
+     * これを塞ぐため、実際に書き込む直前・同一トランザクション内で対象行を再度 lockForUpdate() し、
+     * pass2 で照合済みの version から変化していないかをもう一度確認する。変化していれば
+     * （＝ちょうどこの間に競合が起きた）1行もコミットせず、pass2 と同じ 422 エラー行一覧で返す
+     * （全行ロールバック方針を維持）。これにより画面編集4経路と同じ「ロック→照合→更新」が
+     * 1トランザクションに閉じる形になり、CSVインポートだけ空いていた競合ウィンドウを閉じる。
+     *
+     * @param  array<int, array{row: int, id: ?string, assoc: array<string, mixed>}>  $writable
+     * @param  array<int, int>  $currentVersions  id => pass2 で照合済みの version（新 version・+1 の
+     *                                             算出と、書き込み直前の再照合の両方に使う）
      * @return array{total_rows: int, created: int, updated: int, updated_ids: array<int, int>, written_at: \Illuminate\Support\Carbon}
+     *
+     * @throws ValidationException 書き込み直前の再照合で version 不一致を検出した場合
      */
-    private function write(CsvSchema $schema, array $writable): array
+    private function write(CsvSchema $schema, array $writable, array $currentVersions): array
     {
         /** @var class-string<Model> $model */
         $model = $schema->modelClass();
         $now = now();
 
         $rows = [];
+        $rowNumbersByUpdateId = []; // id => CSV上の行番号（再照合で不一致だった場合のエラー行番号用）
         $updatedIds = [];
         $created = 0;
         $updated = 0;
         $updateColumns = null;
         foreach ($writable as $row) {
             $attrs = $schema->buildAttributes($row['assoc']);
+            $id = $row['id'];
+            // version（楽観ロック・issue #45）：CSVセルの値をそのまま書き込まない。新規行は 0
+            // （DBのdefaultと同値。upsert は全行で同一のキー構成が必要なため明示する）、更新行は
+            // pass2 で照合済みの現在値 + 1 を書き込む（画面編集の PUT/PATCH 側と同じ「保存の都度+1」
+            // にすることで、CSVインポート後に開いていた編集画面の version が確実に古くなり、
+            // 画面側の楽観ロックにも検知される＝相互に穴を作らない）。
+            $attrs['version'] = $id === null ? 0 : $currentVersions[(int) $id] + 1;
             // 更新時に上書きする列＝全属性＋updated_at。id（一致キー）と created_at は除外し既存値を保持する。
             $updateColumns ??= array_merge(array_keys($attrs), ['updated_at']);
             // 全行で列構成を揃える（upsert は先頭行のキーで列を決めるため）。id は新規=null／更新=既存値。
-            $rows[] = ['id' => $row['id'] === null ? null : (int) $row['id']]
+            $rows[] = ['id' => $id === null ? null : (int) $id]
                 + $attrs
                 + ['created_at' => $now, 'updated_at' => $now];
-            if ($row['id'] === null) {
+            if ($id === null) {
                 $created++;
             } else {
                 $updated++;
-                $updatedIds[] = (int) $row['id'];
+                $updatedIds[] = (int) $id;
+                $rowNumbersByUpdateId[(int) $id] = $row['row'];
             }
         }
 
-        DB::transaction(function () use ($model, $rows, $updateColumns): void {
+        DB::transaction(function () use ($model, $rows, $updateColumns, $currentVersions, $rowNumbersByUpdateId): void {
+            $this->guardVersionsUnchangedSincePreload($model, $currentVersions, $rowNumbersByUpdateId);
+
             foreach (array_chunk($rows, 500) as $chunk) {
                 $model::query()->upsert($chunk, ['id'], $updateColumns);
             }
@@ -303,6 +362,46 @@ class CsvImportService
             'updated_ids' => $updatedIds,
             'written_at' => $now,
         ];
+    }
+
+    /**
+     * write() の書き込み直前・同一トランザクション内で行う version の最終再照合（issue #45・2026-09-02 修正）。
+     *
+     * 対象の更新行（id 指定）を lockForUpdate() で再取得し、pass2 で照合した $currentVersions と
+     * 現在の DB 値を比較する。1件でも変化していれば（＝preload〜ここまでの間に他セッションが更新した）
+     * 呼び出し元の DB::transaction を通じて全行ロールバックし、他のバリデーションエラーと同じ
+     * 422 のエラー行一覧（`field: "version"`）を投げる。
+     *
+     * @param  class-string<Model>  $model
+     * @param  array<int, int>  $currentVersions  id => pass2 で照合済みの version
+     * @param  array<int, int>  $rowNumbersByUpdateId  id => CSV上の行番号（エラー表示用）
+     *
+     * @throws ValidationException
+     */
+    private function guardVersionsUnchangedSincePreload(string $model, array $currentVersions, array $rowNumbersByUpdateId): void
+    {
+        $updateIds = array_keys($rowNumbersByUpdateId);
+        if ($updateIds === []) {
+            return;
+        }
+
+        $latestVersions = $model::query()->whereIn('id', $updateIds)->lockForUpdate()->pluck('version', 'id');
+
+        $errors = [];
+        foreach ($updateIds as $id) {
+            if (($latestVersions[$id] ?? null) !== $currentVersions[$id]) {
+                $errors[] = [
+                    'row' => $rowNumbersByUpdateId[$id],
+                    'field' => 'version',
+                    'messages' => ['バージョンが一致しません。他のユーザーがこのデータを更新済みの可能性があります。最新のデータをエクスポートし直してから、再度インポートしてください。'],
+                ];
+            }
+        }
+
+        if ($errors !== []) {
+            usort($errors, fn ($a, $b) => $a['row'] <=> $b['row']);
+            $this->fail($errors);
+        }
     }
 
     /**

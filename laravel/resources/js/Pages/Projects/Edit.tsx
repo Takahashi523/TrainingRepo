@@ -7,7 +7,7 @@ import {
 import { Button } from "@/Components/ui/button";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
-import { Head, router, useForm } from "@inertiajs/react";
+import { Head, router, useForm, usePage } from "@inertiajs/react";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 
@@ -85,6 +85,32 @@ export default function Edit({
 
     const { processing, errors } = form;
 
+    // 楽観ロック（version）の競合で保存が拒否され、同じ編集画面へ差し戻された場合の対応（issue #45）。
+    // このページは「この project を編集する」単一目的の画面のため、project Props が変わるのは
+    // 基本的にこの「競合後の再取得」のケースのみ。useForm の初期値はマウント時の1回しか使われず、
+    // Props 更新だけでは同一コンポーネントの再マウントが起きないため、明示的にフォームを作り直す。
+    //
+    // 通常のバリデーションエラー（422）で back() された場合も project Props は（保存に失敗して
+    // DBが変わっていないとはいえ）新しいオブジェクトとして再取得されるため、ここで無条件に
+    // setData すると入力中の内容がバリデーションエラーのたびに消えてしまう不具合があった。
+    // バリデーションエラー時は errors が入る一方、バージョン競合時は errors を伴わないため、
+    // errors が無いときだけ再同期することで両者を区別する……はずだったが、判定に使う errors を
+    // useForm の内部 state（form.errors、下の scroll 用 effect が使っているもの）から取ると、
+    // page props（project 含む）の更新と useForm 内部の setErrors（visit の onError コールバックで
+    // 発火）が別タイミングのレンダーになることがあり、1回目の保存失敗時だけ「新しい project で
+    // 再レンダーされた時点ではまだ form.errors が空のまま」というレースが起きて入力が消えてしまう
+    // 不具合があった（2回目以降の失敗では前回の form.errors が残っているため偶然ガードが効いていた）。
+    // project と同じ page.props の中身は usePage() から取れば同一のレンダーで確実に同期するため、
+    // このガードだけは form.errors ではなく usePage().props.errors を判定に使う
+    // （下のスクロール effect は DOM 表示と連動させたいので、引き続き form.errors のままでよい）。
+    const { errors: pageErrors } = usePage().props;
+
+    useEffect(() => {
+        if (Object.keys(pageErrors).length > 0) return;
+        form.setData(toFormData(project));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [project]);
+
     // form.errorsが更新され、DOMに反映された後に実行されることを保証するためuseEffectを使う
     // （onError内でrequestAnimationFrameを使う方式だと、Reactのコミット前にクエリが走ることがあり、
     // 初回のエラー表示時だけスクロールされないことがあった）
@@ -135,6 +161,7 @@ export default function Edit({
             preferred_skills: data.preferred_skills
                 .filter((s) => s.label !== "" || s.detail !== "")
                 .map(({ label, detail }) => ({ label, detail })),
+            version: project.version,
         }));
 
         form.put(route("projects.update", project.id));

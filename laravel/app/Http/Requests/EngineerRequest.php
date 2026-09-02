@@ -78,6 +78,10 @@ class EngineerRequest extends FormRequest
         }
         $rules['skills.*.detail'] = ['nullable', ...$shared['skills.*.detail']];
 
+        if ($this->isMethod('put')) {
+            $rules['version'] = ['required', 'integer', 'min:0'];
+        }
+
         return $rules;
     }
 
@@ -113,6 +117,7 @@ class EngineerRequest extends FormRequest
             'proc_development' => '開発',
             'proc_testing' => 'テスト',
             'proc_maintenance' => '保守運用',
+            'version' => 'バージョン',
         ];
     }
 }

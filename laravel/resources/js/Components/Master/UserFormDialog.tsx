@@ -83,6 +83,7 @@ export default function UserFormDialog({
         setData,
         post,
         put,
+        transform,
         processing,
         errors,
         reset,
@@ -138,6 +139,14 @@ export default function UserFormDialog({
 
             return;
         }
+
+        // 楽観ロック（version, issue #45）。FormData には含めず（新規登録に version の概念が
+        // ないため Engineer/Project の Edit.tsx と同様に共有型から外す）、編集時のみ送信直前に
+        // 対象ユーザーの version を積む。
+        transform((d) => ({
+            ...d,
+            version: isEdit ? user.version : undefined,
+        }));
 
         const options = {
             preserveScroll: true,

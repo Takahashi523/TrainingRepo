@@ -50,12 +50,13 @@ export interface Engineer {
     ai_summary: string | null;
     ai_summary_generated_at: string | null;
     /** issue #61：AI要約の生成状態。none=未生成／generated=生成済み／failed=生成失敗／empty=要約対象なし */
-    ai_summary_status: 'none' | 'generated' | 'failed' | 'empty';
+    ai_summary_status: "none" | "generated" | "failed" | "empty";
     /** 表示中の ai_summary が現在の appeal_note に対応していない（陳腐化）かどうか */
     is_ai_summary_stale: boolean;
     updated_at: string;
     /** 紐づくパイプライン件数。削除確認ダイアログの件数警告に使用（show() の loadCount 由来）。 */
     pipelines_count: number;
+    version: number;
 }
 
 export type FieldSettings = {
