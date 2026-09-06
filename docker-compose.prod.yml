@@ -43,8 +43,15 @@ services:
       - ./laravel/.env:/var/www/.env:ro
     healthcheck:
       # Laravel 11 の health エンドポイント（bootstrap/app.php の health: '/up'）。
-      # コンテナ内 nginx は server_name localhost なので Host は既定のままでよい。
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/up"]
+      #
+      # ⚠️ Host ヘッダーを APP_URL のホストと一致させること。
+      #    Laravel の trustHosts（bootstrap/app.php）は APP_URL のホストと
+      #    TRUSTED_HOSTS だけを許可するため、`Host: 127.0.0.1` のままだと 400 が返り、
+      #    healthcheck が永久に失敗する。laravel が healthy にならないと
+      #    nginx の depends_on: condition: service_healthy が満たされず、
+      #    前段 nginx が起動しない＝HTTPS 全面停止になる（Issue #90）。
+      #    コンテナ内 nginx の server_name は素通しなので、弾いているのは Laravel 側。
+      test: ["CMD", "wget", "-q", "-O", "-", "--header", "Host: ${APP_HOST:?APP_HOST is required. See .env.prod.example}", "http://127.0.0.1/up"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -86,7 +93,11 @@ services:
       - mysql_data:/var/lib/mysql
     healthcheck:
       # 初期化完了前に laravel/python が起動して接続失敗するのを防ぐ（Issue #90 #5）
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      #
+      # ⚠️ CMD（exec 形式）ではシェルを介さないため $MYSQL_ROOT_PASSWORD が展開されず、
+      #    リテラル文字列がパスワードとして渡ってしまう。CMD-SHELL にして
+      #    コンテナ内のシェルに展開させること（$$ は compose のエスケープ）。
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
