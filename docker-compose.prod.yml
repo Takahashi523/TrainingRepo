@@ -44,14 +44,17 @@ services:
     healthcheck:
       # Laravel 11 の health エンドポイント（bootstrap/app.php の health: '/up'）。
       #
-      # ⚠️ Host ヘッダーを APP_URL のホストと一致させること。
-      #    Laravel の trustHosts（bootstrap/app.php）は APP_URL のホストと
-      #    TRUSTED_HOSTS だけを許可するため、`Host: 127.0.0.1` のままだと 400 が返り、
+      # ⚠️ Host: 127.0.0.1 が通るのは laravel/.env の TRUSTED_HOSTS に 127.0.0.1 が
+      #    含まれているため（Laravel の trustHosts は APP_URL のホストと TRUSTED_HOSTS
+      #    だけを許可する）。TRUSTED_HOSTS から 127.0.0.1 を消すと 400 が返るようになり、
       #    healthcheck が永久に失敗する。laravel が healthy にならないと
       #    nginx の depends_on: condition: service_healthy が満たされず、
       #    前段 nginx が起動しない＝HTTPS 全面停止になる（Issue #90）。
       #    コンテナ内 nginx の server_name は素通しなので、弾いているのは Laravel 側。
-      test: ["CMD", "wget", "-q", "-O", "-", "--header", "Host: ${APP_HOST:?APP_HOST is required. See .env.prod.example}", "http://127.0.0.1/up"]
+      # wget は URL のホスト（127.0.0.1）をそのまま Host ヘッダーに使うため、
+      # --header での明示指定は不要（以前は APP_HOST で明示していたが、
+      # TRUSTED_HOSTS=127.0.0.1 への切替に伴い廃止した）。
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/up"]
       interval: 30s
       timeout: 5s
       retries: 5
