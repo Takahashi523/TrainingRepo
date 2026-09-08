@@ -1,0 +1,7 @@
+# compose の変数展開に使う .env（MYSQL_ROOT_PASSWORD 等）。
+# docker compose はプロジェクト直下の .env を自動で読み込むため、
+# ここに秘匿値が入る。リポジトリには絶対に入れないこと。
+/.env
+
+# 雛形はコミットする
+!/.env.prod.example
