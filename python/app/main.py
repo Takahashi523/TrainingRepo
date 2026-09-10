@@ -1,8 +1,10 @@
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.exception_handlers import is_body_allowed_for_status_code
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.routers import health, matching, profile
 from app.services.bedrock_service import BedrockError
@@ -42,6 +44,12 @@ app.include_router(profile.router)
 # ※ 500 応答の形を検証するテストでは TestClient(app, raise_server_exceptions=False) を使うこと。
 #   既定（True）だと Starlette の ServerErrorMiddleware が応答返却後に例外を再送出するため、
 #   レスポンスを受け取れず「ハンドラが効いていない」と誤読しやすい。
+#
+# なお StarletteHTTPException（未定義ルート・許可されていないメソッド等、アプリコードが
+# 送出したものではない Starlette/FastAPI 既定の HTTPException）に対する既定ハンドラは
+# {"detail": ...} 形式で返る。他のすべての応答をフラット形式に揃えている以上、ここも
+# 揃えないと404/405のときだけ Laravel 側の error_code 判定が効かなくなるため、
+# 下記でフラット形式にオーバーライドする。
 # ---------------------------------------------------------------------------
 
 
@@ -50,6 +58,29 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(
         status_code=400,
         content={"error_code": "INVALID_PARAMETER", "message": str(exc)},
+    )
+
+
+# 未定義ルート（404）・許可されていないHTTPメソッド（405）等、Starlette/FastAPI が
+# アプリコードの外側で送出する HTTPException 用。個別の業務例外は専用ハンドラが
+# 別途処理するため、ここに到達するのは基本的にルーティングレベルのエラーのみ。
+_STARLETTE_HTTP_ERROR_CODES = {
+    404: "NOT_FOUND",
+    405: "METHOD_NOT_ALLOWED",
+}
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if not is_body_allowed_for_status_code(exc.status_code):
+        return Response(status_code=exc.status_code, headers=getattr(exc, "headers", None))
+
+    error_code = _STARLETTE_HTTP_ERROR_CODES.get(exc.status_code, "HTTP_ERROR")
+    message = exc.detail if isinstance(exc.detail, str) else "リクエストを処理できませんでした。"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error_code": error_code, "message": message},
+        headers=getattr(exc, "headers", None),
     )
 
 

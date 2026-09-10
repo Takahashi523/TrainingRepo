@@ -289,3 +289,32 @@ class TestProfileSummary:
         """engineer_id が欠けている場合 400 になること（E2の必須項目はengineer_idのみ）。"""
         response = self._post_profile_summary({})
         assert response.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# ルーティングレベルのエラー（アプリコードが送出したものではない HTTPException）
+# ---------------------------------------------------------------------------
+
+
+class TestUnmatchedRoutes:
+    """未定義ルート（404）・許可されていないメソッド（405）も、業務例外と同じ
+    フラット形式 {"error_code", "message"} で返ること。
+
+    修正前は Starlette/FastAPI 既定の HTTPException ハンドラがそのまま使われており、
+    {"detail": "Not Found"} のような入れ子形式で返っていた。
+    """
+
+    def test_returns_404_with_flat_body_for_unknown_path(self):
+        response = client.get("/api/v1/does-not-exist")
+        assert response.status_code == 404
+        body = response.json()
+        assert set(body.keys()) == {"error_code", "message"}
+        assert body["error_code"] == "NOT_FOUND"
+
+    def test_returns_405_with_flat_body_for_wrong_method(self):
+        """/api/v1/matching/calculate は POST 専用のため、GET は 405 になること。"""
+        response = client.get("/api/v1/matching/calculate")
+        assert response.status_code == 405
+        body = response.json()
+        assert set(body.keys()) == {"error_code", "message"}
+        assert body["error_code"] == "METHOD_NOT_ALLOWED"
