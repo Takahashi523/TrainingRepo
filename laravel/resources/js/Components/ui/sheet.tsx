@@ -49,27 +49,60 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  /**
+   * オーバーレイ（背景幕）に当てる class。
+   * 既定の暗幕（bg-black/80）を呼び出し側から差し替えるために使う。
+   * 既定値そのものは変えず、必要な画面だけがオプトインする（dialog.tsx / alert-dialog.tsx と同じ方式）。
+   */
+  overlayClassName?: string
+  /**
+   * Portal の描画先。既定は body（＝ビューポート全体を覆う fixed 配置）。
+   * ドロワーをサイドバーの上に乗せたくない画面では、コンテンツ領域のコンテナを渡し、
+   * className 側で fixed → absolute に上書きしてそのコンテナ内に収める。
+   */
+  container?: HTMLElement | null
+  /**
+   * 右上の既定の閉じるボタン（✕）を描画するか。
+   * ヘッダーに独自の閉じるボタンを持つ画面では false にして ✕ の重複を避ける。
+   */
+  showCloseButton?: boolean
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <SheetPrimitive.Content
-      ref={ref}
-      className={cn(sheetVariants({ side }), className)}
-      {...props}
-    >
-      {children}
-      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </SheetPrimitive.Close>
-    </SheetPrimitive.Content>
-  </SheetPortal>
-))
+>(
+  (
+    {
+      side = "right",
+      className,
+      overlayClassName,
+      container,
+      showCloseButton = true,
+      children,
+      ...props
+    },
+    ref
+  ) => (
+    <SheetPortal container={container ?? undefined}>
+      <SheetOverlay className={overlayClassName} />
+      <SheetPrimitive.Content
+        ref={ref}
+        className={cn(sheetVariants({ side }), className)}
+        {...props}
+      >
+        {children}
+        {showCloseButton && (
+          <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </SheetPrimitive.Close>
+        )}
+      </SheetPrimitive.Content>
+    </SheetPortal>
+  )
+)
 SheetContent.displayName = SheetPrimitive.Content.displayName
 
 const SheetHeader = ({

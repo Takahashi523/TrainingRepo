@@ -422,17 +422,21 @@
         <div class="section-divider"></div>
       </div>
 
-      <!-- 氏名 / カナ -->
+      <!-- 氏名 / カナ（別カラム。エラーは各入力欄の直下に個別表示） -->
       <div class="form-row">
         <div class="form-label">
           <span class="badge-required">必須</span>氏名 / カナ
         </div>
         <div class="form-field col">
           <div style="display:flex;gap:8px;width:100%;">
-            <input class="wf-input w-half error" type="text" placeholder="例：山田 太郎">
-            <input class="wf-input w-half" type="text" placeholder="例：ヤマダ タロウ">
+            <div style="flex:1;">
+              <input class="wf-input error" type="text" placeholder="例：山田 太郎" style="width:100%;">
+              <span class="error-msg">⚠ 氏名は必須項目です</span>
+            </div>
+            <div style="flex:1;">
+              <input class="wf-input" type="text" placeholder="例：ヤマダ タロウ" style="width:100%;">
+            </div>
           </div>
-          <span class="error-msg">⚠ 氏名は必須項目です</span>
         </div>
       </div>
 
@@ -450,17 +454,21 @@
         </div>
       </div>
 
-      <!-- 最寄駅 / 路線 -->
+      <!-- 最寄駅 / 路線（別カラム・別 field_key。必須/任意は個別、エラーも各入力欄の直下に個別表示） -->
       <div class="form-row">
-        <div class="form-label">
-          <span class="badge-required">必須</span>最寄駅 / 路線
-        </div>
+        <div class="form-label">最寄駅 / 路線</div>
         <div class="form-field col">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input class="wf-input w-200" type="text" placeholder="路線名（例：JR中央線）">
-            <input class="wf-input w-200" type="text" placeholder="駅名（例：新宿）">
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+            <div>
+              <div style="margin-bottom:4px;"><span class="badge-required">必須</span>最寄駅</div>
+              <input class="wf-input w-200" type="text" placeholder="駅名（例：新宿）">
+            </div>
+            <div>
+              <div style="margin-bottom:4px;"><span class="badge-required">必須</span>路線</div>
+              <input class="wf-input w-200" type="text" placeholder="路線名（例：JR中央線）">
+            </div>
           </div>
-          <span class="hint-text">出社が必要な案件との通勤条件の判定に使用します。入力形式：路線名・駅名をそれぞれ自由入力（例：JR中央線 / 新宿）</span>
+          <span class="hint-text">出社が必要な案件との通勤条件の判定に使用します。最寄駅・路線はそれぞれ別項目で、フォーム設定で個別に必須/任意を切替できます（例：新宿 / JR中央線）</span>
         </div>
       </div>
 

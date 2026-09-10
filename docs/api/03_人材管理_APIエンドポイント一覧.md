@@ -21,8 +21,10 @@
 | 5 | GET | /engineers/{id}/edit | EngineerController@edit | 管理者 / 一般営業 | WF_04 |
 | 6 | PUT | /engineers/{id} | EngineerController@update | 管理者 / 一般営業 | WF_04 |
 | 7 | DELETE | /engineers/{id} | EngineerController@destroy | **管理者のみ** | WF_05 |
+| 8 | POST | /engineers/{id}/ai-summary/regenerate | EngineerController@regenerateAiSummary | 管理者 / 一般営業 | WF_05 |
 
 > **削除ルール（QA #37確定）**：管理者は物理削除（`DELETE /engineers/{id}`）。一般営業がステータスを変更したい場合は `PUT /engineers/{id}` で `status: "not_proposable"` を送信すること。
+> **#8 は issue #61 で追加**：AI要約の明示的な再生成（appeal_note の変更有無に依存しない失敗後のリカバリ手段）。DB設計書 §1-10 参照。
 
 ---
 
@@ -33,11 +35,11 @@
 | status | string[] | 任意 | ステータス配列 | proposable / interviewing / not_proposable |
 | work_styles | string[] | 任意 | 勤務形態キー配列 | onsite / hybrid / remote |
 | phases | string[] | 任意 | 工程経験キー配列 | proc_requirements / proc_basic_design / proc_detail_design / proc_development / proc_testing / proc_maintenance |
-| keyword | string | 任意 | フリーワード検索 | 氏名・スキルラベル・アピールポイントに対して部分一致。検索対象項目はTBD |
-| sort | string | 任意 | ソート項目 | デフォルト：created_at |
-| order | string | 任意 | 並び順 | asc / desc（デフォルト：desc） |
+| keyword | string | 任意 | フリーワード検索 | 氏名（部分一致）・スキルラベル（前方一致）を対象とする。アピールポイントは検索対象外（カードに非表示の項目がヒットするとユーザーが理由を確認できず混乱を招くため） |
+| sort | string | 任意 | ソート項目 | デフォルト：created_at 許容される組み合わせはsortOptions(#1 Props)の4パターンに限る |
+| order | string | 任意 | 並び順 | asc / desc（デフォルト：desc）許容される組み合わせはsortOptions(#1 Props)の4パターンに限る |
 | page | int | 任意 | ページ番号 | デフォルト：1 |
-| per_page | int | 任意 | 1ページあたり件数 | デフォルト：20・上限はTBD |
+| per_page | int | 任意 | 1ページあたり件数 | デフォルト：20・上限：100（超過時は100にクランプ） |
 
 > 異なる項目間はAND条件。例：`(提案可) AND (フルリモート)`  
 > スキル検索は `keyword` のフリーワード検索（スキルラベル前方一致）で対応する。スキルマスタ廃止のため `skill_ids[]` は廃止（WF_03 v3.0確定）
@@ -64,7 +66,7 @@
                                               // available_from が null → "未定"
                                               // available_from に日付あり → "YYYY/MM/DD〜"
                                               // Controller内で生成する
-                                              // ※ 過去日付の扱い（そのまま表示 or "即日〜"）はTBD
+                                              // 過去日付でも特別扱いせず、そのまま"YYYY/MM/DD〜"と表示する
         "users": {
           "main": { "id": "int", "name": "string" },
           "sub":  { "id": "int", "name": "string" } // null許容：未設定の場合null
@@ -114,8 +116,8 @@
     "page": "int"                             // ページ番号
   },
 
-  // ログインユーザーの保存検索条件一覧
-  // エンドポイント定義は 07_保存検索条件_APIエンドポイント一覧.md を参照すること
+  // ログインユーザーの保存済み検索条件一覧
+  // エンドポイント定義は 07_検索条件保存_APIエンドポイント一覧.md を参照すること
   "savedSearches": [
     {
       "id": "int",
@@ -129,13 +131,25 @@
         "order": "string"                     // 並び順
       }
     }
+  ],
+
+  // ソート選択肢（DB設計書 §8 準拠・sort × order の組み合わせが決まっている4パターン固定）
+  // フロントはこの配列をそのまま SortSelect の options として使用する
+  "sortOptions": [
+    { "sort": "string", "order": "string", "label": "string" }
+    // 例：
+    // { "sort": "created_at",     "order": "desc", "label": "登録日順（新しい順）" }
+    // { "sort": "created_at",     "order": "asc",  "label": "登録日順（古い順）" }
+    // { "sort": "updated_at",     "order": "desc", "label": "更新日順（新しい順）" }
+    // { "sort": "available_from", "order": "asc",  "label": "稼働可能時期順" }  ※2026-08-18 に項目名へ統一
   ]
 }
 ```
 
 > **実装注意（N+1対策）**：`skills`・`mainUser`・`subUser` を Eager Loading すること（`with(['skills', 'mainUser', 'subUser'])` 相当）  
-> **実装注意（TEXT除外）**：`appeal_note` / `ai_summary` / `remarks` はTEXTカラムのため `EngineerListResource` で明示的に除外すること（DB設計書 §1-9）
-
+> **実装注意（TEXT除外）**：`appeal_note` / `ai_summary` / `remarks` はTEXTカラムのため `EngineerListResource` で明示的に除外すること（DB設計書 §1-9）  
+> **実装注意（ソート制御）**：sort・order は独立した値としてではなく、`sortOptions` の4組の組み合わせ単位でバリデーションすること（DB設計書 §8 準拠）。フロントの選択肢にない組み合わせ（例：updated_at＋asc）をURL経由で許可しないよう統一する  
+> **実装注意（per_page上限）**：100件を超える指定はサーバー側で100にクランプすること
 ---
 
 ### GET /engineers/create　Props（#2）
@@ -229,7 +243,15 @@
     "remarks": "string",                           // 特記事項
     "ai_summary": "string",                        // AI職務要約テキスト（未生成時はnull）
     "ai_summary_generated_at": "datetime(ISO8601)", // 最終生成日時（WF_05「最終生成：YYYY-MM-DD」表示用）
-    "updated_at": "datetime(ISO8601)"
+    // 【issue #61 追加】AI要約の生成状態。none=未生成／generated=生成済み／failed=生成失敗／empty=要約対象なし
+    // （DB設計書 §6-9・Engineer::AI_SUMMARY_STATUSES がSSOT）。WF_05 で恒久的な失敗表示に使う。
+    "ai_summary_status": "string",
+    // 【issue #61 追加】表示中の ai_summary が現在の appeal_note に対応していない（陳腐化）かどうか。
+    // ai_summary_source_hash と現在の appeal_note のハッシュ比較で判定する派生値（DB設計書 §1-10）。
+    "is_ai_summary_stale": "bool",
+    "updated_at": "datetime(ISO8601)",
+    // 【issue #45 追加】楽観ロック用カウンタ。編集画面はこの値を保持し、PUT時に送信する（→ 下記送信データ表）。
+    "version": "int"
   }
 }
 ```
@@ -282,13 +304,14 @@
 | proc_testing | bool | 任意 | テスト経験（true:有）。proc_experience の is_required 設定で制御 |
 | proc_maintenance | bool | 任意 | 保守運用経験（true:有）。proc_experience の is_required 設定で制御 |
 | has_negotiation_exp | bool | 任意 | 顧客折衝経験（true:有・form_field_settings制御） |
-| appeal_note | string | 任意 | アピールポイント（form_field_settings制御） |
+| appeal_note | string | 任意 | アピールポイント（form_field_settings制御・最大4000文字） |
 | desired_rate | int | 任意 | 希望単価月額（単位：万円・form_field_settings制御） |
 | work_styles | string[] | 任意 | 勤務形態。選択値を配列で送る（onsite / hybrid / remote）。未選択の場合は空配列 [] または省略。Controller内で work_style_* カラムに変換する（form_field_settings制御） |
-| remarks | string | 任意 | 特記事項（form_field_settings制御） |
+| remarks | string | 任意 | 特記事項（form_field_settings制御・最大1000文字） |
 | status | string | ✓ | ステータス（システム固定必須・proposable / interviewing / not_proposable） |
 | main_user_id | int | ✓ | 主担当ユーザーID（システム固定必須） |
 | sub_user_id | int | 任意 | サブ担当ユーザーID（null許容） |
+| version | int | PUTのみ✓ | 【issue #45 追加】楽観ロック用。編集画面が `GET /engineers/{id}` で読み込んだ version を保存時に送信する。DB上の現在値と不一致の場合は保存を拒否する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。POST（新規作成）では送信不要 |
 
 ---
 
@@ -314,10 +337,32 @@
 
 ---
 
+### POST /engineers/{id}/ai-summary/regenerate（#8・issue #61）
+
+WF_05（人材詳細）からの明示的なAI要約再生成。`appeal_note` の変更有無に依存せず、いつでも呼び出せる
+（PUT /engineers/{id} の自動トリガーは appeal_note 変更時のみのため、失敗後に appeal_note を変えずに
+やり直す手段としてこのエンドポイントを設ける）。送信データなし。
+
+#### 挙動
+
+| 条件 | 動作 |
+|---|---|
+| appeal_note が空 | AI エンジンを呼ばず、`ai_summary_status` を `none` に据え置く（クリア済みなら実質変化なし） |
+| appeal_note があり、生成成功（空でない要約） | `ai_summary` / `ai_summary_generated_at` を更新し `ai_summary_status` を `generated`、`ai_summary_source_hash` を再計算 |
+| appeal_note があり、生成成功（空出力） | `ai_summary` を NULL にクリアし `ai_summary_status` を `empty` |
+| appeal_note があり、上流障害（接続不可・タイムアウト・4xx/5xx） | 本体データ・`ai_summary` は直前の値のまま据え置き、`ai_summary_status` のみ `failed` |
+
+#### レスポンス
+
+| 条件 | 動作 |
+|---|---|
+| 成功時（生成成功・空出力とも） | `/engineers/{id}` へリダイレクトし SharedProps の `flash.success` を返す |
+| 生成失敗時（上流障害） | `/engineers/{id}` へリダイレクトし SharedProps の `flash.error` を返す（「AI要約の生成に失敗しました。」） |
+| 対象データなし | 404 を返す |
+
+---
+
 ## 未確定事項（TBD）
 
 | # | 項目 | QA# | 理由 |
 |---|------|-----|------|
-| 1 | 人材一覧フリーワード検索の検索対象項目 | - | スキルラベル前方一致を含む方針だが、氏名以外の対象項目が未確定 |
-| 2 | 人材一覧ページの1ページあたり件数上限値 | - | デフォルト20は確定。上限値（推奨：100件）は未決定 |
-| 3 | available_label の過去日付の扱い | - | 過去日付をそのまま"YYYY/MM/DD〜"と表示するか"即日〜"に変換するかが未確定 |

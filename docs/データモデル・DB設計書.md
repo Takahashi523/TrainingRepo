@@ -2,7 +2,7 @@
 
 **システム名：** Nexus  
 **作成日：** 2026-05-10  
-**最終更新：** 2026-05-10  
+**最終更新：** 2026-08-26  
 **作成者：** 岡大貴  
 **ステータス：** 基本設計中
 
@@ -119,6 +119,46 @@ WF_03（人材一覧）ではこれらの TEXT カラムは表示されない。
 - **詳細エンドポイント**（`GET /api/engineers/{id}`）：全カラムを返してよい。
 - 同様のルールを `projects` テーブルの `description TEXT` / `work_env TEXT` / `remarks TEXT` / `billing_range VARCHAR` にも適用する。
 
+### 1-10.【v1.8 新規】AI要約の状態管理（issue #61）
+
+`ai_summary`（有無）だけでは「未生成／生成失敗／AIが空出力を返した／appeal_note 変更後に未更新（陳腐化＝stale）」を区別できず、
+生成失敗時の恒久表示・失敗後の再生成・stale検知・CSVインポート経由の生成トリガー未対応、という課題があった（issue #61）。
+これを解消するため、`engineers` に以下の2カラムを追加する（→ §4 engineers・§6-9）。
+
+- **`ai_summary_status` ENUM**：直近の生成トリガーの結果（`none` / `generated` / `failed` / `empty`）を保持する。
+- **`ai_summary_source_hash` VARCHAR(64)**：`generated` 確定時点の `appeal_note` の SHA-256 ハッシュ。
+
+**stale（陳腐化）はカラムを持たず、都度算出する**：「現在の `appeal_note` のハッシュ」と `ai_summary_source_hash` が
+一致しない場合、表示中の `ai_summary` は古い `appeal_note` に基づく内容だと判定できる（`Engineer::isAiSummaryStale`
+アクセサ）。状態そのものに `stale` という値を持たせず、`failed`（直近の試行結果）と組み合わせて判定する2軸構成にすることで、
+「生成に失敗した」という事実と「表示内容が古い」という事実を別々に、かつ後から追加のマイグレーションなしで表現できる。
+
+**CSVインポート（PR #58）への適用方針**：CSVインポートは `upsert` によるバッチ書き込みのため、Eloquent イベントを
+通らない。`CsvImportService::write()` が「更新行の id 一覧（`updated_ids`）」と「このバッチの `created_at`/`updated_at`
+基準時刻（`written_at`）」を返し、`EngineerService::triggerAiSummaryForCsvImport($updatedIds, $writtenAt, $importStartedAt, $maxIdBeforeImport)`
+がこの2つ（＋ `$maxIdBeforeImport`）で対象を**今回のインポートで書き込まれた行だけ**に絞り込んだうえで、
+`appeal_note` はあるのに `ai_summary_status` が `none`（未試行）の行にのみ生成を試みる。テーブル全体を都度スイープ
+する方式ではないため、インポートと無関係な既存の未試行データが巻き込まれることはない（それらは各人材の詳細画面
+から個別に再生成する）。
+
+**新規行の特定に `created_at` だけでなく `id` の下限も併用する**：`created_at` は秒精度のため、無関係な既存行が
+たまたま同じ秒に作成されていた場合、`created_at` の一致だけでは誤って対象に含めてしまう（実際にテストで発生を
+確認した）。オートインクリメントの `id` はインポートで新規挿入された行が、それ以前に存在した行の `id` を超える
+性質を利用し、`CsvController` が `import()` 呼び出し前に取得した最大 `id`（`$maxIdBeforeImport`）より大きい、
+かつ `created_at` が一致する行だけを新規行とみなす。二重の条件にすることで、同一秒に無関係な行が作成されていても
+`id` 側で弾ける。
+
+**打ち切り方式は経過時間ベース（固定件数ではない）**：AI呼び出しは同期・直列（1件あたり最大30秒）で、キュー実行
+基盤（ワーカー）が現状の環境（`docker-compose.yml`）に無い。CSV読込・検証・バッチ書き込み自体で最大十数秒を
+使う想定（`08_CSV入出力_APIエンドポイント一覧.md` O-13）のため、PHPの `max_execution_time`（既定30秒。
+docker/php・nginx設定に上書きなし）に対する残り時間はインポートごとの書き込み時間次第で大きく変わる。固定件数の
+上限ではこの変動に対応できない（小規模インポートでは残り時間があるのに早く打ち切りすぎ、大規模インポートでは
+書き込みで時間を使い切った後もタイムアウトの危険が残ったまま同じ件数を回そうとしてしまう）ため、インポート処理
+開始時刻からの経過時間を都度計測し、`config('services.ai_summary.csv_trigger_budget_seconds')`（既定20秒＝30秒から
+フレームワークのオーバーヘッドや安全マージンとして10秒を差し引いた値）を超えたら以降は新規のAI呼び出しを行わず
+スキップする。超過分は件数のみ `flash.error` で通知する（`importResult` とは別チャンネル。flash.error の扱いは
+`バリデーション・エラー表示設計書.md` 参照）。
+
 -----
 
 ## 2. テーブル一覧
@@ -156,7 +196,8 @@ erDiagram
 
 > **工程経験・勤務形態：** §1-8 の設計方針に従い、中間テーブルを設けず `engineers` / `projects` のカラムとして直接保持する。  
 > **担当営業：** `engineers.main_user_id` / `sub_user_id`・`projects.main_user_id` / `sub_user_id` で直接参照。中間テーブルは設けない。WF_04 / WF_07 にてサブは1名まで確定。  
-> **パイプライン担当営業（QA #83 確定）：** 進捗管理画面では `pipelines.engineer_id → engineers.main_user_id → users` の経路で担当者を参照する。
+> **パイプライン担当営業（QA #83 確定）：** 進捗管理画面では `pipelines.engineer_id → engineers.main_user_id → users` の経路で担当者を参照する。  
+> **保存済み検索条件（saved_searches）：** `user_id` は FK `ON DELETE CASCADE`。個人保存・共有機能なし（QA #81 確定）のため、ユーザーが削除されると紐づく保存済み検索条件も連動して自動削除される。`main_user_id`（RESTRICT）とは異なり、アプリ層での事前チェックは不要。
 
 -----
 
@@ -180,6 +221,8 @@ erDiagram
 | ステータス | status | ENUM | NOT NULL | | `proposable` | 提案可 / 面談中 / 提案不可。QA #69 確定。→ §6-1 |
 | AI職歴要約テキスト | ai_summary | TEXT | NULL | | NULL | `appeal_note` を入力元としてAI生成。再生成可能なためNULL許容。**一覧クエリでは取得しないこと（§1-9 参照）** |
 | **AI要約最終生成日時** | **ai_summary_generated_at** | **DATETIME** | **NULL** | | **NULL** | **【v1.7 追加】WF_05「最終生成：YYYY-MM-DD」表示対応。AI要約生成時のみ更新。updated_at と分離することで要約の鮮度を管理できる** |
+| **AI要約の生成状態** | **ai_summary_status** | **ENUM** | **NOT NULL** | | **`none`** | **【v1.8 追加】issue #61。未生成／生成成功／生成失敗／空出力を区別する。→ §6-9** |
+| **AI要約の生成元ハッシュ** | **ai_summary_source_hash** | **VARCHAR(64)** | **NULL** | | **NULL** | **【v1.8 追加】issue #61。`generated` 確定時点の appeal_note の SHA-256 ハッシュ。現在の appeal_note との不一致で stale（陳腐化）を判定する（→ §1-10）** |
 | メイン担当営業 | main_user_id | BIGINT UNSIGNED | NOT NULL | FK | なし（要指定） | → users.id。ON DELETE RESTRICT |
 | サブ担当営業 | sub_user_id | BIGINT UNSIGNED | NULL | FK | NULL | → users.id。ON DELETE SET NULL |
 | 要件定義経験 | proc_requirements | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
@@ -191,6 +234,7 @@ erDiagram
 | 常駐可 | work_style_onsite | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
 | 一部リモート可 | work_style_hybrid | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
 | フルリモート希望 | work_style_remote | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集フォームは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。CSVインポート（更新行）も同じversionで照合し、更新のたびに+1する（新規行は常に0）。詳細は08_CSV入出力APIエンドポイント一覧.md参照【2026-09-01 issue #45 追記】** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -212,7 +256,7 @@ erDiagram
 | 単価備考 | rate_note | VARCHAR(100) | NULL | | NULL | 「スキル見合い、応相談」等の短文。QA #14 確定。rate_min/rate_max が NULL の場合 AI はこのテキストを参考情報として扱う（配点加算なし） |
 | 商流 | commercial_flow | ENUM | NULL | | NULL | プライム / 2次 / 3次 / その他。QA #80 確定。→ §6-7 |
 | 稼働形態 | work_style | ENUM | NULL | | NULL | フルリモート / 一部リモート可 / 常駐。（NULL はCSV取り込み時の空欄に限る）AIマッチング入力パラメータ。→ §6-3 |
-| 勤務地（路線） | work_location_line | VARCHAR(100) | NULL | | NULL | 常駐・一部リモート時のみ入力 |
+| 勤務地（路線名） | work_location_line | VARCHAR(100) | NULL | | NULL | 常駐・一部リモート時のみ入力 |
 | 勤務地（最寄駅） | work_location_station | VARCHAR(100) | NULL | | NULL | 常駐・一部リモート時のみ入力。AIマッチング入力パラメータ |
 | 面談回数 | interview_count | TINYINT UNSIGNED | NULL | | NULL | |
 | 顧客折衝経験要否 | negotiation_required | TINYINT(1) | NULL | | NULL | 1=要 / 0=不問。AIマッチング入力パラメータ |
@@ -229,6 +273,7 @@ erDiagram
 | 開発対象 | proc_development | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
 | テスト対象 | proc_testing | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
 | 保守運用対象 | proc_maintenance | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集フォームは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。CSVインポート（更新行）も同じversionで照合し、更新のたびに+1する（新規行は常に0）。詳細は08_CSV入出力APIエンドポイント一覧.md参照【2026-09-01 issue #45 追記】** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -236,7 +281,11 @@ erDiagram
 
 ### pipelines（進捗管理）
 
-パイプラインカードはマッチング結果経由でのみ生成される（手動追加不可。QA #43 にて確定）。マッチング結果から追加できる上限は**上位5件**（QA #50 にて確定。アプリ層で制御）。
+パイプラインカードはマッチング結果経由でのみ生成される（手動追加不可。QA #43 にて確定）。
+
+**① 案件あたりの上限（進行中アクティブ5件）**：1案件に追加できる**進行中（アクティブ）**パイプラインの上限は5件（QA #50 にて確定。アプリ層で制御）。上限は「進行中のパイプライン数」で判定し、終了済みステータス（terminal：不成立・見送り等）は枠を消費しない。すなわち、ある人材の進捗が終了すると案件のアクティブ枠が1つ空き、**別の（未追加の）人材**を新たに追加できる。※表示件数の「上位5件」とは別概念。
+
+**② 同一人材×同一案件は一度きり（UNIQUE）**：`(engineer_id, project_id)` の UNIQUE 制約（`uk_pipelines_engineer_project`）により、**同一人材を同一案件へ二重に追加することはできない**。この制約はステータスに関わらず有効なため、その人材のパイプラインが終了済みになっても、**同じ人材を同じ案件へ再追加することはできない**（①で空くのはあくまで他人材向けの枠）。
 
 | 論理項目名 | カラム名（案） | 型 | NULL | キー | DEFAULT | 備考 |
 |---|---|---|---|---|---|---|
@@ -252,6 +301,8 @@ erDiagram
 | 顧客コメント | client_comment | TEXT | NULL | | NULL | QA #54 確定 |
 | NG理由 | ng_reason | TEXT | NULL | | NULL | QA #54 確定 |
 | 次回アクション予定日 | next_action_date | DATE | NULL | | NULL | アラート機能不要。QA #54 確定。QA #6 確定 |
+| 終了日時 | ended_at | DATETIME | NULL | | NULL | 終了ステータスへ遷移したタイミングでアプリ層から記録（`ended_at = now()`）。進行中ステータスの場合はNULL。完了済みタブの「終了日」列として表示する |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。ドロワーは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -271,6 +322,8 @@ erDiagram
 | パスワード（ハッシュ） | password | VARCHAR(255) | NOT NULL | | なし（要指定） | bcrypt等でハッシュ化 |
 | ロール | role | ENUM('admin','general') | NOT NULL | | `general` | admin / general。QA #17 確定。→ §6-5 |
 | ログイン状態保持トークン | remember_token | VARCHAR(100) | NULL | | NULL | WF_01「ログイン情報を保存する」チェックボックス対応。Laravel Breeze の `$table->rememberToken()` で生成。未チェック時は NULL。 |
+| 最終ログイン日時 | last_login_at | DATETIME | NULL | | NULL | ログイン成功時にイベント/リスナー（Loginイベント）で自動更新。新規ユーザー追加直後・未ログイン時は NULL。 |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集モーダルは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -343,7 +396,7 @@ erDiagram
 | カラム名（案） | 型 | NULL | キー | DEFAULT | 備考 |
 |---|---|---|---|---|---|
 | id | BIGINT UNSIGNED | NOT NULL | PK | - | AUTO_INCREMENT |
-| user_id | BIGINT UNSIGNED | NOT NULL | FK | なし（要指定） | → users.id。個人保存・共有機能なし。QA #81 確定 |
+| user_id | BIGINT UNSIGNED | NOT NULL | FK | なし（要指定） | → users.id。**ON DELETE CASCADE**。個人保存・共有機能なし。QA #81 確定 |
 | name | VARCHAR(100) | NOT NULL | | なし（要指定） | ユーザーが任意に命名 |
 | search_type | ENUM('engineer','project') | NOT NULL | | なし（要指定） | engineer / project |
 | conditions | JSON | NOT NULL | | なし（要指定） | 検索パラメータをJSONシリアライズして保存 |
@@ -432,9 +485,9 @@ QA #78 にて固定確定。将来の追加なし。
 
 | 値（案） | 表示名 | カンバングループ |
 |---|---|---|
-| `proposed` | 上位提案 | 応募前 |
-| `applied_by_candidate` | 求職者応募済み | 応募前 |
-| `applying` | 応募中 | 応募前 |
+| `proposed` | 上位提案 | エントリー |
+| `applied_by_candidate` | 求職者応募済み | エントリー |
+| `applying` | 応募中 | エントリー |
 | `first_scheduling` | 一次調整中 | 一次選考 |
 | `first_waiting` | 一次待ち | 一次選考 |
 | `first_result_waiting` | 一次結果待ち | 一次選考 |
@@ -445,6 +498,7 @@ QA #78 にて固定確定。将来の追加なし。
 | `assign_waiting` | アサイン承諾待ち | オファー |
 | `contracted` | 成約 | オファー |
 
+> **【2026-07-02 変更】カンバン第1グループ名：** 「応募前」→「**エントリー**」（内部キー `applying_before`→`entry`）。「応募前」は中身（求職者応募済み・応募中）と矛盾していたため、提案〜応募のエントリーフェーズを表す名称へ変更（進捗管理実装 `.steering/20260702-pipeline-management/` にて確定）。  
 > **初期ステータス（QA #49 確定）：** パイプラインへ追加した時点の初期ステータスは `proposed`（上位提案）。  
 > **ステータス遷移制約（QA #4 確定）：** 前後スキップ・巻き戻しともに許可。ただし終了ステータスへの遷移後は不可逆。  
 > **各ステータスの業務定義：** ※QA #62 未確定（未着手）。確定後に追記する。
@@ -496,6 +550,15 @@ QA #78 にて固定確定。将来の追加なし。
 | `required` | 必須スキル | AIマッチング入力パラメータ（必須スキル） |
 | `preferred` | 尚可スキル | AIマッチング入力パラメータ（尚可スキル） |
 
+### 6-9.【v1.8 新規】engineers.ai_summary_status（issue #61）
+
+| 値 | 意味 | 備考 |
+|---|---|---|
+| `none` | 未生成 | appeal_note が空、または一度も生成トリガーが発生していない（DEFAULT） |
+| `generated` | 生成成功 | ai_summary が最新の appeal_note に対応している。ai_summary_source_hash も同時に更新 |
+| `failed` | 生成失敗 | 直近の生成が上流障害（接続不可・タイムアウト・4xx/5xx）で失敗。ai_summary は直前の値のまま据え置く |
+| `empty` | 空出力（要約対象なし） | AI が空出力を返した。失敗ではないが ai_summary は NULL にクリアする |
+
 -----
 
 ## 7. 削除ルール
@@ -505,7 +568,8 @@ QA #78 にて固定確定。将来の追加なし。
 | engineers | status を `not_proposable` に変更してクローズ扱いとする（論理削除ではない。レコードはDBに残る） | 物理DELETEのみ | QA #37 確定 |
 | projects | status を `closed` に変更してクローズ扱いとする（論理削除ではない。レコードはDBに残る） | 物理DELETEのみ | QA #38 確定 |
 | pipelines | 削除不可 | 物理DELETEのみ | QA #71 確定 |
-| users | 操作不可 | 削除実行時に `main_user_id` の紐付け件数をチェック。1件でも残っていれば処理を中断し「担当中の案件が〇件、人材が〇件あるため削除できません。一覧画面から別の担当者へ変更してから再度実行してください。」を表示。紐付けゼロを確認後、物理DELETE。`sub_user_id` の参照は ON DELETE SET NULL で自動的に NULL になる。 | QA #16 確定 |
+| users | 操作不可 | **`main_user_id` は FK `ON DELETE RESTRICT`** のため、主担当が残っているユーザーは DB レベルで削除不可。削除実行時に `main_user_id` の紐付け件数をチェックし、1件でも残っていれば処理を中断し「担当中の案件が〇件、人材が〇件あるため削除できません。一覧画面から別の担当者へ変更してから再度実行してください。」を表示（COUNT→DELETE 間に担当が付いた場合は FK 例外を捕捉して同メッセージの 422 に変換）。紐付けゼロを確認後、物理DELETE。**`sub_user_id` は FK `ON DELETE SET NULL`** のため副担当の参照は削除時に自動で NULL になる（ガード対象外）。加えて、自分自身の削除・最後の管理者の削除は 422 で禁止（`09_マスタ管理_APIエンドポイント一覧.md` 参照）。 | QA #16 確定 |
+| saved_searches | 保存・削除は本人のみ（自身の保存済み検索条件を物理DELETE可能。`07_検索条件保存_APIエンドポイント一覧.md` 参照） | 個別の削除操作なし。**`user_id` は FK `ON DELETE CASCADE`** のため、ユーザー削除（上記）に連動して当該ユーザーの保存済み検索条件も自動的に物理削除される。個人保存のみで共有機能がないため、`main_user_id` のような事前チェック・ガード処理は不要 | QA #81 確定 |
 
 -----
 
@@ -520,7 +584,7 @@ QA #78 にて固定確定。将来の追加なし。
 | `created_at DESC` | 登録日順（新しい順） | **◯** |
 | `created_at ASC` | 登録日順（古い順） | |
 | `updated_at DESC` | 更新日順（新しい順） | |
-| `available_from ASC` | 提案可能タイミング順 | |
+| `available_from ASC` | 稼働可能時期順 | ※2026-08-18：表示ラベルを「提案可能タイミング順」から項目名（稼働可能時期）に統一 |
 
 ### 案件一覧
 
@@ -529,7 +593,9 @@ QA #78 にて固定確定。将来の追加なし。
 | `created_at DESC` | 登録日順（新しい順） | **◯** |
 | `created_at ASC` | 登録日順（古い順） | |
 | `updated_at DESC` | 更新日順（新しい順） | |
-| `start_date ASC` | 稼働開始時期順 | |
+| `start_date ASC` | 参画開始時期順 | ※2026-08-18：表示ラベルを「稼働開始時期順」から項目名（参画開始時期）に統一 |
 | `rate_max DESC` | 単価順（高い順） | |
 | `rate_max ASC` | 単価順（低い順） | |
+
+**単価ソートの末尾バケット内の順序（PRレビュー #53 指摘・確定）：** `rate_max`が同率の場合は`rate_min`（同方向）でタイブレークする。`rate_min`/`rate_max`がともにNULLになる案件（スキル見合い・単価未設定）は、ソート方向（高い順/低い順）に関わらず常に末尾に来るが、そのグループ内では「スキル見合い（`rate_note`あり）→単価未設定（`rate_note`なし）」の順に固定する（意図的に金額非提示とした案件を、真の未入力より前に固める）。
 

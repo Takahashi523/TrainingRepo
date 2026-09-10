@@ -1,0 +1,1258 @@
+<?php
+
+namespace Tests\Feature\Csv;
+
+use App\Models\Engineer;
+use App\Models\Project;
+use App\Support\Csv\CsvInjection;
+use App\Support\Csv\EngineerCsvSchema;
+use App\Support\Csv\ProjectCsvSchema;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use League\Csv\Writer;
+
+/**
+ * CSV インポート（人材・案件）の正常系・異常系・境界値・ロールバック・空行/BOM/RFC 往復・インジェクション。
+ */
+class CsvImportTest extends CsvTestCase
+{
+    use RefreshDatabase;
+
+    // ------------------------------------------------------------------
+    // ヘルパー
+    // ------------------------------------------------------------------
+
+    private function engineer(array $overrides = []): Engineer
+    {
+        $mainUserId = $overrides['main_user_id'] ?? $this->makeUser()->id;
+
+        return Engineer::create(array_merge([
+            'name' => '既存太郎',
+            'name_kana' => 'キソンタロウ',
+            'status' => 'proposable',
+            'main_user_id' => $mainUserId,
+        ], $overrides));
+    }
+
+    /** @param array<int, array{row: ?int, field: ?string, messages: array<int, string>}> $errors */
+    private function findError(array $errors, ?int $row, ?string $field): ?array
+    {
+        foreach ($errors as $e) {
+            if ($e['row'] === $row && $e['field'] === $field) {
+                return $e;
+            }
+        }
+
+        return null;
+    }
+
+    // ------------------------------------------------------------------
+    // 正常系
+    // ------------------------------------------------------------------
+
+    public function test_engineer_import_creates_new_rows(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            ['name' => '新規一郎', 'name_kana' => 'シンキイチロウ', 'status' => 'proposable', 'main_user_id' => $user->id, 'work_style_onsite' => '1'],
+            ['name' => '新規二郎', 'name_kana' => 'シンキジロウ', 'status' => 'interviewing', 'main_user_id' => $user->id, 'desired_rate' => '80'],
+        ]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false);
+        $response->assertRedirect(route('csv.index'));
+
+        $result = session('importResult');
+        $this->assertSame('engineers', $result['resource']);
+        $this->assertSame(['total_rows' => 2, 'created' => 2, 'updated' => 0], $result['summary']);
+
+        $this->assertDatabaseHas('engineers', ['name' => '新規一郎', 'work_style_onsite' => 1]);
+        $this->assertDatabaseHas('engineers', ['name' => '新規二郎', 'desired_rate' => 80]);
+    }
+
+    // ------------------------------------------------------------------
+    // AI 要約生成トリガーの全経路適用（issue #61 課題4）
+    // ------------------------------------------------------------------
+
+    public function test_engineer_import_triggers_ai_summary_for_appeal_note_rows(): void
+    {
+        $user = $this->makeUser('admin');
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => 'CSV経由で生成された要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            [
+                'name' => 'CSV太郎', 'name_kana' => 'シーエスブイタロウ', 'status' => 'proposable',
+                'main_user_id' => $user->id, 'appeal_note' => 'CSV経由のアピール',
+            ],
+        ]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        $engineer = Engineer::where('name', 'CSV太郎')->first();
+        $this->assertNotNull($engineer);
+        $this->assertSame('generated', $engineer->ai_summary_status);
+        $this->assertSame('CSV経由で生成された要約', $engineer->ai_summary);
+        $this->assertSame(hash('sha256', 'CSV経由のアピール'), $engineer->ai_summary_source_hash);
+    }
+
+    public function test_engineer_import_does_not_call_ai_engine_when_appeal_note_absent(): void
+    {
+        $user = $this->makeUser('admin');
+
+        Http::fake();
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            ['name' => 'CSV次郎', 'name_kana' => 'シーエスブイジロウ', 'status' => 'proposable', 'main_user_id' => $user->id],
+        ]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        Http::assertNothingSent();
+        $this->assertSame('none', Engineer::where('name', 'CSV次郎')->first()->ai_summary_status);
+    }
+
+    public function test_engineer_import_does_not_retrigger_ai_summary_for_already_generated_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer([
+            'main_user_id' => $user->id,
+            'appeal_note' => '既存のアピール',
+            'ai_summary' => '既存の要約',
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '既存のアピール'),
+        ]);
+
+        Http::fake();
+
+        // ai_summary は import 対象外列（無視される）。appeal_note も変更しない更新行。
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => $engineer->name,
+            'name_kana' => $engineer->name_kana,
+            'status' => 'proposable',
+            'main_user_id' => $user->id,
+            'appeal_note' => '既存のアピール',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // ai_summary_status が既に generated（未試行ではない）の行は再スイープの対象にならない。
+        Http::assertNothingSent();
+    }
+
+    public function test_engineer_import_retriggers_ai_summary_when_appeal_note_changes_on_update(): void
+    {
+        // 手動確認で発覚した不具合の回帰テスト：更新行に ai_summary_status='none' を課すと、
+        // 一度生成済み（generated 等）の行を CSV 経由で appeal_note ごと更新しても再生成されず、
+        // 陳腐化バナーだけが出て要約本文が古いまま取り残されてしまっていた。
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer([
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新前のアピール',
+            'ai_summary' => '更新前の要約',
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '更新前のアピール'),
+        ]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => '更新後の要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => $engineer->name,
+            'name_kana' => $engineer->name_kana,
+            'status' => 'proposable',
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新後のアピール',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // appeal_note が変わった更新行は、現在の ai_summary_status を問わず再生成される。
+        Http::assertSentCount(1);
+        $engineer->refresh();
+        $this->assertSame('generated', $engineer->ai_summary_status);
+        $this->assertSame('更新後の要約', $engineer->ai_summary);
+        $this->assertSame(hash('sha256', '更新後のアピール'), $engineer->ai_summary_source_hash);
+    }
+
+    public function test_engineer_import_clears_ai_summary_when_appeal_note_becomes_blank_on_update(): void
+    {
+        // コードレビュー指摘の回帰テスト：通常の編集フロー（EngineerService::update()）は
+        // appeal_note を空欄に変更すると clearAiSummary() で ai_summary_status を none に戻すが、
+        // CSV経由の更新は upsert で直接書き込むためこのロジックを通らず、appeal_note を空欄に
+        // する更新であっても古い ai_summary が残ったまま（陳腐化バナー誤表示）になっていた。
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer([
+            'main_user_id' => $user->id,
+            'appeal_note' => '更新前のアピール',
+            'ai_summary' => '更新前の要約',
+            'ai_summary_status' => 'generated',
+            'ai_summary_source_hash' => hash('sha256', '更新前のアピール'),
+        ]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => '呼ばれてはいけない要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => $engineer->name,
+            'name_kana' => $engineer->name_kana,
+            'status' => 'proposable',
+            'main_user_id' => $user->id,
+            'appeal_note' => '',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // appeal_note が空欄になった更新行はAI要約を呼ばず、他の項目編集フローと同じくクリアされる。
+        Http::assertNothingSent();
+        $engineer->refresh();
+        $this->assertSame('none', $engineer->ai_summary_status);
+        $this->assertNull($engineer->ai_summary);
+        $this->assertNull($engineer->ai_summary_source_hash);
+        $this->assertNull($engineer->ai_summary_generated_at);
+    }
+
+    public function test_engineer_import_does_not_trigger_ai_summary_for_unrelated_existing_rows(): void
+    {
+        $user = $this->makeUser('admin');
+
+        // インポート対象外の既存人材（appeal_note あり・未試行）。100件中1件だけインポートしても
+        // 残り99件が巻き込まれないことの確認（issue #61 課題4：スコープを今回のインポート分に限定）。
+        $untouched = $this->engineer([
+            'main_user_id' => $user->id,
+            'name' => '無関係太郎',
+            'appeal_note' => 'インポート対象外の既存アピール',
+        ]);
+        // create() 直後の $untouched は ai_summary_status を明示的に渡していないため、DB側の
+        // DEFAULT('none') が反映されない（Eloquent は fresh()/refresh() しない限り DB 側の
+        // デフォルト値をモデルに取り込まない）。ここでは fresh() で実際の DB の値を確認する。
+        $this->assertSame('none', $untouched->fresh()->ai_summary_status);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => Http::response([
+                'ai_summary' => 'CSV経由で生成された要約',
+                'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+            ], 200),
+        ]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            [
+                'name' => 'CSV太郎', 'name_kana' => 'シーエスブイタロウ', 'status' => 'proposable',
+                'main_user_id' => $user->id, 'appeal_note' => 'CSV経由のアピール',
+            ],
+        ]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        // 今回インポートした行だけ生成される。
+        Http::assertSentCount(1);
+        $this->assertSame('generated', Engineer::where('name', 'CSV太郎')->first()->ai_summary_status);
+
+        // インポートと無関係な既存行は none のまま（都度スイープされない）。
+        $this->assertSame('none', $untouched->fresh()->ai_summary_status);
+    }
+
+    public function test_engineer_import_stops_ai_summary_generation_once_time_budget_is_exceeded(): void
+    {
+        $user = $this->makeUser('admin');
+
+        // 経過時間予算（issue #61 課題4）を500msにし、AI呼び出し1件ごとに150msの遅延を模擬する。
+        // 5件（150ms×5=750ms）は予算を必ず超えるため全件生成にはならず、CSVパース等の
+        // 基本オーバーヘッド（数ms〜数十ms程度）は500msに対して十分小さいため1件もスキップされない
+        // 事態にもならない。実時間で予算超過を再現するテストのため usleep を使うが、
+        // 150ms/500msという十分な余裕を持たせ、CI環境差によるジッターでの flaky 化を避ける。
+        config(['services.ai_summary.csv_trigger_budget_seconds' => 0.5]);
+
+        Http::fake([
+            '*/api/v1/ai/profile-summary' => function () {
+                usleep(150_000);
+
+                return Http::response([
+                    'ai_summary' => 'CSV経由で生成された要約',
+                    'ai_summary_generated_at' => '2026-08-20T10:00:00+09:00',
+                ], 200);
+            },
+        ]);
+
+        $rows = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $rows[] = [
+                'name' => "CSV時間太郎{$i}", 'name_kana' => 'シーエスブイジカンタロウ', 'status' => 'proposable',
+                'main_user_id' => $user->id, 'appeal_note' => "予算確認用アピール{$i}",
+            ];
+        }
+        $csv = $this->buildCsv(new EngineerCsvSchema, $rows);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false);
+        $response->assertRedirect(route('csv.index'));
+
+        $generatedCount = Engineer::where('name_kana', 'シーエスブイジカンタロウ')
+            ->where('ai_summary_status', 'generated')->count();
+        $noneCount = Engineer::where('name_kana', 'シーエスブイジカンタロウ')
+            ->where('ai_summary_status', 'none')->count();
+
+        // 全件が生成されるわけでも、全件スキップされるわけでもない（予算内で打ち切られる）。
+        $this->assertGreaterThanOrEqual(1, $generatedCount);
+        $this->assertLessThan(5, $generatedCount);
+        $this->assertSame(5, $generatedCount + $noneCount);
+
+        // 実際に生成された件数だけ HTTP 呼び出しが発生している（スキップ分は呼び出さない）。
+        Http::assertSentCount($generatedCount);
+
+        // 超過分はスキップとして flash.aiSummarySkipped で通知する（importResult とは別チャンネル）。
+        // 手動確認で発覚した不具合の回帰テスト：以前は flash.error で通知していたが、成功トースト
+        // （CsvImportSection::onSuccess）と同時に発火し、トースト実装の TOAST_LIMIT=1 により
+        // 黙って上書き消去されてしまっていた。常設バナー用の構造化データとして通知する。
+        $skipped = 5 - $generatedCount;
+        $response->assertSessionHas('aiSummarySkipped', fn ($value) => $value['triggered'] === $generatedCount
+            && $value['skipped'] === $skipped);
+    }
+
+    public function test_engineer_import_updates_existing_row_and_ignores_ai_summary(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id, 'ai_summary' => '既存の要約']);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id,
+            'name' => '更新後の名前',
+            'name_kana' => 'コウシンゴ',
+            'status' => 'not_proposable',
+            'main_user_id' => $user->id,
+            'ai_summary' => 'これは無視されるべき', // import 対象外列（buildCsv には出ないが念のため）
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)
+            ->assertRedirect(route('csv.index'));
+
+        $this->assertSame(['total_rows' => 1, 'created' => 0, 'updated' => 1], session('importResult')['summary']);
+
+        $engineer->refresh();
+        $this->assertSame('更新後の名前', $engineer->name);
+        $this->assertSame('not_proposable', $engineer->status);
+        $this->assertSame('既存の要約', $engineer->ai_summary, 'ai_summary は上書きされない');
+    }
+
+    public function test_engineer_import_mixed_create_and_update(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            ['id' => $engineer->id, 'name' => '更新済', 'name_kana' => 'コウシンズミ', 'status' => 'proposable', 'main_user_id' => $user->id],
+            ['name' => '新規のみ', 'name_kana' => 'シンキノミ', 'status' => 'proposable', 'main_user_id' => $user->id],
+        ]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertSame(['total_rows' => 2, 'created' => 1, 'updated' => 1], session('importResult')['summary']);
+    }
+
+    public function test_engineer_import_empty_cell_overwrites_existing_with_null(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id, 'nearest_station' => '東京', 'desired_rate' => 90]);
+
+        // nearest_station / desired_rate を空セルで送る → null 上書き
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id, 'name' => '既存太郎', 'name_kana' => 'キソンタロウ',
+            'status' => 'proposable', 'main_user_id' => $user->id,
+            'nearest_station' => '', 'desired_rate' => '',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $engineer->refresh();
+        $this->assertNull($engineer->nearest_station);
+        $this->assertNull($engineer->desired_rate);
+    }
+
+    public function test_engineer_name_kana_half_width_space_is_normalized(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '山田 太郎', 'name_kana' => 'ヤマダ タロウ', 'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        // 半角スペースが全角に正規化されて保存される（フォームと一致）
+        $this->assertDatabaseHas('engineers', ['name' => '山田　太郎', 'name_kana' => 'ヤマダ　タロウ']);
+    }
+
+    public function test_project_import_creates_new_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '新規案件', 'status' => 'open', 'main_user_id' => $user->id,
+            'work_style' => 'remote', 'commercial_flow' => 'prime', 'headcount' => '3',
+        ]]);
+
+        $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertSame('projects', session('importResult')['resource']);
+        $this->assertDatabaseHas('projects', ['name' => '新規案件', 'work_style' => 'remote', 'headcount' => 3]);
+    }
+
+    // ------------------------------------------------------------------
+    // 異常系（ファイルレベル）
+    // ------------------------------------------------------------------
+
+    public function test_non_csv_extension_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $file = $this->makeUpload('id\n1', 'data.png', 'text/plain');
+
+        $this->postImport($user, 'csv.engineers.import', $file)
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('file');
+    }
+
+    public function test_oversized_file_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $file = UploadedFile::fake()->create('big.csv', 6000); // 6000KB > 5MB
+
+        $this->actingAs($user)->post(route('csv.engineers.import'), ['file' => $file], ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('file');
+    }
+
+    public function test_non_utf8_file_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $sjis = mb_convert_encoding("id,氏名\n1,日本語", 'SJIS-win', 'UTF-8');
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($sjis));
+        $response->assertStatus(422)->assertJsonValidationErrorFor('file');
+        $this->assertStringContainsString('UTF-8', $response->json('errors.file.0'));
+    }
+
+    public function test_over_5000_data_rows_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $content = "id\r\n".str_repeat("x\r\n", 5001);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422)->assertJsonValidationErrorFor('file');
+        $this->assertStringContainsString('5,000', $response->json('errors.file.0'));
+    }
+
+    public function test_missing_required_header_aborts_whole_import(): void
+    {
+        $user = $this->makeUser('admin');
+        // 氏名カナ 列を落としたヘッダー（必須列欠落）
+        $content = "id,氏名,ステータス,主担当ID\r\n,山田,proposable,{$user->id}\r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 1, null));
+        $this->assertStringContainsString('必要な列がありません', $errors[0]['messages'][0]);
+        $this->assertStringContainsString('氏名カナ', $errors[0]['messages'][0]);
+    }
+
+    public function test_unknown_header_column_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        // 全 importable 列＋定義にない「メモ」列（未知列）。ヘッダー段階で全体中断する。
+        $headers = array_keys((new EngineerCsvSchema)->importableHeaderMap());
+        $content = implode(',', $headers).",メモ\r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 1, null));
+        $this->assertStringContainsString('不明な列があります', $errors[0]['messages'][0]);
+        $this->assertStringContainsString('メモ', $errors[0]['messages'][0]);
+    }
+
+    public function test_empty_header_column_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        // 末尾の余分なカンマ由来の空ヘッダーは専用メッセージで弾く（列位置つき）。
+        $headers = array_keys((new EngineerCsvSchema)->importableHeaderMap());
+        $content = implode(',', $headers).",\r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 1, null));
+        $this->assertStringContainsString('ヘッダーに空の列があります', $errors[0]['messages'][0]);
+    }
+
+    public function test_duplicate_header_column_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        // 「氏名」を重複させる。値の対応が曖昧になるためヘッダー段階で弾く。
+        $headers = array_keys((new EngineerCsvSchema)->importableHeaderMap());
+        $content = implode(',', $headers).',氏名'."\r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 1, null));
+        $this->assertStringContainsString('ヘッダーに重複した列があります', $errors[0]['messages'][0]);
+        $this->assertStringContainsString('氏名', $errors[0]['messages'][0]);
+    }
+
+    public function test_header_only_zero_data_rows_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, []); // ヘッダーのみ
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertStringContainsString('インポートする対象データがありません', $errors[0]['messages'][0]);
+    }
+
+    // ------------------------------------------------------------------
+    // 異常系（行）
+    // ------------------------------------------------------------------
+
+    public function test_column_count_mismatch_is_structural_error(): void
+    {
+        $user = $this->makeUser('admin');
+        $headers = implode(',', array_keys((new EngineerCsvSchema)->importableHeaderMap()));
+        // 列数不足の行（1列だけ）→ レイアウトエラー（field:null）・項目検証はスキップ
+        $content = $headers."\r\nonlyonecolumn\r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $error = $this->findError($this->importErrors($response), 2, null);
+        $this->assertNotNull($error);
+        $this->assertStringContainsString('列数がヘッダーと一致しません', $error['messages'][0]);
+    }
+
+    public function test_spaces_only_line_is_layout_error_not_skipped(): void
+    {
+        $user = $this->makeUser('admin');
+        $headers = implode(',', array_keys((new EngineerCsvSchema)->importableHeaderMap()));
+        // 2行目=スペースだけ（1列としてパース→レイアウトエラー）／空行ではない
+        $content = $headers."\r\n   \r\n";
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, null));
+    }
+
+    public function test_non_existent_update_id_is_row_error(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => 99999, 'name' => '存在しないID', 'name_kana' => 'ソンザイシナイ', 'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $error = $this->findError($this->importErrors($response), 2, 'id');
+        $this->assertNotNull($error);
+        $this->assertDatabaseMissing('engineers', ['name' => '存在しないID']);
+    }
+
+    // ------------------------------------------------------------------
+    // version（楽観ロック・issue #45）
+    // ------------------------------------------------------------------
+
+    public function test_import_creates_new_row_with_version_zero(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '新規版数', 'name_kana' => 'シンキバンスウ', 'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertDatabaseHas('engineers', ['name' => '新規版数', 'version' => 0]);
+    }
+
+    public function test_import_increments_version_on_matching_update(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+        // Engineer::create() 直後の $engineer には version の DB デフォルト（0）が読み込まれて
+        // いない（Eloquent は insert 後に自動採番PK以外の属性を再取得しない）ため、
+        // DBの実値で確認するには refresh() が必要。
+        $engineer->refresh();
+        $this->assertSame(0, $engineer->version);
+
+        // buildCsv は id 指定行の version を DB の現在値（0）で自動補完する
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id, 'name' => '更新後', 'name_kana' => 'コウシンゴ',
+            'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertDatabaseHas('engineers', ['id' => $engineer->id, 'name' => '更新後', 'version' => 1]);
+    }
+
+    public function test_import_rejects_stale_version_and_does_not_write_any_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id, 'name' => '既存太郎']);
+
+        // 1行目は version 不一致（他ユーザーが先に更新した想定）、2行目は正常な新規行。
+        // 全行ロールバック方針のとおり、2行目も書き込まれないことを確認する。
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            [
+                'id' => $engineer->id, 'name' => '横取り更新', 'name_kana' => 'ヨコドリコウシン',
+                'status' => 'proposable', 'main_user_id' => $user->id, 'version' => 99,
+            ],
+            ['name' => '道連れ新規', 'name_kana' => 'ミチヅレシンキ', 'status' => 'proposable', 'main_user_id' => $user->id],
+        ]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+
+        $error = $this->findError($this->importErrors($response), 2, 'version');
+        $this->assertNotNull($error);
+        $this->assertStringContainsString('バージョンが一致しません', $error['messages'][0]);
+
+        // 全行ロールバック：1行目の上書きも2行目の新規作成も起きていない
+        $engineer->refresh();
+        $this->assertSame('既存太郎', $engineer->name);
+        $this->assertSame(0, $engineer->version);
+        $this->assertDatabaseMissing('engineers', ['name' => '道連れ新規']);
+    }
+
+    public function test_import_requires_version_on_update_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+        // version を明示的に空欄にする（buildCsv の自動補完を上書き）
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id, 'name' => '更新後', 'name_kana' => 'コウシンゴ',
+            'status' => 'proposable', 'main_user_id' => $user->id, 'version' => '',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'version'));
+    }
+
+    public function test_import_ignores_version_cell_on_new_row(): void
+    {
+        // 新規行（id 空）に version を書いても無視され、常に 0 で作成される
+        // （エクスポートしたテンプレートを複製して新規行を作ったケースを想定）。
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '複製新規', 'name_kana' => 'フクセイシンキ', 'status' => 'proposable',
+            'main_user_id' => $user->id, 'version' => '7',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertDatabaseHas('engineers', ['name' => '複製新規', 'version' => 0]);
+    }
+
+    /**
+     * 2026-09-02 追加（レビュー指摘）：新規行では version セルの内容を一切検証しないことの確認。
+     * 数値ですらない値（コピペ残り等を想定）が入っていても弾かれず、常に 0 で作成される。
+     * 「新規行では何を入れても無視される」というCSVヒント文・チェックリストの説明と実装を一致させる。
+     */
+    public function test_import_ignores_non_numeric_version_cell_on_new_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '非数値版数', 'name_kana' => 'ヒスウチバンスウ', 'status' => 'proposable',
+            'main_user_id' => $user->id, 'version' => 'abc',
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $this->assertDatabaseHas('engineers', ['name' => '非数値版数', 'version' => 0]);
+    }
+
+    /**
+     * 2026-09-02 追加（レビュー指摘）：write() が書き込み直前・同一トランザクション内で行う
+     * version 再照合（{@see \App\Services\Csv\CsvImportService}）を確認する。
+     *
+     * pass2 の version 照合は import() 冒頭の preload 時点の値しか見ていないため、そこから実際の
+     * upsert() がコミットされるまでの間に他セッションが同じ行を更新すると、その更新をそのまま
+     * 上書きしてしまう可能性があった。ここでは DB::listen で「preload 用の SELECT」が発行された
+     * 直後（＝pass2 のバリデーションが走るより前）を捉え、別セッションからの更新を模して
+     * DB 上の version を直接進める。write() 側の再照合がこれを検知し、422（全行ロールバック）に
+     * なることを確認する。
+     */
+    public function test_import_rejects_when_row_changes_between_preload_and_write(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id, 'name' => '既存太郎']);
+        $engineer->refresh();
+
+        // buildCsv が preload 前の現在値（0）で version を自動補完する
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id, 'name' => '横取りテスト', 'name_kana' => 'ヨコドリテスト',
+            'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        // 「engineers」「version」を含む最初のクエリ（＝import() 冒頭の preload）を捉えたタイミングで
+        // 一度だけ、別セッションからの更新を模した直接更新を割り込ませる。$raced ガードにより、
+        // この直接更新自身のクエリや write() 側の再照合クエリで再度発火することはない。
+        $raced = false;
+        DB::listen(function ($query) use ($engineer, &$raced): void {
+            if ($raced) {
+                return;
+            }
+            if (str_contains($query->sql, 'engineers') && str_contains($query->sql, 'version')) {
+                $raced = true;
+                DB::table('engineers')->where('id', $engineer->id)->update(['version' => 1]);
+            }
+        });
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+
+        $error = $this->findError($this->importErrors($response), 2, 'version');
+        $this->assertNotNull($error);
+        $this->assertStringContainsString('バージョンが一致しません', $error['messages'][0]);
+
+        // 全行ロールバック：CSV側の更新（横取りテスト）は反映されず、割り込んだ直接更新（version=1）だけが残る
+        $fresh = $engineer->fresh();
+        $this->assertSame('既存太郎', $fresh->name);
+        $this->assertSame(1, $fresh->version);
+    }
+
+    public function test_duplicate_id_in_file_is_structural_error(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            ['id' => $engineer->id, 'name' => 'A', 'name_kana' => 'エー', 'status' => 'proposable', 'main_user_id' => $user->id],
+            ['id' => $engineer->id, 'name' => 'B', 'name_kana' => 'ビー', 'status' => 'proposable', 'main_user_id' => $user->id],
+        ]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, null));
+        $this->assertNotNull($this->findError($errors, 3, null));
+        $this->assertStringContainsString('同一ID', $this->findError($errors, 2, null)['messages'][0]);
+    }
+
+    public function test_leading_zero_id_variants_are_detected_as_duplicate(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+        // 同一レコードを指す "1" と "01"（Excel 等が生む表記ゆれ）を2行に置く。
+        // 文字列そのままをキーにすると別ID扱いで重複をすり抜け、同一行を二重 UPDATE してしまうため、
+        // 正規化キー（(int) 化）で重複として検出されることを担保する。
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            ['id' => (string) $engineer->id, 'name' => 'A', 'name_kana' => 'エー', 'status' => 'proposable', 'main_user_id' => $user->id],
+            ['id' => '0'.$engineer->id, 'name' => 'B', 'name_kana' => 'ビー', 'status' => 'proposable', 'main_user_id' => $user->id],
+        ]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, null));
+        $this->assertNotNull($this->findError($errors, 3, null));
+        $this->assertStringContainsString('同一ID', $this->findError($errors, 2, null)['messages'][0]);
+
+        // 全行ロールバック：どちらの表記も書き込まれず、既存レコードは元のまま（後勝ちの二重更新が起きない）
+        $engineer->refresh();
+        $this->assertSame('既存太郎', $engineer->name);
+    }
+
+    public function test_decimal_id_is_rejected_and_does_not_overwrite_integer_row(): void
+    {
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+        // "1.5" のような小数 id は (int) 化すると id=1 を指してしまう。
+        // サイレントに id=1 を上書きせず、形式エラー（field:id）として弾かれ、既存行が変わらないことを担保する。
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'id' => $engineer->id.'.5',
+            'name' => '書き換え', 'name_kana' => 'カキカエ', 'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'id'));
+
+        // サイレントな取り違え更新が起きていない（既存レコードは元のまま）
+        $engineer->refresh();
+        $this->assertSame('既存太郎', $engineer->name);
+    }
+
+    public function test_non_existent_main_user_id_is_row_error_without_n_plus_one(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '担当不明', 'name_kana' => 'タントウフメイ', 'status' => 'proposable', 'main_user_id' => 88888,
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'main_user_id'));
+    }
+
+    /**
+     * 更新インポートのクエリ数が行数に比例しないこと（担当者id存在照合の N+1 回避＋書き込みの upsert バッチ化）。
+     * 個別 UPDATE / 行ごとの exists クエリだと件数に比例してクエリが増えるため、
+     * 行数を変えてもクエリ数が変わらないことを直接アサートして回帰を検知する。
+     */
+    public function test_update_import_query_count_does_not_scale_with_row_count(): void
+    {
+        $user = $this->makeUser('admin');
+
+        // 既存 n 件を更新するインポートを実行し、その間に発行されたクエリ数を返す。
+        $measure = function (int $n) use ($user): int {
+            // 事前データ作成は計測前（enableQueryLog 前）に行うのでカウントに含めない。
+            $rows = collect(range(1, $n))->map(function () use ($user): array {
+                $engineer = $this->engineer(['main_user_id' => $user->id]);
+
+                return [
+                    'id' => (string) $engineer->id,
+                    'name' => '更新後', 'name_kana' => 'コウシンゴ',
+                    'status' => 'proposable', 'main_user_id' => $user->id,
+                ];
+            })->all();
+            $csv = $this->buildCsv(new EngineerCsvSchema, $rows);
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+            $queryCount = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $queryCount;
+        };
+
+        // 3件と30件でクエリ数が一致すること（preload 1回＋バッチ upsert 1回で一定）。
+        $this->assertSame(
+            $measure(3),
+            $measure(30),
+            '行数に比例してクエリが増えている（個別UPDATEまたは行ごとexistsのN+1の疑い）',
+        );
+    }
+
+    public function test_boundary_values_are_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '境界値', 'name_kana' => 'キョウカイチ', 'status' => 'proposable', 'main_user_id' => $user->id,
+            'desired_rate' => '1000',        // max:999 違反
+            'birth_date' => '2020/01/01',    // date_format:Y-m-d 違反
+            'work_style_onsite' => '2',      // in:0,1 違反
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, 'desired_rate'));
+        $this->assertNotNull($this->findError($errors, 2, 'birth_date'));
+        $this->assertNotNull($this->findError($errors, 2, 'work_style_onsite'));
+
+        // フラグ列・日付は §8 に沿った分かりやすい文面にする（汎用の「選択された…は無効です」等にしない）
+        $this->assertStringContainsString(
+            '0または1',
+            $this->findError($errors, 2, 'work_style_onsite')['messages'][0],
+        );
+        $this->assertStringContainsString(
+            'YYYY-MM-DD',
+            $this->findError($errors, 2, 'birth_date')['messages'][0],
+        );
+    }
+
+    /**
+     * EngineerRules::formatRules() の appeal_note(max:4000)/remarks(max:1000) が
+     * EngineerCsvSchema::sharedFormatRules() 経由でCSVインポートにも波及していることの確認。
+     */
+    public function test_engineer_appeal_note_and_remarks_boundaries(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '文字数境界', 'name_kana' => 'モジスウキョウカイ', 'status' => 'proposable', 'main_user_id' => $user->id,
+            'appeal_note' => str_repeat('あ', 4001), // max:4000
+            'remarks' => str_repeat('あ', 1001),     // max:1000
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, 'appeal_note'));
+        $this->assertNotNull($this->findError($errors, 2, 'remarks'));
+    }
+
+    public function test_one_cell_collects_multiple_messages(): void
+    {
+        $user = $this->makeUser('admin');
+        // 氏名カナ：漢字（regex 違反）かつ 100文字超（max 違反）→ 2メッセージ
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => 'テスト', 'name_kana' => str_repeat('漢', 101), 'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $error = $this->findError($this->importErrors($response), 2, 'name_kana');
+        $this->assertNotNull($error);
+        $this->assertGreaterThanOrEqual(2, count($error['messages']), '1セルに複数メッセージが集約される（bail なし）');
+    }
+
+    public function test_sub_user_id_must_differ_from_main(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => '同一担当', 'name_kana' => 'ドウイツ', 'status' => 'proposable',
+            'main_user_id' => $user->id, 'sub_user_id' => $user->id,
+        ]]);
+
+        $response = $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'sub_user_id'));
+    }
+
+    public function test_any_error_rolls_back_all_rows(): void
+    {
+        $user = $this->makeUser('admin');
+        // 1行目は正常、2行目は必須欠落 → 全行ロールバック（1行目も保存されない）
+        $csv = $this->buildCsv(new EngineerCsvSchema, [
+            ['name' => '正常行', 'name_kana' => 'セイジョウ', 'status' => 'proposable', 'main_user_id' => $user->id],
+            ['name' => '', 'name_kana' => '', 'status' => '', 'main_user_id' => ''],
+        ]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv))->assertStatus(422);
+
+        $this->assertDatabaseCount('engineers', 0);
+    }
+
+    public function test_project_rate_min_greater_than_max_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '単価逆転', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '100', 'rate_max' => '50',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, 'rate_min'));
+        $this->assertNotNull($this->findError($errors, 2, 'rate_max'));
+    }
+
+    public function test_project_rate_min_only_is_rejected(): void
+    {
+        // 片側だけのレンジは取込では作れない（フォームの相互必須と同じ制約）。
+        // 許すと「取込はできるが編集画面では保存できない」レコードが生まれる。
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '下限のみ', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '50', 'rate_max' => '',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'rate_max'));
+        $this->assertDatabaseCount('projects', 0);
+    }
+
+    public function test_project_rate_max_only_is_rejected(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '上限のみ', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '', 'rate_max' => '80',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'rate_min'));
+        $this->assertDatabaseCount('projects', 0);
+    }
+
+    public function test_project_rate_note_only_is_accepted(): void
+    {
+        // 単価未定（スキル見合い）の行は従来どおり取り込める＝相互必須が過剰にならないことの確認。
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '単価備考のみ', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '', 'rate_max' => '', 'rate_note' => 'スキル見合い',
+        ]]);
+
+        $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv))->assertRedirect();
+        $this->assertDatabaseHas('projects', ['name' => '単価備考のみ', 'rate_note' => 'スキル見合い']);
+    }
+
+    public function test_project_rate_range_with_note_is_rejected(): void
+    {
+        // 単価備考は「スキル見合い」を表す欄。レンジと同時入力はフォームでは作れない状態のため取込でも弾く。
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => 'レンジと備考', 'status' => 'open', 'main_user_id' => $user->id,
+            'rate_min' => '50', 'rate_max' => '80', 'rate_note' => '応相談',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'rate_note'));
+        $this->assertDatabaseCount('projects', 0);
+    }
+
+    public function test_project_station_required_when_onsite(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '常駐案件', 'status' => 'open', 'main_user_id' => $user->id,
+            'work_style' => 'onsite', 'work_location_station' => '',
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $this->assertNotNull($this->findError($this->importErrors($response), 2, 'work_location_station'));
+    }
+
+    public function test_project_headcount_and_interview_boundaries(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '境界案件', 'status' => 'open', 'main_user_id' => $user->id,
+            'headcount' => '100',       // max:99
+            'interview_count' => '11',  // max:10
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, 'headcount'));
+        $this->assertNotNull($this->findError($errors, 2, 'interview_count'));
+    }
+
+    /**
+     * ProjectRules::formatRules() に追加した description/work_env/remarks の max ルールが
+     * ProjectCsvSchema::sharedFormatRules() 経由でCSVインポートにも波及していることの確認。
+     */
+    public function test_project_description_work_env_remarks_boundaries(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new ProjectCsvSchema, [[
+            'name' => '文字数境界案件', 'status' => 'open', 'main_user_id' => $user->id,
+            'description' => str_repeat('あ', 4001), // max:4000
+            'work_env' => str_repeat('あ', 1001),    // max:1000
+            'remarks' => str_repeat('あ', 1001),     // max:1000
+        ]]);
+
+        $response = $this->postImport($user, 'csv.projects.import', $this->makeUpload($csv));
+        $response->assertStatus(422);
+        $errors = $this->importErrors($response);
+        $this->assertNotNull($this->findError($errors, 2, 'description'));
+        $this->assertNotNull($this->findError($errors, 2, 'work_env'));
+        $this->assertNotNull($this->findError($errors, 2, 'remarks'));
+    }
+
+    // ------------------------------------------------------------------
+    // 空行 / BOM / RFC4180 / インジェクション
+    // ------------------------------------------------------------------
+
+    public function test_blank_lines_are_skipped_and_not_counted(): void
+    {
+        $user = $this->makeUser('admin');
+        $headers = implode(',', array_keys((new EngineerCsvSchema)->importableHeaderMap()));
+        $schema = new EngineerCsvSchema;
+        // buildCsv は空行を入れられないので、2つの有効行の CSV を作って間に空行を挿入する
+        $rowA = $this->rowLine($schema, ['name' => 'Ａ行', 'name_kana' => 'エーギョウ', 'status' => 'proposable', 'main_user_id' => $user->id]);
+        $rowB = $this->rowLine($schema, ['name' => 'Ｂ行', 'name_kana' => 'ビーギョウ', 'status' => 'proposable', 'main_user_id' => $user->id]);
+        $content = $headers."\r\n".$rowA."\r\n\r\n".$rowB."\r\n\r\n";
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($content), false)->assertRedirect();
+
+        // 空行は total_rows に計上されない
+        $this->assertSame(['total_rows' => 2, 'created' => 2, 'updated' => 0], session('importResult')['summary']);
+    }
+
+    public function test_bom_prefixed_file_imports_successfully(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = "\xEF\xBB\xBF".$this->buildCsv(new EngineerCsvSchema, [[
+            'name' => 'BOM太郎', 'name_kana' => 'ボムタロウ', 'status' => 'proposable', 'main_user_id' => $user->id,
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+        $this->assertDatabaseHas('engineers', ['name' => 'BOM太郎']);
+    }
+
+    public function test_rfc4180_field_with_comma_quote_newline_round_trips(): void
+    {
+        $user = $this->makeUser('admin');
+        $tricky = "行1,\"引用\"\n2行目"; // カンマ・ダブルクオート・改行を含む
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => 'RFC太郎', 'name_kana' => 'アールエフシー', 'status' => 'proposable',
+            'main_user_id' => $user->id, 'appeal_note' => $tricky,
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $engineer = Engineer::where('name', 'RFC太郎')->first();
+        $this->assertSame($tricky, $engineer->appeal_note, '引用符内の改行・カンマ・"" が1論理レコードとして復元される');
+    }
+
+    public function test_csv_injection_round_trip_on_import(): void
+    {
+        $user = $this->makeUser('admin');
+        // エクスポートを模し、値を escape した状態のセルを import → restore で元値に戻る
+        $escaped = CsvInjection::escape('=SUM(1+1)');
+        $this->assertSame("'=SUM(1+1)", $escaped);
+
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => 'インジェクション', 'name_kana' => 'インジェクション', 'status' => 'proposable',
+            'main_user_id' => $user->id, 'appeal_note' => $escaped,
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $engineer = Engineer::where('name', 'インジェクション')->first();
+        $this->assertSame('=SUM(1+1)', $engineer->appeal_note, '機械が付けた先頭 \' は復元で除去される');
+    }
+
+    public function test_human_entered_leading_quote_is_preserved_on_import(): void
+    {
+        $user = $this->makeUser('admin');
+        $csv = $this->buildCsv(new EngineerCsvSchema, [[
+            'name' => 'アポストロフィ', 'name_kana' => 'アポストロフィ', 'status' => 'proposable',
+            'main_user_id' => $user->id, 'appeal_note' => "'重要メモ", // 人が意図した先頭 '
+        ]]);
+
+        $this->postImport($user, 'csv.engineers.import', $this->makeUpload($csv), false)->assertRedirect();
+
+        $engineer = Engineer::where('name', 'アポストロフィ')->first();
+        $this->assertSame("'重要メモ", $engineer->appeal_note, '危険文字が続かない先頭 \' は保持される');
+    }
+
+    public function test_exported_csv_round_trips_back_through_import(): void
+    {
+        // この機能のメイン運用（エクスポート→編集→再インポート）を実 export 出力で通しで検証する。
+        // 実ファイルには export専用列（主担当名/サブ担当名/AI要約）と BOM が含まれるが、
+        // 未知列扱いにならず（exportHeaders に含む）、値は無視され、id 付きで既存行が更新される。
+        $mainUser = $this->makeUser('admin');
+        $subUser = $this->makeUser('general');
+        $engineer = $this->engineer([
+            'main_user_id' => $mainUser->id,
+            'sub_user_id' => $subUser->id,
+            'name' => '往復太郎',
+            'name_kana' => 'オウフクタロウ',
+            'status' => 'interviewing',
+            'birth_date' => '1990-01-02',
+            'work_style_onsite' => 1,
+            'ai_summary' => 'AI生成の要約',
+        ]);
+
+        // 実際のエクスポート出力（BOM 付き・26列・export専用列を含む）をそのまま取り込む。
+        $exported = $this->actingAs($mainUser)->get(route('csv.engineers.export'))->streamedContent();
+
+        $this->postImport($mainUser, 'csv.engineers.import', $this->makeUpload($exported), false)
+            ->assertRedirect(route('csv.index'));
+
+        $this->assertSame(['total_rows' => 1, 'created' => 0, 'updated' => 1], session('importResult')['summary']);
+
+        $engineer->refresh();
+        $this->assertSame('往復太郎', $engineer->name);
+        $this->assertSame('interviewing', $engineer->status);
+        $this->assertSame('1990-01-02', $engineer->birth_date, '日付が Y-m-d で往復する');
+        $this->assertSame(1, (int) $engineer->work_style_onsite);
+        // AI要約 は export専用列のため取り込まれず、既存値が保持される（上書きされない）
+        $this->assertSame('AI生成の要約', $engineer->ai_summary);
+    }
+
+    /**
+     * 案件の「エクスポートは通るがインポートで落ちる」非対称を検出するための往復テスト。
+     *
+     * 単価に相互必須（rate_min/rate_max）と排他（rate_note）を課したため、
+     * 保存できる形の案件がエクスポート後に再インポートできなくなると運用が壊れる
+     * （インポートは1行でも失敗するとファイル全体がロールバックされるため影響が大きい）。
+     * 保存可能な2形（レンジのみ／備考のみ）を実 export 出力で通しで確認する。
+     */
+    public function test_exported_project_csv_round_trips_back_through_import(): void
+    {
+        $mainUser = $this->makeUser('admin');
+        $subUser = $this->makeUser('general');
+
+        // 形1：レンジのみ（備考なし）
+        $ranged = Project::create([
+            'name' => '往復案件レンジ',
+            'status' => 'open',
+            'main_user_id' => $mainUser->id,
+            'sub_user_id' => $subUser->id,
+            'commercial_flow' => 'prime',
+            'work_style' => 'remote',
+            'start_date' => '2026-09-01',
+            'rate_min' => 60,
+            'rate_max' => 90,
+        ]);
+
+        // 形2：備考のみ（レンジなし＝スキル見合い）
+        $noted = Project::create([
+            'name' => '往復案件備考',
+            'status' => 'open',
+            'main_user_id' => $mainUser->id,
+            'commercial_flow' => 'secondary',
+            'work_style' => 'remote',
+            'rate_note' => 'スキル見合い',
+        ]);
+
+        // 実際のエクスポート出力（BOM 付き・export専用列を含む）をそのまま取り込む。
+        $exported = $this->actingAs($mainUser)->get(route('csv.projects.export'))->streamedContent();
+
+        $this->postImport($mainUser, 'csv.projects.import', $this->makeUpload($exported), false)
+            ->assertRedirect(route('csv.index'));
+
+        $this->assertSame(
+            ['total_rows' => 2, 'created' => 0, 'updated' => 2],
+            session('importResult')['summary'],
+            'エクスポートした案件はそのまま再インポートできる（単価ルールで弾かれない）'
+        );
+
+        $ranged->refresh();
+        $this->assertSame(60, (int) $ranged->rate_min);
+        $this->assertSame(90, (int) $ranged->rate_max);
+        $this->assertNull($ranged->rate_note);
+        $this->assertSame('2026-09-01', $ranged->start_date, '日付が Y-m-d で往復する');
+
+        $noted->refresh();
+        $this->assertNull($noted->rate_min);
+        $this->assertNull($noted->rate_max);
+        $this->assertSame('スキル見合い', $noted->rate_note);
+    }
+
+    /**
+     * 1行分のセルを importableHeaderMap の順序で CSV 1行文字列にする（空行挿入テスト用）。
+     */
+    private function rowLine(EngineerCsvSchema $schema, array $row): string
+    {
+        $fields = array_values($schema->importableHeaderMap());
+        $writer = Writer::createFromString();
+        $writer->setEscape('');
+        $writer->setEndOfLine('');
+        $writer->insertOne(array_map(fn ($f) => (string) ($row[$f] ?? ''), $fields));
+
+        return rtrim($writer->toString(), "\r\n");
+    }
+}

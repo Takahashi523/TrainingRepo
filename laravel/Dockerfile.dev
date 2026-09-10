@@ -8,6 +8,9 @@ RUN apk add --no-cache bash nodejs npm git \
 # Composer 2.8 のインストール（バージョン固定）
 COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 
+# アップロード上限を引き上げる（既定 2M ではアプリの 5MB 上限に届かないため）
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 WORKDIR /var/www
 
 EXPOSE 8000

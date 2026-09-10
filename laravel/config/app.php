@@ -56,16 +56,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Additional Trusted Hosts
+    |--------------------------------------------------------------------------
+    |
+    | bootstrap/app.php の trustHosts が許可するホストの「追加分」（カンマ区切り）。
+    | 既定では APP_URL のホストのみを許可するため、ホスト名の移行中に新旧2ホストを
+    | 同時に通したい場合や、監視が APP_URL 以外の名前で /up を叩く場合に使う。
+    | 恒久設定ではないので、移行が終わったら空に戻すこと。
+    |
+    */
+
+    'trusted_hosts' => env('TRUSTED_HOSTS', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
     | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | will be used by the PHP date and date-time functions.
+    |
+    | 本システムは国内 SES 向けの社内ツール（利用者は日本国内）であり、
+    | ダッシュボードの「今日／期限超過／7日以内」など日付境界を JST 基準で扱う必要があるため
+    | Asia/Tokyo を既定とする（DB セッション TZ も config/database.php で +09:00 に揃える）。
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Tokyo'),
 
     /*
     |--------------------------------------------------------------------------
@@ -78,9 +95,9 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => 'ja',
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    'fallback_locale' => 'ja',
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 

@@ -55,6 +55,10 @@ return [
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            // アプリ TZ（Asia/Tokyo）と DB セッション TZ を揃える。
+            // これにより NOW() / CURRENT_TIMESTAMP 既定値も JST になり、PHP 側の日付境界とズレない。
+            // 名前指定（Asia/Tokyo）は MySQL のタイムゾーンテーブルが必要なため数値オフセットを使う。
+            'timezone' => env('DB_TIMEZONE', '+09:00'),
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
