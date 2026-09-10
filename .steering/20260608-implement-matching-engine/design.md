@@ -21,6 +21,11 @@
 > `スコアリングロジック設計書.md` v0.6 改訂履歴（B-05・B-06・B-07）でこれらは**削除**と確定していたことが判明したため、
 > Step 8 にて実装・テストとも巻き戻した。E1のレスポンス件数は当初から一貫して「常に上位5件固定」（QA#33・#50）である。
 
+> **Step 9 以降について**：本ドキュメントの Step 構成は初期実装（Step 1〜8）を対象としており、
+> その後のレビュー対応（E2のDB書込撤去・エラー応答のフラット化・スコア上限クランプ等）は
+> `tasklist.md`・`reason.md` の Step 9〜12 として記録している。本ドキュメントの以降の記述は
+> Step 12 時点の実装に合わせて更新済みだが、Stepごとの経緯や訂正履歴はそちらを正とする。
+
 ---
 
 ## アーキテクチャ
@@ -58,11 +63,13 @@ Step 3.6  候補 >30 件なら カスケードソートで上位30件に絞込
 （工程経験重複数 → 単価 → 勤務形態 → 開始時期 → 登録日）
 ※AIは候補ごとに個別呼び出しするため、1プロンプトへの一括投入トークン上限には抵触しない。
 30件という上限は、コスト・レスポンス時間要件（QA#30の同期5〜10秒）を満たすための上限。
+※ただしAI呼び出しは候補ごとの直列実行であり、実測でこの要件を満たせているかは未確認
+（EC2 + 実Bedrockでの計測が必要。tasklist.md「残課題」を参照）。
 Step 3.7  Google Maps で commute_time_minutes 取得（案件ごと）
 Step 3.8  Bedrock AI 総合判定（候補案件ごとに個別呼び出し）
 （match_score / ai_score_reason / ai_comment / ai_missing を一括生成。
  プロンプトには配点目安ガイド・判定ルールを明示的に埋め込む）
-Step 3.9  アプリ層クランプ（match_score = max(0, raw_score)）
+Step 3.9  アプリ層クランプ（match_score = min(100, max(0, raw_score))）
 Step 3.10 アプリ層ランク検算（AI 出力の match_rank は無視し _determine_rank で確定）
 Step 3.11 スコア降順ソート → 上位5件に絞込（QA#33・QA#50 確定。常に固定5件）
 Step 3.12 レスポンス構築・返却
@@ -91,10 +98,12 @@ Bedrock（Claude 3.5 Sonnet）が以下の8観点をプロンプトで指示さ�
 配点の詳細・計算式は `docs/02_design/backend/AIプロンプト設計書.md`（v0.3）§3.3 を正とする。
 **Python コードが担う計算はクランプとランク検算のみ**（match_scoreの各観点合計値との一致自体はプロンプト指示でAIに担保させる）。
 
-### クランプ処理（スコアリングロジック設計書 v0.6 §3.3.1）
+### クランプ処理（スコアリングロジック設計書 v0.7 §3.3.1）
 
 ```python
-match_score = max(0, raw_score)  # TINYINT UNSIGNED の下限保証
+match_score = min(100, max(0, raw_score))
+# 下限：必須スキル全不足ペナルティ(-30点)で負値になり得るが、TINYINT UNSIGNEDのため格納不可。
+# 上限：観点別配点の合計をAIに出力させる方式のため100超も起こり得る（Step 11で追加）。
 ```
 
 ### ランク算定
@@ -113,12 +122,17 @@ match_score = max(0, raw_score)  # TINYINT UNSIGNED の下限保証
 ```
 Step 8.1  engineer_id でエンジニア情報の存在チェック（同時に appeal_note を取得）
 Step 8.2  Bedrock でプロフィール要約生成（engineers.appeal_note のみを入力とする）
-Step 8.3  ai_summary が空でなければ engineers.ai_summary / ai_summary_generated_at を UPDATE
+Step 8.3  生成結果（ai_summary・ai_summary_generated_at）をレスポンスとして返却するのみ。
+          DBへの書き込みは行わない（保存はLaravel側の責務。スコアリングロジック設計書 §1.3）
 Step 8.4  レスポンス返却
 ```
 
 > 入力は `engineer_id` のみ。画面から`appeal_point`・`raw_skills`を直接受け取る方式ではない
 > （以前この誤った仕様で実装されていたため Step 8 で巻き戻した）。
+>
+> **Step 9 追記**：当初この Step 8.3 は Python 側で `UPDATE engineers ...` を実行する設計だったが、
+> Laravel 側も同じカラムを書く二重書き込みとなり不整合の原因になっていたため、Python 側の
+> DB書き込みは撤去し、生成結果を返すのみとした（経緯は reason.md の Step 9 を参照）。
 
 ---
 
@@ -128,13 +142,13 @@ Step 8.4  レスポンス返却
 |---|---|
 | `python/app/services/matching_service.py` | DB取得・フロー全体。カスケードソート閾値は30件（`_MAX_AI_BATCH_SIZE`）、最終返却件数は常に5件固定（`_MAX_RESPONSE_MATCHES`）。E2は`engineer_id`のみ受け付け、`appeal_note`をDBから取得。✅ |
 | `python/app/services/bedrock_service.py` | Bedrock 呼び出しラッパー（リトライ・JSON再試行）。プロンプトに配点目安ガイド・判定ルールを埋め込み。呼び出しパラメータ`temperature=0.3`/`top_p=0.9`/`max_tokens`（マッチング800・要約600）。✅ |
-| `python/app/services/gmaps_service.py` | Google Maps API ラッパー ✅ |
-| `python/app/routers/matching.py` | E1 実装完成。リクエストは`engineer_id`・`project_ids`のみ。`BedrockError`はexcept Exceptionに握りつぶされないよう明示的に再送出。✅ |
-| `python/app/routers/profile.py` | E2 実装完成。リクエストは`engineer_id`のみ。✅ |
-| `python/app/models/schemas.py` | `MatchingRequest`/`MatchingResponse`は`engineer_id`・`project_ids`・`matches`のみ（`limit`/`rank_filter`/`total_hits`は持たない）。`ProfileSummaryRequest`は`engineer_id`のみ。✅ |
+| `python/app/services/gmaps_service.py` | Google Maps API ラッパー。SSM クライアントにタイムアウト設定（Step 12） ✅ |
+| `python/app/routers/matching.py` | E1 実装完成。リクエストは`engineer_id`・`project_ids`のみ。例外は捕捉せず`main.py`のapp-levelハンドラに委ねる（Step 11でrouter側の`try/except`は撤去済み）。✅ |
+| `python/app/routers/profile.py` | E2 実装完成。リクエストは`engineer_id`のみ。matching.pyと同様、例外は捕捉せず`main.py`に委ねる。✅ |
+| `python/app/models/schemas.py` | `MatchingRequest`/`MatchingResponse`は`engineer_id`・`project_ids`・`matches`のみ（`limit`/`rank_filter`/`total_hits`は持たない）。`ProfileSummaryRequest`は`engineer_id`のみ。`MatchResult.match_score`に`Field(ge=0, le=100)`（Step 11）。✅ |
 | `python/app/models/db.py` | DBセッション取得の唯一の実体。`matching.py`・`profile.py`双方から参照 ✅ |
-| `python/app/main.py` | 例外ハンドラ集約（`EngineerNotFoundError`/`NoActiveCandidateError`/`BedrockError`の変換対応） ✅ |
-| `python/tests/` | 全体で103件・カバレッジ96% ✅ |
+| `python/app/main.py` | 例外ハンドラ集約（`RequestValidationError`/`EngineerNotFoundError`/`NoActiveCandidateError`/`BedrockError`/`StarletteHTTPException`/`Exception`の変換対応）。500の`error_code`は`INTERNAL_ERROR`（Step 11）。未定義ルート（404）・メソッド不一致（405）もフラット形式で返す ✅ |
+| `python/tests/` | 全体で113件・カバレッジ96% ✅ |
 
 ---
 
@@ -153,9 +167,13 @@ Step 8.4  レスポンス返却
 ### Google Maps Distance Matrix API
 
 - キー取得：boto3 SSM `get_parameter(Name="Nexus-google-maps-key", WithDecryption=True)`
-- エンドポイント：`https://maps.googleapis.com/maps/api/distancematrix/json`
+  （クライアントは `Config(connect_timeout=2, read_timeout=3, retries={"max_attempts": 2})`。既定値のままだと
+  SSM 不通時に分単位でブロックし得るため、Distance Matrix 側のタイムアウトと釣り合う値に絞る）
+- エンドポイント：`https://maps.googleapis.com/maps/api/distancematrix/json`（httpx タイムアウト5秒）
 - 単位：commute_time_minutes（秒→分に変換）
-- ローカルテスト時：`pytest-mock` を使用して適切にモック化すること
+- 失敗時は `None` を返してフローを継続（AIプロンプト上は「NULL（算出失敗）」＝通勤適合度0点）
+- ローカルテスト時：`pytest-mock` を使用して適切にモック化すること。`calculate_matching` を通すテストでも
+  `get_commute_time_minutes` のモックを忘れないこと（モック漏れでも例外が握りつぶされて緑になるため気づきにくい）
 
 ---
 
@@ -166,12 +184,23 @@ Step 8.4  レスポンス返却
 | バリデーションエラー | 400 | `INVALID_PARAMETER` |
 | エンジニアが見つからない | 404 | `ENGINEER_NOT_FOUND` |
 | パイプライン除外後に候補ゼロ | 422 | `NO_ACTIVE_PROJECT` |
-| その他の予期せぬエラー | 500 | `INTERNAL_SERVER_ERROR`（内部の例外メッセージは含めず汎用文言で返す） |
+| その他の予期せぬエラー | 500 | `INTERNAL_ERROR`（内部の例外メッセージは含めず汎用文言で返す） |
 | Bedrock タイムアウト（リトライ後も失敗） | 504 | `UPSTREAM_TIMEOUT` |
+| 未定義ルート | 404 | `NOT_FOUND` |
+| 許可されていないHTTPメソッド | 405 | `METHOD_NOT_ALLOWED` |
 
-`@app.exception_handler` を `main.py` に集約する。ルーター層にも`except BedrockError: raise`を置き、
-ルーターの`except Exception`に握りつぶされず`main.py`側のハンドラへ確実に到達するようにする
-（以前この対応が漏れており、Bedrockタイムアウトが誤って500として返っていた不具合があったため）。
+上記のうち 404（未定義ルート）・405（メソッド不一致）はアプリコードが送出するものではなく、
+Starlette/FastAPI がルーティング時に既定の `HTTPException` として送出するもの。既定のままでは
+`{"detail": ...}` の入れ子形式で返るため、`@app.exception_handler(StarletteHTTPException)` を
+`main.py` に追加してフラット形式にオーバーライドしている。
+
+`@app.exception_handler` を `main.py` に集約する。**ルーター層（`matching.py`・`profile.py`）には
+`try/except` を一切置かない**（Step 11で撤去）。以前は`except EngineerNotFoundError: raise`等の
+再送出パターンをルーター側にも置いていたが、`except Exception`が`HTTPException(detail={...})`を
+投げるコードパスだけが残っており、500だけ`{"detail": {...}}`の入れ子形式・かつ設計書に存在しない
+`INTERNAL_SERVER_ERROR`のまま漏れていた。ルーター側の`try/except`を丸ごと撤去し、すべての例外を
+`main.py`のapp-levelハンドラに到達させることで、404/422/500/504のすべてがフラット形式・正しい
+`error_code`で返るようにしている。
 
 ---
 
@@ -189,4 +218,4 @@ Step 8.4  レスポンス返却
 ## 影響範囲
 
 - Laravel 側への影響なし（HTTP 呼び出しのインターフェースは変わらない。E1は当初から常に上位5件固定のため、`limit`/`rank_filter`巻き戻しによるLaravel側の変更も不要）
-- DB スキーマへの変更なし（既存テーブルを読み書きするのみ）
+- DB スキーマへの変更なし。Python側は読み取りのみで、書き込みは一切行わない（保存責務はLaravel側に統一。Step 9参照）

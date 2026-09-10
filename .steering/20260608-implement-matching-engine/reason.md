@@ -94,6 +94,8 @@ Step 6 実装により、暫定スタブ（`None`固定）から実際のDistanc
 ルーターの `except Exception` が `BedrockError` より先に評価される位置にあると、`main.py` の `@app.exception_handler(BedrockError)` に到達する前に握りつぶされ、意図しない500になってしまう。`except Exception` より手前に `except BedrockError: raise` を置くことで、握りつぶさずに `main.py` 側のハンドラへ確実に横流しする。
 （※この対応が漏れており、Bedrockタイムアウト時に504ではなく500が返る不具合が実際に発生していた。修正済み。）
 
+> **⚠️ 訂正（2026-09-10）**：上記は Step 11 で解消済み。`except Exception` ごと撤去したため、それを避けるための `except BedrockError: raise` も不要になり、現在のルーターには `try/except` 自体が存在しない。例外はすべて `main.py` の app-level ハンドラに到達する。
+
 ### run_matching としてインポートしエイリアスした理由
 Router 関数名を `matching_calculate` にすると `calculate_matching`（サービス層関数）と区別できる。エイリアスにより「呼び出し元（router）がどの関数を呼んでいるか」がテスト時の `mocker.patch("app.routers.matching.run_matching")` で明示される。
 
@@ -175,6 +177,33 @@ Laravelチームより「PythonがDBのUPDATEを行っていないか」とい�
 
 ---
 
+## Step 12: レビュー指摘対応（2026-09-10）
+
+Step 9〜11 の修正が `design.md` に反映されておらず、撤去済みの実装を説明したままだった点を中心に是正した。あわせて、レビューで挙がった実装上の穴（Bedrock 異常応答・未定義ルートのエラー形式・SSM のタイムアウト・テストの外部通信）にも対応した。
+
+### design.md を Step 11 時点の実装に合わせて更新した理由
+`reason.md`・`tasklist.md` は Step 9〜11 のたびに更新していたが、`design.md` は Step 8 時点のままで、①クランプ式が `max(0, raw_score)`（上限なし）、②500 の `error_code` が `INTERNAL_SERVER_ERROR`、③撤去済みの「ルーターにも `except BedrockError: raise` を置く」方針、④E2 フローに `UPDATE engineers` が残存、⑤テスト件数 103 件、の5点が実装と食い違っていた。`design.md` だけを読んだ人が誤った実装を正と理解してしまうため実装に合わせ、Step 9 以降の経緯は `tasklist.md`・`reason.md` を正とする旨も明記した。
+
+### `start_date`/`created_at` の型注釈を `date`/`datetime` に直した理由
+`internal_types.py` は `Optional[str]`（YYYY-MM-DD 形式）と宣言していたが、実際には生 SQL 経由で DB から返る `date`/`datetime` オブジェクトが入る。`_cascade_sort` は `p.start_date or _DATE_MAX`（`date.max`）と比較するため、注釈どおり str が入る前提で読むと「str と date を比較していて壊れている」と誤読する。実挙動は正しいので注釈側を実態に合わせた。
+
+### Bedrock 応答の `KeyError`/`IndexError` をリトライ対象に含めた理由
+`_invoke_model` のリトライ対象は `(BotoCoreError, ClientError, json.JSONDecodeError)` のみだったため、ガードレールによるブロック等で `content` が空・欠落した応答が返ると `KeyError`/`IndexError` がリトライされずに送出され、`main.py` の汎用ハンドラで 500 `INTERNAL_ERROR` になっていた。実態は上流（Bedrock）側の異常なので、他の Bedrock 障害と同じくリトライ → 504 `UPSTREAM_TIMEOUT` に寄せる方が一貫する。
+
+### 未定義ルート（404）・メソッド不一致（405）もフラット形式に揃えた理由
+Starlette/FastAPI がルーティング時に送出する既定の `HTTPException` は `{"detail": "Not Found"}` の形で返る。他のエラー応答をすべてフラット形式に統一した以上、ここだけ形が違うと、URL の打ち間違いやメソッド誤りのときに Laravel 側が `error_code` をトップレベルで読めず、Step 10 で解消したはずの「形が違って判定できない」状態に戻る。`@app.exception_handler(StarletteHTTPException)` で上書きし、`NOT_FOUND`／`METHOD_NOT_ALLOWED` を返す。
+
+### SSM クライアントにタイムアウトを設定した理由
+`bedrock_service.py` は `Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 0})` を明示しているのに対し、`gmaps_service.py` の SSM クライアントは既定値（connect/read とも60秒・リトライあり）のままで、SSM 不通時に通勤時間の取得だけで分単位のブロックが起こり得た。Distance Matrix 側の httpx タイムアウト（5秒）と釣り合う値（connect 2秒・read 3秒・最大2回）に絞り、最悪でも約10秒で `None`（算出失敗）に倒す。APIキーは初回取得後にキャッシュされるため、このコストを払うのは起動直後か失敗継続時のみ。
+
+### TestCalculateMatching で通勤時間取得をモックする理由
+`requirements.md` は「外部 API（Bedrock / Google Maps）は pytest-mock でモック化すること」としているが、`TestCalculateMatching` は `invoke_matching` だけをモックし `get_commute_time_minutes` は素通しだった。`_make_engineer`／`_make_project` が最寄駅を持つため、実行のたびに候補件数ぶん（最大35件）SSM・Distance Matrix API へ実接続を試みていた。例外は握りつぶされて `None` が返るためテストは緑のままだが、外部通信に依存した遅いテストになり、オフライン環境では全体がタイムアウトする。クラス単位の autouse フィクスチャでモック化し、あわせて Step 3.7 の受け渡し（最寄駅・勤務地 → 通勤時間 → AI 呼び出し）を検証するテストを追加した。
+
+### 教訓
+Step 9 の教訓（チェックを付ける前にコード差分の存在を確認する）はコードとチェックリストの乖離についてのものだったが、今回はドキュメント間の乖離だった。**修正のたびに更新するドキュメントを固定しない**（`reason.md`・`tasklist.md` だけを更新して `design.md` を置き去りにしない）こと、そして**同じ事実を複数のドキュメントに書かない**（クランプ式や `error_code` のような実装値は正ドキュメントを参照させ、写経を減らす）ことが再発防止になる。
+
+---
+
 ## 改訂履歴（誤りの記録）
 
 このファイルおよび `design.md`・`requirements.md`・`tasklist.md` は、開発初期の理解に基づくメモとして作成されたものであり、後から判明した誤りが複数含まれていた。特に以下の4点は、正ドキュメントとの突き合わせで明確に誤りと判明したため、Step 8・Step 9 にて修正・削除している。
@@ -183,5 +212,6 @@ Laravelチームより「PythonがDBのUPDATEを行っていないか」とい�
 2. 「Step 5.5：`limit`/`rank_filter`/`total_hits`をE1に追加する理由」→ これらの機能はv0.6で既に削除確定していた仕様であり、追加自体が誤りだった。
 3. 「E2の入力を`appeal_point`/`raw_skills`とする理由」→ 正しくは`engineer_id`のみで、DBの`appeal_note`を使う仕様だった。
 4. 「E2で`engineers.ai_summary`をUPDATEする理由」→ そもそもPythonはDBに書き込まない方針（§1.3）であり、UPDATEを実装したこと自体が誤りだった。Laravelチームからの指摘で判明。
+5. `design.md` が Step 9〜11 の修正を反映しないまま残っていた（クランプ式・500の`error_code`・撤去済みのルーター`except`方針・E2のUPDATE・テスト件数）→ 誤りというより更新漏れだが、`design.md`だけを読むと撤去済みの実装を正と理解してしまう状態だった。Step 12 にて実装に合わせて更新。
 
 同様の勘違いを繰り返さないよう、今後このプロジェクトを担当する際は、本ファイル群よりも先に正ドキュメント（`スコアリングロジック設計書.md`・`AIプロンプト設計書.md`）を参照すること。特に§1.3「データ連携方針」は見落としやすいので要注意。

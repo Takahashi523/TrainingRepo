@@ -195,9 +195,43 @@ Step 10 のレビューで、500 応答だけ是正から漏れていたこと�
 
 ---
 
+## Step 12: ドキュメント乖離の是正と残る穴の修正（2026-09-10・レビュー対応）
+
+PR #25 全体のレビューで、Step 9〜11 の修正が `design.md` に反映されておらず、撤去済みの実装が正として書かれたままだったことが判明。あわせて指摘のあった実装上の穴も対応した。
+
+**ドキュメントと実装の乖離是正**
+
+- [x] ✅ 2026-09-10 `design.md`：クランプ式を `max(0, raw_score)` → `min(100, max(0, raw_score))` に更新（Step 11 未反映）
+- [x] ✅ 2026-09-10 `design.md`：エラーハンドリング方針の 500 を `INTERNAL_SERVER_ERROR` → `INTERNAL_ERROR` に更新（Step 11 未反映）
+- [x] ✅ 2026-09-10 `design.md`：「ルーターにも `except BedrockError: raise` を置く」という撤去済みの方針の記述を、現行（ルーターに `try/except` を置かない）の説明へ差し替え（Step 11 未反映）
+- [x] ✅ 2026-09-10 `design.md`：E2 フローの Step 8.3 に残っていた `UPDATE engineers ...` の記述を「DBへ書き込まず返却のみ」に修正（Step 9 未反映）
+- [x] ✅ 2026-09-10 `design.md`：テスト件数を 103 件 → 最新値に更新。あわせて Step 9〜11 の経緯は `tasklist.md`・`reason.md` を正とする旨を明記
+- [x] ✅ 2026-09-10 `reason.md`：Step 5「ルーターに `except BedrockError: raise` を明示的に置く理由」に Step 11 で解消済みである旨の訂正を追記。改訂履歴に本件（項目5）を追加
+
+**実装の修正**
+
+- [x] ✅ 2026-09-10 `bedrock_service.py`：`_invoke_model` のリトライ対象に `KeyError`・`IndexError` を追加。ガードレールブロック等で `content` が空・欠落した応答が返った場合、従来はリトライされず 500 `INTERNAL_ERROR` になっていたが、他の Bedrock 障害と同じくリトライ → 504 `UPSTREAM_TIMEOUT` に揃えた
+- [x] ✅ 2026-09-10 `main.py`：`@app.exception_handler(StarletteHTTPException)` を追加。未定義ルート（404）・メソッド不一致（405）が既定の `{"detail": ...}` 形式で返っていたため、`NOT_FOUND`／`METHOD_NOT_ALLOWED` のフラット形式に統一
+- [x] ✅ 2026-09-10 `gmaps_service.py`：SSM クライアントに `Config(connect_timeout=2, read_timeout=3, retries={"max_attempts": 2})` を指定。既定値（connect/read とも60秒・リトライあり）のままで、SSM 不通時に分単位でブロックし得た
+- [x] ✅ 2026-09-10 `internal_types.py`：`ProjectData.start_date`・`created_at` の型注釈を `Optional[str]` → `Optional[date]`／`Optional[datetime]` に修正（実際に DB から返る型に合わせた。`_cascade_sort` の比較対象 `date.max`／`datetime.max` とも整合）
+
+**テスト**
+
+- [x] ✅ 2026-09-10 `tests/test_matching_service.py`：`TestCalculateMatching` が `get_commute_time_minutes` をモックしておらず、実行のたびに候補件数ぶん SSM・Distance Matrix API へ実接続していた（例外は握りつぶされるためテストは緑のまま）。クラス単位の autouse フィクスチャでモック化し、`requirements.md` の「外部APIはモック化すること」に適合させた
+- [x] ✅ 2026-09-10 `tests/test_matching_service.py`：Step 3.7 の受け渡し（最寄駅・勤務地 → 通勤時間 → AI呼び出し）を検証する `test_commute_time_is_fetched_and_passed_to_ai` を追加
+- [x] ✅ 2026-09-10 `tests/test_bedrock_service.py`：`content` 欠落応答のリトライ・リトライ枯渇時の `BedrockError` を検証する2件を追加
+- [x] ✅ 2026-09-10 `tests/test_routers.py`：404/405 がフラット形式で返ることを検証する2件を追加
+- [x] ✅ 2026-09-10 `tests/test_gmaps_service.py`：SSM クライアントのタイムアウト設定を検証する `test_ssm_client_created_with_bounded_timeout` を追加
+
+**検証**
+
+- [x] ✅ 2026-09-10 pytest 全件通過（113件・カバレッジ96%）。外部通信を一切行わずに完走することも確認（修正前はオフライン環境で全体がタイムアウトしていた）
+
+---
+
 ## 完了基準
 
-- [x] ✅ ~~2026-07-14 pytest 全件通過（103件）~~ → ~~2026-08-18（104件）~~ → **2026-08-25 pytest 全件通過（107件）**（Step 10 で契約テスト1件、Step 11 で500契約テスト・上限クランプ・非数値の3件を追加）
+- [x] ✅ ~~2026-07-14 pytest 全件通過（103件）~~ → ~~2026-08-18（104件）~~ → ~~2026-08-25（107件）~~ → **2026-09-10 pytest 全件通過（113件）**（Step 10 で契約テスト1件、Step 11 で3件、Step 12 で6件を追加）
 - [x] ✅ 2026-07-14 カバレッジ90%以上（96% 達成）
 - [x] ✅ 2026-07-14 `SELECT *` が存在しないこと
 - [x] ✅ 2026-07-14 Pydantic 型定義がすべてのリクエスト/レスポンスに存在すること
@@ -209,6 +243,7 @@ Step 10 のレビューで、500 応答だけ是正から漏れていたこと�
 
 ## 残課題（本番リリース前に対応必須）
 
+- [ ] **E1 のレスポンス時間の実測（EC2 + 実 Bedrock）**。`design.md` は「30件という上限は、コスト・レスポンス時間要件（QA#30の同期5〜10秒）を満たすための上限」としているが、`calculate_matching` は候補ごとに `invoke_matching` を**直列**で呼ぶため、候補が十数件を超えると 5〜10 秒を割り込む可能性がある（1件あたりの実測値が無いと判断できないため、EC2 上での計測が必要）。要件を満たせない場合は並列化（`concurrent.futures` 等）または `_MAX_AI_BATCH_SIZE` の見直しを検討する。Bedrock 側のレート制限・コストとのトレードオフになるため、計測結果を持って方針を決める（Step 12 のレビューで指摘）
 - [ ] `MOCK_MODE`の無効化・削除（AWS本番アカウント整備後）
 - [ ] Laravel⇔Python間の通信経路確定（スコアリングロジック設計書 v0.6 §6 T29、インフラ担当確認待ち）
 - [ ] `スコアリングロジック設計書.md` §3.2の出力文字数表記を`AIプロンプト設計書.md`の数値に同期（文書オーナーへ確認予定、低優先度）
