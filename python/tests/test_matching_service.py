@@ -539,6 +539,53 @@ def _make_ai_result(score: int):
 class TestCalculateMatching:
     """calculate_matching のフロー統合テスト。"""
 
+    @pytest.fixture(autouse=True)
+    def mock_commute_time(self, mocker):
+        """通勤時間取得（Google Maps + SSM）は外部APIのため全テストで常にモック化する。
+
+        requirements.md「外部 API（Bedrock / Google Maps）は pytest-mock を使用して
+        適切にモック化すること」に対応。モックしていないと、_make_project /
+        _make_engineer が最寄駅を持っている関係で `get_commute_time_minutes` が
+        実際に SSM・Distance Matrix API へ接続を試みる。例外は握りつぶされて None が
+        返るためテストは緑のままだが、候補件数ぶん実通信が走り（35件のケースもある）、
+        オフライン環境ではテストが極端に遅くなる。
+        """
+        return mocker.patch(
+            "app.services.matching_service.get_commute_time_minutes",
+            return_value=30,
+        )
+
+    def test_commute_time_is_fetched_and_passed_to_ai(self, mocker, mock_commute_time):
+        """Step 3.7：人材の最寄駅・案件の勤務地から通勤時間を取得し、
+        その値が Step 3.8 の AI 呼び出しへ引き渡されること。
+        """
+        engineer = _make_engineer(nearest_station="渋谷")
+        projects = [_make_project(1, work_location_station="新宿")]
+
+        mocker.patch(
+            "app.services.matching_service.fetch_engineer", return_value=engineer
+        )
+        mocker.patch(
+            "app.services.matching_service.fetch_active_projects", return_value=projects
+        )
+        mocker.patch(
+            "app.services.matching_service.fetch_registered_project_ids",
+            return_value=set(),
+        )
+        mock_invoke = mocker.patch(
+            "app.services.matching_service.invoke_matching",
+            return_value=_make_ai_result(70),
+        )
+
+        calculate_matching(MagicMock(), engineer_id=1, project_ids=None)
+
+        assert mock_commute_time.call_args.kwargs == {
+            "origin": "渋谷",
+            "destination": "新宿",
+        }
+        # invoke_matching(engineer, project, commute_time) の第3引数として渡る
+        assert mock_invoke.call_args.args[2] == 30
+
     def test_returns_top5_sorted_by_score(self, mocker):
         """6件候補（カスケード絞込は発生しない件数。閾値30件）→ 全件AIスコアリングされ、
         スコア降順で上位5件のみ返ること（スコアリングロジック設計書 v0.6 §3.4 Step 5・6 準拠）。

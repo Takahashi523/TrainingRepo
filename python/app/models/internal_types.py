@@ -1,4 +1,5 @@
 from dataclasses import dataclass  # モジュール名を正しく修正
+from datetime import date, datetime
 from typing import List, Optional
 
 @dataclass
@@ -41,7 +42,7 @@ class ProjectData:
     id: int
     description: Optional[str]
     negotiation_required: Optional[int]
-    start_date: Optional[str]        # YYYY-MM-DD 形式
+    start_date: Optional[date]       # DB上はDATE型（_cascade_sortでdate.maxと比較するためstrではなくdate）
     rate_min: Optional[int]
     rate_max: Optional[int]
     rate_note: Optional[str]
@@ -53,7 +54,7 @@ class ProjectData:
     proc_development: int
     proc_testing: int
     proc_maintenance: int
-    created_at: Optional[str]        # カスケードソートで使用
+    created_at: Optional[datetime]   # DB上はDATETIME型。カスケードソートで使用
     skills: List[ProjectSkill]
 
 @dataclass

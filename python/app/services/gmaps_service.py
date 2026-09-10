@@ -5,12 +5,24 @@ from typing import Optional
 
 import boto3
 import httpx
+from botocore.config import Config
 
 from app.config import AWS_REGION, GOOGLE_MAPS_API_KEY_SSM_NAME
 
 logger = logging.getLogger(__name__)
 
 _GMAPS_ENDPOINT = "https://maps.googleapis.com/maps/api/distancematrix/json"
+
+# SSM 呼び出しのタイムアウト。既定値（connect/read とも60秒・リトライあり）のままだと、
+# SSM が不通のときに E1 のフロー全体が数分単位でブロックされ得るため明示的に絞る。
+# Distance Matrix 側の httpx タイムアウト（5秒）と釣り合う値とし、最悪でも
+# (2+3)×2回 = 約10秒で打ち切って None（通勤時間算出失敗）に倒す。
+# APIキーは初回取得後にキャッシュされるため、このコストを払うのは起動直後か失敗継続時のみ。
+_SSM_CLIENT_CONFIG = Config(
+    connect_timeout=2,
+    read_timeout=3,
+    retries={"max_attempts": 2},
+)
 
 # IAM ロールベースで boto3 が自動的に認証情報を取得するため APIキーの直書きは行わない
 _api_key: Optional[str] = None
@@ -20,7 +32,7 @@ def _get_api_key() -> str:
     """SSM Parameter Store から Google Maps API キーを取得する（遅延シングルトン）。"""
     global _api_key
     if _api_key is None:
-        ssm = boto3.client("ssm", region_name=AWS_REGION)
+        ssm = boto3.client("ssm", region_name=AWS_REGION, config=_SSM_CLIENT_CONFIG)
         response = ssm.get_parameter(Name=GOOGLE_MAPS_API_KEY_SSM_NAME, WithDecryption=True)
         _api_key = response["Parameter"]["Value"]
     return _api_key

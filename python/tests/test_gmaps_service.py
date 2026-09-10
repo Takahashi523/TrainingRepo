@@ -90,6 +90,25 @@ class TestGetCommuteTimeMinutes:
 
         assert mock_ssm.get_parameter.call_count == 1
 
+    def test_ssm_client_created_with_bounded_timeout(self, mocker):
+        """SSM クライアントに明示的なタイムアウト設定が渡されること。
+
+        既定値（connect/read とも60秒・リトライあり）のままだと SSM 不通時に
+        E1 のフロー全体が長時間ブロックされるため、bedrock_service と同様に
+        botocore Config で上限を設ける。
+        """
+        mock_ssm_client = MagicMock()
+        mock_ssm_client.get_parameter.return_value = {"Parameter": {"Value": "test-api-key"}}
+        mock_boto3_client = mocker.patch("boto3.client", return_value=mock_ssm_client)
+        mocker.patch("httpx.get", return_value=_ok_response(600))
+
+        get_commute_time_minutes("渋谷駅", "新宿駅")
+
+        config = mock_boto3_client.call_args.kwargs["config"]
+        assert config.connect_timeout == 2
+        assert config.read_timeout == 3
+        assert config.retries["max_attempts"] == 2
+
 
 # ---------------------------------------------------------------------------
 # None を返すケース
