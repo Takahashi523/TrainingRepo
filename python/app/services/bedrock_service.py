@@ -162,6 +162,11 @@ def _invoke_model(
     """共通のリトライ付き Bedrock 呼び出し処理。
     タイムアウトや各種エラー時はリトライを行い、枯渇した場合は BedrockError を送出する。
     パラメータの既定値（temperature=0.3 / top_p=0.9）はスコアリングロジック設計書 v0.6 §5.2 準拠。
+
+    ガードレールによるブロック等で content が空/欠落した応答が返るケースも、
+    BotoCoreError/ClientError と同様にリトライ対象として扱う（KeyError/IndexError）。
+    ここを補足しないと、その他の except Exception（main.py）に流れて 500 INTERNAL_ERROR
+    になってしまい、本来 504 UPSTREAM_TIMEOUT として扱うべき上流障害の種類が変わってしまう。
     """
     client = _get_client()
 
@@ -187,8 +192,8 @@ def _invoke_model(
             )
             response_body = json.loads(response.get("body").read())
             return str(response_body["content"][0]["text"])
-            
-        except (BotoCoreError, ClientError, json.JSONDecodeError) as e:
+
+        except (BotoCoreError, ClientError, json.JSONDecodeError, KeyError, IndexError) as e:
             logger.warning("Bedrock 呼び出し試行 %d 回目失敗: %s", attempt + 1, e)
             if attempt < 2:
                 time.sleep(1.0 * (attempt + 1))  # 簡易的なバックオフ

@@ -308,6 +308,45 @@ class TestInvokeMatching:
         with pytest.raises(BedrockError):
             invoke_matching(_make_engineer(), _make_project(), commute_time_minutes=None)
 
+    def test_retries_on_malformed_response_body(self, mocker):
+        """content が欠落した応答（ガードレールブロック等）はリトライされ、
+        リトライ枯渇時は KeyError/IndexError のまま漏れずに BedrockError になること。
+        修正前は _invoke_model の except 節が (BotoCoreError, ClientError,
+        json.JSONDecodeError) のみで KeyError/IndexError を拾わなかったため、
+        main.py の汎用 except Exception に流れて 500 INTERNAL_ERROR になっていた。
+        """
+        mock_client = MagicMock()
+        mocker.patch.object(svc, "_get_client", return_value=mock_client)
+        mocker.patch("app.services.bedrock_service.time.sleep")  # スリープをスキップ
+
+        malformed_body = MagicMock()
+        malformed_body.read.return_value = json.dumps({"content": []}).encode()  # contentは空リスト
+
+        mock_client.invoke_model.side_effect = [
+            {"body": malformed_body},
+            _bedrock_response(_valid_ai_response(70)),  # 2回目で正常な応答
+        ]
+
+        result = invoke_matching(_make_engineer(), _make_project(), commute_time_minutes=60)
+
+        assert result.match_score == 70
+        assert mock_client.invoke_model.call_count == 2
+
+    def test_raises_bedrock_error_when_response_body_malformed_after_max_retries(self, mocker):
+        """content 欠落応答がリトライ上限まで続いた場合、BedrockError として送出されること
+        （KeyError/IndexError が main.py まで素通りしないことの確認）。
+        """
+        mock_client = MagicMock()
+        mocker.patch.object(svc, "_get_client", return_value=mock_client)
+        mocker.patch("app.services.bedrock_service.time.sleep")
+
+        malformed_body = MagicMock()
+        malformed_body.read.return_value = json.dumps({"content": []}).encode()
+        mock_client.invoke_model.return_value = {"body": malformed_body}
+
+        with pytest.raises(BedrockError):
+            invoke_matching(_make_engineer(), _make_project(), commute_time_minutes=None)
+
     def test_null_commute_time_does_not_raise(self, mocker):
         """commute_time_minutes が None でもエラーにならないこと。"""
         mock_client = MagicMock()
