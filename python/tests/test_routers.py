@@ -139,7 +139,36 @@ class TestMatchingCalculate:
             side_effect=BedrockError("Bedrock タイムアウト"),
         )
         response = self._post_matching({"engineer_id": 1})
-        assert response.status_code in [504, 500]
+        # E2 側の同名テストと同じく厳密に固定する。`in [504, 500]` では
+        # app-level ハンドラが効かず 500 に落ちても緑のままになってしまう。
+        assert response.status_code == 504
+        assert response.json()["error_code"] == "UPSTREAM_TIMEOUT"
+
+    def test_returns_504_without_leaking_internal_exception_message(self, mocker):
+        """504 応答に botocore の生メッセージが漏れないこと（契約テスト）。
+
+        BedrockError の文言には botocore の生エラーがそのまま含まれる。
+        AccessDeniedException の場合は AWS アカウント ID・ロール ARN・インスタンス ID
+        までレスポンスに乗り、本番の EC2 で実際に漏れていることを確認した。
+        500 と同じく内部情報は出さず、詳細はログにのみ残す。
+        """
+        mocker.patch(
+            "app.routers.matching.run_matching",
+            side_effect=BedrockError(
+                "Bedrock への接続または応答の取得に失敗しました (リトライ枯渇): "
+                "An error occurred (AccessDeniedException) when calling the InvokeModel "
+                "operation: User: arn:aws:sts::123456789012:assumed-role/example-role/i-0abc123 "
+                "is not authorized to perform: bedrock:InvokeModel"
+            ),
+        )
+        response = self._post_matching({"engineer_id": 1})
+        assert response.status_code == 504
+        body = response.json()
+        assert set(body.keys()) == {"error_code", "message"}
+        assert body["error_code"] == "UPSTREAM_TIMEOUT"
+        assert "arn:aws" not in body["message"]
+        assert "assumed-role" not in body["message"]
+        assert "AccessDenied" not in body["message"]
 
     def test_returns_400_for_missing_engineer_id(self):
         response = self._post_matching({})
@@ -270,6 +299,24 @@ class TestProfileSummary:
         response = self._post_profile_summary({"engineer_id": 1})
         assert response.status_code == 504
         assert response.json()["error_code"] == "UPSTREAM_TIMEOUT"
+
+    def test_returns_504_without_leaking_internal_exception_message(self, mocker):
+        """E2 も E1 と同じく、504 応答に botocore の生メッセージを含めないこと。"""
+        mocker.patch(
+            "app.routers.profile.generate_profile_summary",
+            side_effect=BedrockError(
+                "Bedrock への接続または応答の取得に失敗しました (リトライ枯渇): "
+                "An error occurred (AccessDeniedException) when calling the InvokeModel "
+                "operation: User: arn:aws:sts::123456789012:assumed-role/example-role/i-0abc123 "
+                "is not authorized to perform: bedrock:InvokeModel"
+            ),
+        )
+        response = self._post_profile_summary({"engineer_id": 1})
+        assert response.status_code == 504
+        body = response.json()
+        assert set(body.keys()) == {"error_code", "message"}
+        assert "arn:aws" not in body["message"]
+        assert "assumed-role" not in body["message"]
 
     def test_returns_500_without_leaking_internal_exception_message(self, mocker):
         """予期せぬ例外発生時、内部の例外メッセージがレスポンスに漏れないこと。"""

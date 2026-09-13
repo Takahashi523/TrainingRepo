@@ -111,8 +111,15 @@ async def no_active_candidate_handler(request: Request, exc: NoActiveCandidateEr
 
 @app.exception_handler(BedrockError)
 async def bedrock_error_handler(request: Request, exc: BedrockError):
-    # Bedrock タイムアウト（リトライ後も失敗）は 504 UPSTREAM_TIMEOUT（スコアリングロジック設計書 §4.2）
+    # Bedrock タイムアウト（リトライ後も失敗）は 504 UPSTREAM_TIMEOUT（スコアリングロジック設計書 §4.2）。
+    #
+    # message に str(exc) を入れてはならない。BedrockError の文言には botocore の生エラーが
+    # そのまま含まれており、AccessDeniedException の場合は AWS アカウント ID・ロール ARN・
+    # インスタンス ID までレスポンスに乗る（本番の EC2 で実際に漏れていることを確認済み）。
+    # 500 と同じく内部情報は外に出さず、詳細はログにのみ残す
+    # （reason.md「500エラー時に内部の例外メッセージをレスポンスに含めない理由」と同じ方針）。
+    logger.error("Bedrock error", exc_info=exc)
     return JSONResponse(
         status_code=504,
-        content={"error_code": "UPSTREAM_TIMEOUT", "message": str(exc)},
+        content={"error_code": "UPSTREAM_TIMEOUT", "message": "AI処理がタイムアウトしました"},
     )
