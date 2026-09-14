@@ -1,0 +1,45 @@
+# ビルドコンテキストから除外するもの（Issue #90 #2）
+#
+# 最大の目的は .env をイメージに焼き込ませないこと。
+# Dockerfile が `COPY . .` のため、除外しないとビルド時に存在する .env が
+# そのままイメージに入り、APP_KEY・DB_PASSWORD・AWS の鍵が固定化される。
+# 実行時は docker-compose.prod.yml のバインドマウントで .env を渡す。
+#
+# ⚠️ .dockerignore は行頭の # のみをコメントとして扱う。行末コメントは
+#    パターンの一部として解釈され、そのパターンは何にもマッチしなくなる。
+#    コメントは必ず対象行の「上」に置くこと。
+
+# --- 秘匿情報 ---
+.env
+.env.*
+!.env.example
+
+# --- ビルド時に生成されるもの（コンテキストに含めても上書きされる／不要）---
+# vendor: Dockerfile 内で composer install する
+vendor/
+# node_modules: frontend ステージで npm ci する
+node_modules/
+# public/build: frontend ステージの成果物を COPY --from で入れる
+public/build/
+public/hot
+
+# --- 実行時に生成されるもの ---
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/app/public/*
+# config.php には DB パスワード等が展開済みで載るため必ず除外する
+bootstrap/cache/*.php
+
+# --- 本番イメージに不要 ---
+tests/
+phpunit.xml
+.phpunit.result.cache
+.git
+.gitignore
+.gitattributes
+.editorconfig
+README.md
+docker-compose.yml
+Dockerfile.dev
