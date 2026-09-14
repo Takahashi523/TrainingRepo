@@ -34,9 +34,12 @@ export default function PipelineCard({ card, statusOptions, activeId, onOpen }: 
     // カード上でのステータス変更。終了ステータスの不可逆確認は StatusSelect 側で行うため、
     // ここでは確認通過後の即時反映（部分リロード）のみを担う。
     const changeStatus = (value: PipelineStatus) => {
+        // PipelineUpdateRequest は version を必須にしている（issue #45 楽観ロック）。
+        // ここを送り忘れると 422 になり back() で差し戻される＝カードのステータスが変わらず
+        // 保存が黙って失敗しているように見えるだけの不具合になるため、必ず含める。
         router.patch(
             route('pipelines.update', card.id),
-            { status: value },
+            { status: value, version: card.version },
             { preserveScroll: true, preserveState: true },
         );
     };

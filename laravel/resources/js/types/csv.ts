@@ -92,6 +92,7 @@ export const CSV_FIELD_LABELS: Record<CsvResource, Record<string, string>> = {
         proc_testing: 'テスト経験',
         proc_maintenance: '保守運用経験',
         has_negotiation_exp: '顧客折衝経験',
+        version: 'バージョン（システム管理）', // 楽観ロック制御列（issue #45）。列名にシステム管理である旨を明記し、業務項目と区別する（PHP 側 EngineerCsvSchema と同期）。
     },
     projects: {
         id: 'id',
@@ -121,6 +122,7 @@ export const CSV_FIELD_LABELS: Record<CsvResource, Record<string, string>> = {
         proc_development: '開発対象',
         proc_testing: 'テスト対象',
         proc_maintenance: '保守運用対象',
+        version: 'バージョン（システム管理）', // 楽観ロック制御列（issue #45）。列名にシステム管理である旨を明記し、業務項目と区別する（PHP 側 ProjectCsvSchema と同期）。
     },
 };
 

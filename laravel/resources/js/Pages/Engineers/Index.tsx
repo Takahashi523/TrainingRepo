@@ -8,6 +8,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EngineerFilters, EngineerListPageProps } from '@/types/engineer';
 import { PageProps } from '@/types';
 import { useKeywordDebounce } from '@/hooks/use-keyword-debounce';
+import { useScrollContainer } from '@/hooks/use-scroll-container';
 import { Head, router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -61,12 +62,27 @@ export default function Index({
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
+    // 一覧のスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴む。
+    const { scrollContainerRef, scrollToTop } = useScrollContainer();
+
+    // visit は「結果セットが総入れ替わる操作」専用の経路（ページ送り・絞り込み・デバウンス・
+    // ソート・すべてクリア）なので、成功時は必ず一覧の先頭へ戻す（issue #107）。
+    // ページ送りだけを対象にしない理由：検索条件パネルは sticky top-0 で常に画面上に留まるため、
+    // 一覧の途中までスクロールした状態でも条件を変更できる。そのとき位置を保つと「別の結果セットの
+    // 途中から表示される」＝ページ送りで直したのと同じ症状になる。保たれた位置は、消えた結果
+    // セットの中の位置であって意味を持たない。
+    //
+    // preserveScroll: true は外さない。スクロール境界が <main> 側にあり、Inertia のリセットは
+    // window と scroll-region 属性の要素しか対象にしないため、付けても外しても <main> は動かない
+    // （＝位置を決めているのは下の scrollToTop だけ）。
+    // 成功時のみ戻す（onFinish だと失敗・キャンセルでも画面が飛ぶ）。
     const visit = (patch: Partial<EngineerFilters>) => {
         const next: EngineerFilters = { ...filtersRef.current, ...patch };
         router.get('/engineers', buildQuery(next), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            onSuccess: scrollToTop,
         });
     };
 
@@ -126,7 +142,7 @@ export default function Index({
     // 地色（bg-muted/30）は <main> に載せる。カード一覧側に置くと少件数・0件のときに
     // 画面下部が <main> の白背景のまま残るため。人材詳細・案件詳細と同じ使い方（issue #82）。
     return (
-        <AuthenticatedLayout mainClassName="bg-muted/30">
+        <AuthenticatedLayout mainClassName="bg-muted/30" mainRef={scrollContainerRef}>
             <Head title="人材一覧" />
             {/* マッチング実行の遷移中（Python AI 同期計算）に全画面で計算中を表示する。
                 共通部品の既定は汎用文言のため、ここではマッチング用途の具体文言を渡す。
@@ -210,6 +226,8 @@ export default function Index({
                         ))
                     )}
 
+                    {/* 現在ページの再クリックは Pagination 側で握り潰される（同じ内容の取り直し・
+                        視点だけのジャンプを防ぐ）。ここは素直にページを差し替えるだけでよい。 */}
                     <Pagination
                         meta={engineers.meta}
                         onChange={(page) => visit({ page })}

@@ -68,6 +68,10 @@ export default function PipelineDrawer({ pipeline, statusOptions, onClose }: Pro
         next_action_date: pipeline.next_action_date ?? '',
         client_comment: pipeline.client_comment ?? '',
         ng_reason: pipeline.ng_reason ?? '',
+        // 楽観ロック（version, issue #45）。このドロワーは開くたびに key={pipeline.id} で
+        // 再マウントされる設計のため、Engineer/Project の Edit.tsx のような props 変化時の
+        // 再同期 useEffect は不要（コンポーネントごと作り直されるため常に最新の pipeline.version を積む）。
+        version: pipeline.version,
     });
     const { data, setData, processing, errors } = form;
 

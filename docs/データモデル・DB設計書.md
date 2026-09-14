@@ -234,6 +234,7 @@ erDiagram
 | 常駐可 | work_style_onsite | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
 | 一部リモート可 | work_style_hybrid | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
 | フルリモート希望 | work_style_remote | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-3 |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集フォームは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。CSVインポート（更新行）も同じversionで照合し、更新のたびに+1する（新規行は常に0）。詳細は08_CSV入出力APIエンドポイント一覧.md参照【2026-09-01 issue #45 追記】** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -272,6 +273,7 @@ erDiagram
 | 開発対象 | proc_development | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
 | テスト対象 | proc_testing | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
 | 保守運用対象 | proc_maintenance | TINYINT(1) | NULL | | NULL | 1=あり / 0=なし（NULL はCSV取り込み時の空欄に限る）。AIマッチング入力パラメータ。→ §6-2 |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集フォームは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）。CSVインポート（更新行）も同じversionで照合し、更新のたびに+1する（新規行は常に0）。詳細は08_CSV入出力APIエンドポイント一覧.md参照【2026-09-01 issue #45 追記】** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -300,6 +302,7 @@ erDiagram
 | NG理由 | ng_reason | TEXT | NULL | | NULL | QA #54 確定 |
 | 次回アクション予定日 | next_action_date | DATE | NULL | | NULL | アラート機能不要。QA #54 確定。QA #6 確定 |
 | 終了日時 | ended_at | DATETIME | NULL | | NULL | 終了ステータスへ遷移したタイミングでアプリ層から記録（`ended_at = now()`）。進行中ステータスの場合はNULL。完了済みタブの「終了日」列として表示する |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。ドロワーは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 
@@ -320,6 +323,7 @@ erDiagram
 | ロール | role | ENUM('admin','general') | NOT NULL | | `general` | admin / general。QA #17 確定。→ §6-5 |
 | ログイン状態保持トークン | remember_token | VARCHAR(100) | NULL | | NULL | WF_01「ログイン情報を保存する」チェックボックス対応。Laravel Breeze の `$table->rememberToken()` で生成。未チェック時は NULL。 |
 | 最終ログイン日時 | last_login_at | DATETIME | NULL | | NULL | ログイン成功時にイベント/リスナー（Loginイベント）で自動更新。新規ユーザー追加直後・未ログイン時は NULL。 |
+| **バージョン** | **version** | **INT UNSIGNED** | **NOT NULL** | | **0** | **【issue #45 追加】楽観ロック用カウンタ。更新のたびに+1する。編集モーダルは読み込み時の値を保持し、保存時にDB上の現在値と照合する（→ バリデーション・エラー表示設計書「楽観ロック競合時の共通挙動」）** |
 | 作成日時 | created_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | |
 | 更新日時 | updated_at | DATETIME | NOT NULL | | CURRENT_TIMESTAMP | Eloquentが自動更新 |
 

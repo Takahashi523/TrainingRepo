@@ -39,6 +39,8 @@ class UpdateUserRequest extends FormRequest
             // パスワードを入力した場合のみ確認欄を必須にする（省略時は変更なし）。
             'password_confirmation' => ['nullable', 'required_with:password', 'same:password'],
             'role' => ['required', 'in:admin,general'],
+            // 楽観ロック（version, issue #45）。
+            'version' => ['required', 'integer', 'min:0'],
         ];
     }
 
@@ -66,6 +68,7 @@ class UpdateUserRequest extends FormRequest
             'password' => 'パスワード',
             'password_confirmation' => 'パスワード（確認）',
             'role' => 'ロール',
+            'version' => 'バージョン',
         ];
     }
 

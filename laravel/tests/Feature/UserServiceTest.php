@@ -97,4 +97,48 @@ class UserServiceTest extends TestCase
         $this->assertDatabaseMissing('users', ['id' => $admin->id]);
         $this->assertSame(1, User::where('role', 'admin')->count());
     }
+
+    /**
+     * 最後の管理者「降格」ガード（UserService::guardLastAdminOnDemotion）を Service 直呼びで検証する
+     * （2026-09-02 追加。上の削除ガード検証と対になるもの）。
+     *
+     * HTTP 単一リクエストでは、最後の管理者を降格できるのは本人のみ（管理者専用ルート）で、
+     * UpdateUserRequest::withValidator() の自己ロール変更ガードが先に発火して return するため、
+     * 「最後の管理者」チェック（$demotingAdmin && adminCount <= 1）には到達しない
+     * （actor ≠ target なら actor 自身も管理者としてカウントされ、adminCount は必ず2以上になるため）。
+     * つまりこの分岐は通常操作の中だけでは単独確認できない、実質的にService層でしか検証できないガード。
+     */
+    public function test_update_rejects_demoting_the_only_admin(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        try {
+            $this->service()->update($admin, [
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'role' => 'general',
+            ]);
+            $this->fail('ValidationException が送出されるべき');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('role', $e->errors());
+        }
+
+        // 最後の管理者は降格されず admin のまま残っている
+        $this->assertSame('admin', $admin->fresh()->role);
+    }
+
+    public function test_update_allows_demoting_admin_when_another_admin_exists(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        User::factory()->create(['role' => 'admin']); // もう1名の管理者
+
+        $this->service()->update($admin, [
+            'name' => $admin->name,
+            'email' => $admin->email,
+            'role' => 'general',
+        ]);
+
+        // 管理者が2名いれば降格可（過剰にブロックしない）
+        $this->assertSame('general', $admin->fresh()->role);
+    }
 }

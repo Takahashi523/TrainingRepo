@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\StaleUpdateException;
 use App\Models\Pipeline;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -107,16 +108,30 @@ class PipelineService
             unset($data['status']);
         }
 
-        return DB::transaction(function () use ($pipeline, $data) {
+        $version = $data['version'] ?? null;
+        unset($data['version']);
+
+        return DB::transaction(function () use ($pipeline, $data, $version) {
+            $locked = Pipeline::lockForUpdate()->findOrFail($pipeline->id);
+
+            if ($locked->version !== (int) $version) {
+                throw StaleUpdateException::forVersionMismatch();
+            }
+
             if (array_key_exists('status', $data)
                 && Pipeline::isTerminal($data['status'])
-                && ! Pipeline::isTerminal($pipeline->status)) {
+                && ! Pipeline::isTerminal($locked->status)) {
                 $data['ended_at'] = now();
             }
 
-            $pipeline->update($data);
+            // 2026-09-02 修正／レビュー指摘: increment($column, $amount, $extra) による
+            // 1回のUPDATEへの統合は、date/datetime キャスト列（本サービスでは next_action_date）が
+            // DB上で書式崩れする不具合（実テストで next_action_date が "Y-m-d H:i:s" ではなく
+            // "Y-m-d" で保存される事象を確認）があったため取り消した（詳細は EngineerService 参照）。
+            $locked->update($data);
+            $locked->increment('version');
 
-            return $pipeline;
+            return $locked;
         });
     }
 

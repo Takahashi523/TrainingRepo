@@ -20,7 +20,7 @@ class MasterController extends Controller
     public function index(): Response
     {
         $users = User::query()
-            ->select(['id', 'name', 'email', 'role', 'last_login_at'])
+            ->select(['id', 'name', 'email', 'role', 'last_login_at', 'version'])
             ->orderBy('name')
             ->orderBy('id') // 同名時のタイブレーク（順序を決定的にする）
             ->get();

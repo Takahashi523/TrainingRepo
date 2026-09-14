@@ -28,6 +28,7 @@ class PipelineDetailResource extends JsonResource
             'ng_reason' => $this->ng_reason,
             'next_action_date' => $this->next_action_date?->format('Y-m-d'),
             'updated_at' => $this->updated_at,
+            'version' => $this->version,
             'engineer' => [
                 'id' => $this->engineer->id,
                 'name' => $this->engineer->name,

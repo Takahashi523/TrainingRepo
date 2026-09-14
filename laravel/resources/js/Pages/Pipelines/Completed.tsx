@@ -21,6 +21,7 @@ import { emptyText } from '@/lib/emptyValue';
 import { isValidYmd } from '@/lib/utils';
 import { useDebouncedEffect } from '@/hooks/use-debounced-effect';
 import { KEYWORD_DEBOUNCE_MS, useKeywordDebounce } from '@/hooks/use-keyword-debounce';
+import { useScrollContainer } from '@/hooks/use-scroll-container';
 import { Head, router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -137,12 +138,18 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
+    // テーブルのスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴む。
+    // 結果セットが総入れ替わる visit の成功時に先頭へ戻す（issue #107）。
+    // 人材一覧 Index.tsx と同じ配線（ページ送りだけを対象にしない理由もそちらのコメントを参照）。
+    const { scrollContainerRef, scrollToTop } = useScrollContainer();
+
     const visit = (patch: Partial<CompletedFilters>, page: number) => {
         const next: CompletedFilters = { ...filtersRef.current, ...patch };
         router.get(route('pipelines.completed'), buildQuery(next, page), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            onSuccess: scrollToTop,
         });
     };
 
@@ -206,7 +213,7 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
     // 地色（bg-muted/30）は <main> に載せる。テーブル領域側に置くと少件数・0件のときに
     // 画面下部が <main> の白背景（bg-background）のまま残るため（issue #82）。
     return (
-        <AuthenticatedLayout mainClassName="bg-muted/30">
+        <AuthenticatedLayout mainClassName="bg-muted/30" mainRef={scrollContainerRef}>
             <Head title="進捗管理" />
 
             {/*
@@ -350,6 +357,8 @@ export default function Completed({ pipelines, filters, users, statuses, sortOpt
                     </div>
                 )}
 
+                    {/* 現在ページの再クリックは Pagination 側で握り潰される（人材一覧と同じ）。
+                        条件は現状維持なので patch は空、ページだけを差し替える。 */}
                     <Pagination
                         meta={pipelines.meta}
                         onChange={(page) => visit({}, page)}

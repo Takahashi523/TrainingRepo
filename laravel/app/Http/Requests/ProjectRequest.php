@@ -138,6 +138,10 @@ class ProjectRequest extends FormRequest
         // ----------------------------------------------------------------
         $rules['sub_user_id'] = ['nullable', ...$shared['sub_user_id']];
 
+        if ($this->isMethod('put')) {
+            $rules['version'] = ['required', 'integer', 'min:0'];
+        }
+
         return $rules;
     }
 
@@ -177,6 +181,7 @@ class ProjectRequest extends FormRequest
             'proc_development' => '開発',
             'proc_testing' => 'テスト',
             'proc_maintenance' => '保守運用',
+            'version' => 'バージョン',
         ];
     }
 }

@@ -20,11 +20,13 @@ class PipelineUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // ドロワーで変更した項目のみ送信する部分更新のため各項目 nullable
+            // ドロワーで変更した項目のみ送信する部分更新のため各項目 nullable。
+            // version のみ楽観ロック（issue #45）の照合に使うため必須。
             'status' => ['nullable', Rule::in(array_keys(Pipeline::STATUSES))],
             'client_comment' => ['nullable', 'string', 'max:1000'],
             'ng_reason' => ['nullable', 'string', 'max:1000'],
             'next_action_date' => ['nullable', 'date'],
+            'version' => ['required', 'integer', 'min:0'],
         ];
     }
 
@@ -39,6 +41,7 @@ class PipelineUpdateRequest extends FormRequest
             'client_comment' => '顧客コメント',
             'ng_reason' => 'NG理由',
             'next_action_date' => '次回アクション予定日',
+            'version' => 'バージョン',
         ];
     }
 

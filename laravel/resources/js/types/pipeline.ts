@@ -87,6 +87,7 @@ export interface PipelineCard {
     match_rank: string | null;
     next_action_date: string | null;
     updated_at: string;
+    version: number;
     engineer: PipelineEngineerRef;
     project: PipelineProjectRef;
 }
@@ -113,6 +114,7 @@ export interface PipelineDetail {
     ng_reason: string | null;
     next_action_date: string | null;
     updated_at: string;
+    version: number;
     engineer: PipelineEngineerRef;
     project: PipelineProjectRef;
 }

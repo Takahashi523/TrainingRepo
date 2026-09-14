@@ -13,6 +13,7 @@ export interface MasterUser {
     role_label: string;
     /** 最終ログイン日時（ISO8601）。未ログインは null */
     last_login_at: string | null;
+    version: number;
 }
 
 export interface FormSetting {

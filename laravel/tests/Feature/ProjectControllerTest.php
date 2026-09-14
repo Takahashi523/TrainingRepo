@@ -35,13 +35,14 @@ class ProjectControllerTest extends TestCase
         }
     }
 
-    private function validPayload(int $mainUserId): array
+    private function validPayload(int $mainUserId, int $version = 0): array
     {
         return [
             'name' => 'テスト案件',
             'status' => 'open',
             'main_user_id' => $mainUserId,
             'sub_user_id' => null,
+            'version' => $version,
         ];
     }
 
@@ -2089,6 +2090,77 @@ class ProjectControllerTest extends TestCase
         $response = $this->actingAs($user)->put('/projects/99999', $this->validPayload($user->id));
 
         $response->assertNotFound();
+    }
+
+    // -------------------------------------------------------
+    // update: PUT /projects/{project} — 楽観ロック（version, issue #45）
+    // -------------------------------------------------------
+
+    public function test_update_increments_version_when_version_matches(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+
+        // create() は DB 側の DEFAULT (0) を明示的に返さないため、
+        // モデル属性ではなく DB を見て前提（初期 version=0）を確認する。
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'version' => 0]);
+
+        $payload = array_merge($this->validPayload($user->id, 0), ['name' => '新案件名']);
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertRedirect("/projects/{$project->id}");
+        $this->assertDatabaseHas('projects', [
+            'id' => $project->id,
+            'name' => '新案件名',
+            'version' => 1,
+        ]);
+    }
+
+    public function test_update_rejects_stale_version_and_keeps_the_winning_update(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id, 'name' => '元の案件名']);
+
+        $winnerPayload = array_merge($this->validPayload($user->id, 0), ['name' => '先勝ちの案件名']);
+        $winnerResponse = $this->actingAs($user)->put("/projects/{$project->id}", $winnerPayload);
+        $winnerResponse->assertRedirect("/projects/{$project->id}");
+
+        $loserPayload = array_merge($this->validPayload($user->id, 0), ['name' => '後追いの案件名']);
+        $loserResponse = $this->actingAs($user)->put(
+            "/projects/{$project->id}",
+            $loserPayload,
+            ['X-Inertia' => 'true', 'referer' => "/projects/{$project->id}/edit"]
+        );
+
+        $loserResponse->assertStatus(303);
+        $loserResponse->assertRedirect("/projects/{$project->id}/edit");
+        $loserResponse->assertSessionHas('error', '他のユーザーがこの案件情報を更新しました。最新のデータを表示しました。');
+
+        $this->assertDatabaseHas('projects', [
+            'id' => $project->id,
+            'name' => '先勝ちの案件名',
+            'version' => 1,
+        ]);
+        $this->assertDatabaseMissing('projects', [
+            'id' => $project->id,
+            'name' => '後追いの案件名',
+        ]);
+    }
+
+    public function test_update_requires_version_field(): void
+    {
+        $this->seedFormFieldSettings();
+        $user = User::factory()->create();
+        $project = $this->createProject(['main_user_id' => $user->id]);
+
+        $payload = $this->validPayload($user->id);
+        unset($payload['version']);
+
+        $response = $this->actingAs($user)->put("/projects/{$project->id}", $payload);
+
+        $response->assertSessionHasErrors('version');
     }
 
     public function test_project_is_updated_with_valid_payload(): void

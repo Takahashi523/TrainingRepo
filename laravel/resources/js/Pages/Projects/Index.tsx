@@ -7,6 +7,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { ProjectFilters, ProjectIndexPageProps } from "@/types/project";
 import { PageProps } from "@/types";
 import { useKeywordDebounce } from "@/hooks/use-keyword-debounce";
+import { useScrollContainer } from "@/hooks/use-scroll-container";
 import { Head, router } from "@inertiajs/react";
 import { Plus } from "lucide-react";
 import { useRef } from "react";
@@ -63,12 +64,18 @@ export default function Index({
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
+    // 一覧のスクロール境界（AuthenticatedLayout の <main>）。ref をレイアウトへ渡して掴む。
+    // 結果セットが総入れ替わる visit の成功時に先頭へ戻す（issue #107）。
+    // 人材一覧 Index.tsx と同じ配線（ページ送りだけを対象にしない理由もそちらのコメントを参照）。
+    const { scrollContainerRef, scrollToTop } = useScrollContainer();
+
     const visit = (patch: Partial<ProjectFilters>) => {
         const next: ProjectFilters = { ...filtersRef.current, ...patch };
         router.get("/projects", buildQuery(next), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            onSuccess: scrollToTop,
         });
     };
 
@@ -99,7 +106,7 @@ export default function Index({
     // 地色（bg-muted/30）は <main> に載せる。カード一覧側に置くと少件数・0件のときに
     // 画面下部が <main> の白背景のまま残るため。人材一覧・案件詳細と同じ使い方（issue #82）。
     return (
-        <AuthenticatedLayout mainClassName="bg-muted/30">
+        <AuthenticatedLayout mainClassName="bg-muted/30" mainRef={scrollContainerRef}>
             <Head title="案件一覧" />
             {/*
              * 人材一覧と同様に、スクロール境界は AuthenticatedLayout の <main> 1か所に一本化する
@@ -184,6 +191,7 @@ export default function Index({
                         ))
                     )}
 
+                    {/* 現在ページの再クリックは Pagination 側で握り潰される（人材一覧と同じ）。 */}
                     <Pagination
                         meta={projects.meta}
                         onChange={(page) => visit({ page })}

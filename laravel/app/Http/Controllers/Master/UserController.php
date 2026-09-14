@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Master;
 
+use App\Exceptions\StaleUpdateException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DeleteUserRequest;
 use App\Http\Requests\StoreUserRequest;
@@ -28,7 +29,12 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
-        $this->userService->update($user, $request->validated());
+        try {
+            $this->userService->update($user, $request->validated());
+        } catch (StaleUpdateException) {
+            return back(fallback: route('master.index'))
+                ->with('error', '他のユーザーがこのユーザー情報を更新しました。最新のデータを表示しました。');
+        }
 
         return redirect()->route('master.index')->with('success', 'ユーザーを更新しました。');
     }

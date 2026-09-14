@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\StaleUpdateException;
 use App\Http\Controllers\Concerns\ResolvesSort;
 use App\Http\Requests\ProjectIndexRequest;
 use App\Http\Requests\ProjectRequest;
@@ -212,7 +213,11 @@ class ProjectController extends Controller
      */
     public function update(ProjectRequest $request, Project $project): RedirectResponse
     {
-        $project = $this->projectService->update($request, $project);
+        try {
+            $project = $this->projectService->update($request, $project);
+        } catch (StaleUpdateException) {
+            return back()->with('error', '他のユーザーがこの案件情報を更新しました。最新のデータを表示しました。');
+        }
 
         return redirect()->route('projects.show', $project)->with('success', '案件情報を更新しました。');
     }

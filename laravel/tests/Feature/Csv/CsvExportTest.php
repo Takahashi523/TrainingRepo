@@ -87,6 +87,21 @@ class CsvExportTest extends CsvTestCase
         $this->assertSame('AI生成の要約', $col('AI要約'));
     }
 
+    public function test_export_includes_version_column(): void
+    {
+        // 楽観ロック制御列（issue #45）。エクスポートに参照用の現在値が出ることを確認する。
+        $user = $this->makeUser('admin');
+        $engineer = $this->engineer(['main_user_id' => $user->id]);
+        $engineer->increment('version'); // 1回更新済み想定（version=1）
+
+        $response = $this->actingAs($user)->get(route('csv.engineers.export'));
+        $records = $this->records($response);
+        $header = $records[0];
+
+        $this->assertContains('バージョン（システム管理）', $header);
+        $this->assertSame('1', $records[1][array_search('バージョン（システム管理）', $header, true)]);
+    }
+
     public function test_export_blank_relation_name_when_sub_user_absent(): void
     {
         $mainUser = $this->makeUser('admin');
@@ -153,8 +168,10 @@ class CsvExportTest extends CsvTestCase
         $header = $records[0];
         $this->assertContains('商流', $header);
         $this->assertContains('主担当名', $header);
+        $this->assertContains('バージョン（システム管理）', $header, '楽観ロック制御列（issue #45）');
         $this->assertNotContains('AI要約', $header, '案件に ai_summary 列は無い');
         $this->assertSame('prime', $records[1][array_search('商流', $header, true)], 'enum は内部値');
+        $this->assertSame('0', $records[1][array_search('バージョン（システム管理）', $header, true)]);
     }
 
     public function test_export_invalid_filter_returns_422(): void

@@ -5,3 +5,6 @@
 
 # 雛形はコミットする
 !/.env.prod.example
+
+_reference_docs/
+.claude/
