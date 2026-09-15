@@ -1,0 +1,111 @@
+# 本番構成（EC2 単体・プロジェクト名 trainingrepo-prod）
+#
+# 起動:
+#   docker compose -f docker-compose.prod.yml -p trainingrepo-prod up -d
+#
+# 前提:
+#   - リポジトリ直下に .env（compose 変数用）を置くこと。雛形は .env.prod.example
+#   - laravel/.env・python/.env はアプリ用。イメージには含めず、下記のとおり読み取り専用で
+#     マウントする（.dockerignore で焼き込みを禁止しているため、マウントが無いと起動しない）
+#   - .env を変更したときは再ビルド不要。`docker compose ... restart <service>` で反映される
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-proxy/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # ACME(webroot) 用。certbot --webroot でこのディレクトリに認証ファイルが置かれる。
+      # standalone 方式（nginx を止めて更新）から webroot 方式（無停止更新）へ移行するために必要。
+      - certbot_webroot:/var/www/certbot:ro
+    depends_on:
+      laravel:
+        condition: service_healthy
+
+  laravel:
+    build:
+      context: ./laravel
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - APP_ENV=production
+    volumes:
+      # .env はイメージに焼き込まず実行時にマウントする（Issue #90 #2）。
+      # env_file ではなくバインドマウントにしているのは、Laravel の Dotenv と
+      # Compose の env_file でクォート・空白の解釈が異なり、APP_NAME のような
+      # 値で挙動が変わるため。ファイルをそのまま渡すのが最も予測可能。
+      - ./laravel/.env:/var/www/.env:ro
+    healthcheck:
+      # Laravel 11 の health エンドポイント（bootstrap/app.php の health: '/up'）。
+      #
+      # ⚠️ Host: 127.0.0.1 が通るのは laravel/.env の TRUSTED_HOSTS に 127.0.0.1 が
+      #    含まれているため（Laravel の trustHosts は APP_URL のホストと TRUSTED_HOSTS
+      #    だけを許可する）。TRUSTED_HOSTS から 127.0.0.1 を消すと 400 が返るようになり、
+      #    healthcheck が永久に失敗する。laravel が healthy にならないと
+      #    nginx の depends_on: condition: service_healthy が満たされず、
+      #    前段 nginx が起動しない＝HTTPS 全面停止になる（Issue #90）。
+      #    コンテナ内 nginx の server_name は素通しなので、弾いているのは Laravel 側。
+      # wget は URL のホスト（127.0.0.1）をそのまま Host ヘッダーに使うため、
+      # --header での明示指定は不要（以前は APP_HOST で明示していたが、
+      # TRUSTED_HOSTS=127.0.0.1 への切替に伴い廃止した）。
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  python:
+    build:
+      context: ./python
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - APP_ENV=production
+    volumes:
+      - ./python/.env:/app/.env:ro
+    healthcheck:
+      # E3 ヘルスチェック（/api/v1/health）。
+      # ※ このエンドポイントは PR #25 で追加される。develop の main.py には
+      #    ルーターが登録されておらず 404 になるため、PR #25 マージ前は
+      #    このヘルスチェックが失敗する（＝未デプロイであることが可視化される）。
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/api/v1/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mysql:
+    image: mysql:8.4
+    command: --default-time-zone=+09:00
+    restart: always
+    environment:
+      MYSQL_DATABASE: ses_matching
+      # 平文の既定値を廃止（Issue #90 #4）。未設定なら起動時にエラーで止まる。
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required. See .env.prod.example}
+      TZ: Asia/Tokyo
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # 初期化完了前に laravel/python が起動して接続失敗するのを防ぐ（Issue #90 #5）
+      #
+      # ⚠️ CMD（exec 形式）ではシェルを介さないため $MYSQL_ROOT_PASSWORD が展開されず、
+      #    リテラル文字列がパスワードとして渡ってしまう。CMD-SHELL にして
+      #    コンテナ内のシェルに展開させること（$$ は compose のエスケープ）。
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mysql_data:
+  certbot_webroot:
